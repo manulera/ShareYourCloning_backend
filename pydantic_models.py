@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from enum import Enum
 from typing import List, Optional
 
@@ -28,6 +28,9 @@ class GenbankSequence(BaseModel):
     type: str = 'file'
     file_extension: str = 'gb'
     file_content: str = ''
+    overhang: int = Field(0, description='Taken from pydna\'s `dseq::ovhg`\
+        An integer describing the length of the\
+        crick strand overhang in the 5\' end of the molecule.')
 
 
 class SequenceEntity(BaseModel):

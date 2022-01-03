@@ -1,4 +1,4 @@
-from Bio.Restriction.Restriction import CommOnly, RestrictionBatch
+from Bio.Restriction.Restriction import CommOnly
 from Bio.SeqFeature import FeatureLocation
 from pydna.dseqrecord import Dseqrecord
 from typing import List, OrderedDict
