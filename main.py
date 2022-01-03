@@ -4,8 +4,8 @@ from pydantic import conlist, create_model
 from pydna.parsers import parse as pydna_parse
 from Bio.SeqIO import read as seqio_read
 from pydna.genbank import Genbank
-from dna_functions import get_restriction_enzyme_products_list
-from pydantic_models import GenbankSequence, SequenceEntity, SequenceFileFormat, GenbankIdSource, RestrictionEnzymeDigestionSource, UploadedFileSource
+from dna_functions import get_restriction_enzyme_products_list, format_sequence_genbank, read_dsrecord_from_json
+from pydantic_models import SequenceEntity, SequenceFileFormat, GenbankIdSource, RestrictionEnzymeDigestionSource, UploadedFileSource
 from fastapi.middleware.cors import CORSMiddleware
 
 # Instance of the API object
@@ -20,15 +20,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-def format_sequence_genbank(seq: Dseqrecord) -> SequenceEntity:
-    gb_seq = GenbankSequence(file_content=seq.format('genbank'))
-    return SequenceEntity(sequence=gb_seq)
-
-
-def read_dsrecord_from_json(seq: SequenceEntity) -> Dseqrecord:
-    return pydna_parse(seq.sequence.file_content)[0]
 
 
 @ app.post('/read_from_file', response_model=create_model(

@@ -1,11 +1,55 @@
 from Bio.Restriction.Restriction import CommOnly
-from Bio.SeqFeature import FeatureLocation
 from pydna.dseqrecord import Dseqrecord
-from typing import List, OrderedDict
+from pydna.dseq import Dseq
+from typing import List
+from pydantic_models import RestrictionEnzymeDigestionSource, GenbankSequence, SequenceEntity
+from pydna.parsers import parse as pydna_parse
 
-from pydna.seqfeature import SeqFeature
 
-from pydantic_models import RestrictionEnzymeDigestionSource
+def format_sequence_genbank(seq: Dseqrecord) -> SequenceEntity:
+    overhang_crick_3prime, overhang_watson_3prime = both_overhangs_from_dseq(
+        seq.seq)
+    gb_seq = GenbankSequence(file_content=seq.format('genbank'),
+                             overhang_crick_3prime=overhang_crick_3prime,
+                             overhang_watson_3prime=overhang_watson_3prime)
+    return SequenceEntity(sequence=gb_seq)
+
+
+def read_dsrecord_from_json(seq: SequenceEntity) -> Dseqrecord:
+    initial_dseqrecord: Dseqrecord = pydna_parse(seq.sequence.file_content)[0]
+    if seq.sequence.overhang_watson_3prime == 0 and seq.sequence.overhang_crick_3prime == 0:
+        return initial_dseqrecord
+    else:
+        dseqrecord_with_overhang = Dseqrecord(dseq_from_both_overhangs(
+            str(initial_dseqrecord.seq),
+            seq.sequence.overhang_crick_3prime,
+            seq.sequence.overhang_watson_3prime))
+        dseqrecord_with_overhang.features = initial_dseqrecord.features
+        return dseqrecord_with_overhang
+
+
+def dseq_from_both_overhangs(full_sequence: str, overhang_crick_3prime: int, overhang_watson_3prime: int) -> Dseq:
+    full_sequence_rev = str(Dseq(full_sequence).reverse_complement())
+    watson = full_sequence
+    crick = full_sequence_rev
+
+    # If necessary, we trim the left side
+    if overhang_crick_3prime < 0:
+        crick = crick[:overhang_crick_3prime]
+    elif overhang_crick_3prime > 0:
+        watson = watson[overhang_crick_3prime:]
+
+    # If necessary, we trim the right side
+    if overhang_watson_3prime < 0:
+        watson = watson[:overhang_watson_3prime]
+    elif overhang_watson_3prime > 0:
+        crick = crick[overhang_watson_3prime:]
+
+    return Dseq(watson, crick=crick, ovhg=overhang_crick_3prime)
+
+
+def both_overhangs_from_dseq(dseq: Dseq):
+    return dseq.ovhg, len(dseq.watson) - len(dseq.crick) + dseq.ovhg
 
 
 def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnzymeDigestionSource) -> tuple[List[Dseqrecord], List[int]]:
@@ -19,27 +63,5 @@ def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnz
         fragment_boundaries.append(len(seq))
     else:
         fragment_boundaries.append(fragment_boundaries[0])
-    # For now, to represent the overhangs of the enzyme cut, we just add a
-    # feature to the Dseqrecord
-    for fragment in output_list:
-        five_prime_end = fragment.seq.five_prime_end()
-        if five_prime_end[0] != 'blunt':
-            feature_name = 'overhang_' + five_prime_end[0]
-            start = 0
-            end = len(five_prime_end[1])
-            fragment.features.append(SeqFeature(
-                location=FeatureLocation(start, end),
-                type="misc_feature",
-                qualifiers=OrderedDict({"label": feature_name}), strand=None))
-
-        three_prime_end = fragment.seq.three_prime_end()
-        if three_prime_end[0] != 'blunt':
-            feature_name = 'overhang_' + three_prime_end[0]
-            start = len(fragment) - len(three_prime_end[1])
-            end = len(fragment)
-            fragment.features.append(SeqFeature(
-                location=FeatureLocation(start, end),
-                type="misc_feature",
-                qualifiers=OrderedDict({"label": feature_name}), strand=None))
 
     return output_list, fragment_boundaries

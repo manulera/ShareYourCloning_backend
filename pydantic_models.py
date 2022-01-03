@@ -28,9 +28,11 @@ class GenbankSequence(BaseModel):
     type: str = 'file'
     file_extension: str = 'gb'
     file_content: str = ''
-    overhang: int = Field(0, description='Taken from pydna\'s `dseq::ovhg`\
+    overhang_crick_3prime: int = Field(0, description='Taken from pydna\'s `dseq::ovhg`\
         An integer describing the length of the\
-        crick strand overhang in the 5\' end of the molecule.')
+        crick strand overhang in the 5\' of the molecule, or 3\' of the crick strand')
+    overhang_watson_3prime: int = Field(0, description='The equivalent of `overhang_crick_3prime`\
+        but for the watson strand')
 
 
 class SequenceEntity(BaseModel):
