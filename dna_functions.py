@@ -148,6 +148,16 @@ def get_assembly_summary_from_fragment_list(assembly: tuple[Dseqrecord]) -> Stic
     return assembly_summary
 
 
+def sum_assembly_fragments(assembly: tuple[Dseqrecord]) -> Dseqrecord:
+    if len(assembly) == 1:
+        return assembly[0]
+    else:
+        out = assembly[0]
+        for f in assembly[1:]:
+            out += f
+        return out
+
+
 def get_sticky_ligation_products_list(seqs: List[Dseqrecord]) -> tuple[List[Dseqrecord], List[StickyLigationSource]]:
 
     # TODO: include also partial ligations, it could also be made more performant by creating
@@ -171,9 +181,7 @@ def get_sticky_ligation_products_list(seqs: List[Dseqrecord]) -> tuple[List[Dseq
                     break
             if assembly_is_valid:
 
-                print(assembly[0], assembly[1], assembly[0]+assembly[1])
-
-                linear_ligation = sum(assembly[1:], assembly[0:1])
+                linear_ligation = sum_assembly_fragments(assembly)
                 assembly_summary = get_assembly_summary_from_fragment_list(
                     assembly)
                 # Sometimes they can be circularised, for now, we circularise by
