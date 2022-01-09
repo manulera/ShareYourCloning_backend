@@ -1,12 +1,17 @@
-from fastapi import FastAPI, UploadFile, File, Query
+from math import prod
+from fastapi import FastAPI, UploadFile, File, Query, HTTPException
 from pydna.dseqrecord import Dseqrecord
 from pydantic import conlist, create_model
 from pydna.parsers import parse as pydna_parse
 from Bio.SeqIO import read as seqio_read
 from pydna.genbank import Genbank
-from dna_functions import get_restriction_enzyme_products_list, format_sequence_genbank, read_dsrecord_from_json
-from pydantic_models import SequenceEntity, SequenceFileFormat, GenbankIdSource, RestrictionEnzymeDigestionSource, UploadedFileSource
+from dna_functions import get_restriction_enzyme_products_list, \
+    format_sequence_genbank, get_sticky_ligation_products_list, read_dsrecord_from_json
+from pydantic_models import SequenceEntity, SequenceFileFormat, \
+    GenbankIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource,\
+    UploadedFileSource
 from fastapi.middleware.cors import CORSMiddleware
+from urllib.error import HTTPError, URLError
 
 # Instance of the API object
 app = FastAPI()
@@ -30,7 +35,9 @@ app.add_middleware(
 async def read_from_file(file: UploadFile = File(...),
                          file_format: SequenceFileFormat = Query(
                              None,
-                             description='Format of the sequence file. Unless specified, it will be guessed from the extension')
+                             description='Format of the sequence file. \
+                                Unless specified, it will be guessed\
+                                from the extension')
                          ):
     """Return a json sequence from a sequence file
     """
@@ -72,7 +79,19 @@ async def read_from_file(file: UploadFile = File(...),
 ))
 async def get_from_genebank_id(source: GenbankIdSource):
     gb = Genbank("example@gmail.com")
-    seq = Dseqrecord(gb.nucleotide(source.genbank_id))
+    try:
+        seq = Dseqrecord(gb.nucleotide(source.genbank_id))
+    except HTTPError as exception:
+        if exception.code == 500:
+            raise HTTPException(
+                503, f'GenBank returned: {exception} - GenBank might be down')
+        elif exception.code == 400:
+            raise HTTPException(
+                404, f'GenBank returned: {exception} - Likely you inserted\
+                     a wrong GenBank id')
+    except URLError as exception:
+        raise HTTPException(504, f'Unable to connect to GenBank: {exception}')
+
     output_sequence = format_sequence_genbank(seq)
     source.output_list = [output_sequence]
     return {'sequence': output_sequence, 'source': source}
@@ -86,12 +105,39 @@ async def get_from_genebank_id(source: GenbankIdSource):
 async def restriction(source: RestrictionEnzymeDigestionSource,
                       sequences: conlist(SequenceEntity, min_items=1, max_items=1)):
     dseq = read_dsrecord_from_json(sequences[0])
+    # TODO: return error if the id of the sequence does not correspond
     products_dseq, fragment_boundaries = get_restriction_enzyme_products_list(
         dseq, source)
 
     source.output_list = [format_sequence_genbank(seq) for seq
                           in products_dseq]
     source.fragment_boundaries = fragment_boundaries
+
+    if source.output_index is not None:
+        output_sequence = source.output_list[source.output_index]
+    else:
+        output_sequence = None
+    return {'sequence': output_sequence, 'source': source}
+
+
+@ app.post('/sticky_ligation', response_model=create_model(
+    'StickyLigationResponse',
+    source=(StickyLigationSource, ...),
+    sequence=(SequenceEntity, None)
+))
+async def sticky_ligation(source: StickyLigationSource,
+                          sequences: conlist(SequenceEntity, min_items=1)):
+
+    dseqs = [read_dsrecord_from_json(seq) for seq in sequences]
+
+    products_dseq, assemblies = get_sticky_ligation_products_list(
+        dseqs)
+    if len(products_dseq) == 0:
+        raise HTTPException(
+            400, 'Fragments are not compatible for sticky ligation')
+
+    source.output_list = [format_sequence_genbank(seq) for seq
+                          in products_dseq]
 
     if source.output_index is not None:
         output_sequence = source.output_list[source.output_index]

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from enum import Enum
 from typing import List, Optional
 
@@ -11,6 +11,7 @@ class SourceType(str, Enum):
     genbank_id = 'genbank_id',
     file = 'file',
     restriction = 'restriction'
+    sticky_ligation = 'sticky_ligation'
 
 
 class SequenceFileFormat(str, Enum):
@@ -46,12 +47,16 @@ class SequenceEntity(BaseModel):
 class Source(BaseModel):
     """A class to represent sources of DNA
     """
+    # Fields required to execute a source step
     id: int = None
     input: List[int] = []
-    output_list: List[SequenceEntity] = []
-    output_index: int = None
     output: int = None
     type: SourceType = None
+    output_index: int = None
+
+    # Fields used to choose between multiple outputs
+    # and other client-side functionality
+    output_list: List[SequenceEntity] = []
 
 
 class UploadedFileSource(Source):
@@ -73,6 +78,31 @@ class RestrictionEnzymeDigestionSource(Source):
     """Documents a restriction enzyme digestion, and the selection of
     one of the fragments
     """
-    restriction_enzymes: conlist(str, min_items=1)
+
     type: SourceType = SourceType('restriction')
+    # This can only take one input
+    input: conlist(int, min_items=1, max_items=1)
+
+    # Field required to execute the source step
+    restriction_enzymes: conlist(str, min_items=1)
+
+    # Field for client-side functionality
     fragment_boundaries: List[int] = []
+
+
+class StickyLigationSource(Source):
+    """Documents a ligation with sticky ends. This might consist of \
+    a single fragment's circularisation"""
+
+    # TODO: this should support at some point specifying the order of the fragments
+    # of the assembly + whether there is circularization.
+    input: conlist(int, min_items=1)
+    type: SourceType = SourceType('sticky_ligation')
+    fragments_inverted: List[bool] = []
+    circularised: bool = None
+
+    # TODO include this
+    # @validator('fragments_inverted')
+    # def lists_have_equal_length(cls, v, values):
+    #     assert len(v) == len(values['input']) or len(v) == 0, '`fragments_inverted` must\
+    #         be either empty, or have the same length as `input`'

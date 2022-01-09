@@ -1,10 +1,13 @@
-from dna_functions import dseq_from_both_overhangs, both_overhangs_from_dseq, format_sequence_genbank, read_dsrecord_from_json
+from dna_functions import dseq_from_both_overhangs, both_overhangs_from_dseq, \
+    format_sequence_genbank, read_dsrecord_from_json, assemblies_are_circular_permutations
 import unittest
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
 from Bio.SeqFeature import FeatureLocation
 from pydna.seqfeature import SeqFeature
 from typing import OrderedDict
+
+from pydantic_models import StickyLigationSource
 
 
 class DseqFromBothOverhangsTest(unittest.TestCase):
@@ -32,8 +35,9 @@ class DseqFromBothOverhangsTest(unittest.TestCase):
                     dseq_2 = Dseqrecord(dseq_2)
 
                     # We add some features:
-                    # TODO document somewhere the fact that the strand must be specified.The file readers
-                    # assume +1 strand for all features when reading from GenBank files
+                    # TODO document somewhere the fact that the strand must
+                    # be specified. The file readers assume +1 strand for
+                    # all features when reading from GenBank files
                     for a, start, end in [('a', 0, 2), ('b', 1, 2), ('c', 4, 7)]:
                         dseq_original.features.append(
                             SeqFeature(
@@ -54,7 +58,6 @@ class DseqFromBothOverhangsTest(unittest.TestCase):
 
                     # Finally we test with pydantic models
                     seq_entity = format_sequence_genbank(dseq_original)
-                    # print(seq_entity.sequence.file_content)
                     dseq_3 = read_dsrecord_from_json(seq_entity)
 
                     self.assertEqual(dseq_original.seq.watson,
@@ -69,3 +72,13 @@ class DseqFromBothOverhangsTest(unittest.TestCase):
                         self.assertEqual(
                             feature_original.extract(dseq_original),
                             feature_3.extract(dseq_3))
+
+
+class assemblyComparisonTest(unittest.TestCase):
+
+    def test_sticky(self):
+        assembly1 = StickyLigationSource(
+            input=[1, 2, 3], fragments_inverted=[False, False, False])
+        assembly2 = StickyLigationSource(
+            input=[2, 3, 1], fragments_inverted=[False, False, False])
+        assert assemblies_are_circular_permutations(assembly1, assembly2)
