@@ -1,4 +1,3 @@
-from math import prod
 from fastapi import FastAPI, UploadFile, File, Query, HTTPException
 from pydna.dseqrecord import Dseqrecord
 from pydantic import conlist, create_model
@@ -17,7 +16,9 @@ from urllib.error import HTTPError, URLError
 app = FastAPI()
 
 # Allow CORS
-origins = ["http://localhost:3000"]
+# TODO put a wildcard on the shareyourcloning.netlify to allow for the draft websites
+# to also work in netlify.
+origins = ["http://localhost:3000", "https://shareyourcloning.netlify.app"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
