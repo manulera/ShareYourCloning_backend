@@ -71,7 +71,7 @@ origins = ["http://localhost:3000", "https://shareyourcloning.netlify.app"]
 
 Finally, if you are running your api at an address other than `http://127.0.0.1:8000/`, you have to configure your frontend to send request to your api address ([see here](https://github.com/manulera/ShareYourCloning_backend#connecting-to-the-frontend)).
 
-## Contributing
+## Contributing :hammer_and_wrench:
 
 Check [contribution guidelines in the main repository](https://github.com/manulera/ShareYourCloning/blob/master/CONTRIBUTING.md).
 
@@ -81,7 +81,7 @@ Thanks to [@maratumba](https://github.com/maratumba) for recommending the usage 
 
 ## Settings for vscode :desktop_computer:
 
-Going to develop in vscode, you can create a folder in the directory of the project called `.vscode`, and create a `settings.json` as below.
+If you are going to develop using vscode, you can create a folder in the directory of the project called `.vscode`, and create a `settings.json` as below.
 
 You will have to change `path/to/python/environment/bin/` by the location of the bin folder of the virtual environment created by pipenv. For that, run `pipenv shell` in the project directory to activate the virtual environment (after you have installed the dependencies), and then run `which python`. Once you do that, you will have autocompletion for the python libraries installed for the project and code linting.
 
