@@ -1,0 +1,23 @@
+name: Python tests
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Python
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.9
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pipenv
+          pipenv lock --dev --keep-outdated --requirements > requirements.txt
+          rm Pipfile Pipfile.lock
+          pip install --upgrade --no-cache-dir -r requirements.txt
+      - name: Run tests
+        run: python -m unittest
+      - name: Run linter
+        run: flake8
