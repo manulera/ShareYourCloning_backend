@@ -7,6 +7,7 @@ from pydantic_models import RestrictionEnzymeDigestionSource,\
     GenbankSequence, SequenceEntity, StickyLigationSource
 from pydna.parsers import parse as pydna_parse
 from itertools import permutations, product, chain
+import numpy
 
 
 def sum_is_sticky(seq1: Dseq, seq2: Dseq) -> bool:
