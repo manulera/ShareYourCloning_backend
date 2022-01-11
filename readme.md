@@ -4,24 +4,22 @@
 This API is part of a bigger application, before going further, please go to the [main project readme](https://github.com/manulera/ShareYourCloning), where you can find an introduction.
 
 This python API is built with [FastAPI](https://fastapi.tiangolo.com/) and is for *in silico* cloning.
-
+ 
 ## Summary
 
 Read [main project readme](https://github.com/manulera/ShareYourCloning) first.
 
-This API provides a series of entry points. The API documentation can be accessed [here](https://shareyourcloning.api.genestorian.org/docs)
+This API provides a series of entry points. The API documentation can be accessed [here](https://shareyourcloning.api.genestorian.org/docs). You can use the documentation page to try some request directly on the browser. Otherwise, the API is open for you to make requests from a python script or command line at: [https://shareyourcloning.api.genestorian.org/](https://shareyourcloning.api.genestorian.org/).
 
 ## Getting started
 
-### Prerequisites
+### Local installation
 
 You should have python 3.9 installed in your machine. For the management of the dependencies I used `pipenv`, if you don't have it:
 
 ```
 pip install pipenv
 ```
-
-### Local installation
 
 In the project directory:
 
@@ -33,19 +31,40 @@ pipenv install
 pipenv shell
 
 ```
-
-Now you should be able to run the api in the debug mode by doing:
+Now you should be able to run the api by running:
 
 ```bash
-# These commands are also in the file run_app.sh
-export FLASK_APP=app.py
-export FLASK_ENV=development
-flask run
+# The --reload argument will reload the API if you make changes to the code
+uvicorn main:app --reload
 ```
 
-If you go to the url of the flask application (by default [http://127.0.0.1:5000/](http://127.0.0.1:5000/)), you should see a greeting json response. That means the application is working.
+Then you should be able to open the API docs at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) to know that your API is working.
 
-You can see some example requests to the API in `examples/request_to_restriction_sites.py`. However, at this point, the goal is to use it as a backend for [ShareYourCloning](https://github.com/manulera/ShareYourCloning) UI.
+### Running locally with docker
+
+You can build the docker image and run it:
+
+```bash
+docker build -t shareyourcloningapi .
+docker run -d --name apicontainer -p 3000:80 shareyourcloningapi
+```
+
+If you don't want to download the repository and build the image, you can fetch the latest image from dockerhub (same image that is used in [https://shareyourcloning.api.genestorian.org/](https://shareyourcloning.api.genestorian.org/))
+
+```
+docker pull manulera/shareyourcloningapi
+docker run -d --name apicontainer -p 3000:80 manulera/shareyourcloningapi
+```
+
+The api will be running at `http://localhost:3000`, so you should be able to access the docs at [http://localhost:3000/docs](http://localhost:300/docs0).
+
+## Contributing
+
+Check [contribution guidelines in the main repository](https://github.com/manulera/ShareYourCloning/blob/master/CONTRIBUTING.md).
+
+## Acknowledgements
+
+Thanks to @maratumba for recommending the usage of FastAPI and for giving some general guidelines for the development.
 
 ## My settings for vscode
 
@@ -68,12 +87,5 @@ You will have to change `path/to/python/environment/bin/` by the location of the
     "python.linting.flake8Enabled": true,
     "python.linting.flake8Path": "path/to/python/environment/bin/flake8",
     "python.defaultInterpreterPath": "path/to/python/environment/bin/python",
-    "python.pythonPath": "path/to/python/environment/bin/python"
-
 }
 ```
-
-
-### Tests
-* The type field is set correctly
-* The circular field is set correctly
