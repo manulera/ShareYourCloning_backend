@@ -5,7 +5,8 @@ from pydna.parsers import parse as pydna_parse
 from Bio.SeqIO import read as seqio_read
 from pydna.genbank import Genbank
 from dna_functions import get_restriction_enzyme_products_list, \
-    format_sequence_genbank, get_sticky_ligation_products_list, read_dsrecord_from_json
+    format_sequence_genbank, get_sticky_ligation_products_list, \
+    read_dsrecord_from_json
 from pydantic_models import SequenceEntity, SequenceFileFormat, \
     GenbankIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource,\
     UploadedFileSource
@@ -16,8 +17,9 @@ from urllib.error import HTTPError, URLError
 app = FastAPI()
 
 # Allow CORS
-# TODO put a wildcard on the shareyourcloning.netlify to allow for the draft websites
-# to also work in netlify.
+# TODO put a wildcard on the shareyourcloning.netlify to
+# allow for the draft websites to also work in netlify.
+
 origins = ["http://localhost:3000", "https://shareyourcloning.netlify.app"]
 app.add_middleware(
     CORSMiddleware,

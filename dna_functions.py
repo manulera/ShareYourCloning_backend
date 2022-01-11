@@ -106,7 +106,7 @@ def assemblies_are_circular_permutations(assembly_1: StickyLigationSource, assem
     # We concatenate a list with itself to compare the circular permutation
     summed_list = values1 + values1
     for i in range(list_len):
-        if values2 == summed_list[i:i+list_len]:
+        if values2 == summed_list[i:i + list_len]:
             return True
     return False
 
@@ -120,14 +120,15 @@ def eliminate_assembly_duplicates(assemblies_in: List[StickyLigationSource],
     while(len(assemblies_in)):
         assembly = assemblies_in.pop()
         product = products_in.pop()
-        # We include all linear assemblies, they are all different.
+        # For the linear assemblies, we apply the constrain that the
+        # first fragment is not inverted
         # For the circular assemblies, we apply the constrain that the
         # smallest id comes first, and that is not inverted. This eliminates
         # all equivalent assemblies.
-        if not assembly.circularised or (min(assembly.input) == assembly.input[0] and assembly.fragments_inverted[0] == False):
-            print(assembly.input, assembly.fragments_inverted)
-            assemblies_out.append(assembly)
-            products_out.append(product)
+        if not assembly.fragments_inverted[0]:
+            if not assembly.circularised or (min(assembly.input) == assembly.input[0]):
+                assemblies_out.append(assembly)
+                products_out.append(product)
 
     return assemblies_out, products_out
 
@@ -175,8 +176,8 @@ def get_sticky_ligation_products_list(seqs: List[Dseqrecord]) -> tuple[List[Dseq
         assembly: tuple[Dseqrecord]
         for assembly in product(*arrangements):
             assembly_is_valid = True
-            for i in range(0, len(assembly)-1):
-                if not sum_is_sticky(assembly[i].seq, assembly[i+1].seq):
+            for i in range(0, len(assembly) - 1):
+                if not sum_is_sticky(assembly[i].seq, assembly[i + 1].seq):
                     assembly_is_valid = False
                     break
             if assembly_is_valid:
