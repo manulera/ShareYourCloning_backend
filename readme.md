@@ -64,7 +64,7 @@ Check [contribution guidelines in the main repository](https://github.com/manule
 
 ## Acknowledgements
 
-Thanks to @maratumba for recommending the usage of FastAPI and for giving some general guidelines for the development.
+Thanks to [@maratumba](https://github.com/maratumba) for recommending the usage of FastAPI and for giving some general guidelines for the development.
 
 ## My settings for vscode
 
