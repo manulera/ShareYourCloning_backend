@@ -19,6 +19,7 @@ app = FastAPI()
 # Allow CORS
 # TODO put a wildcard on the shareyourcloning.netlify to
 # allow for the draft websites to also work in netlify.
+# TODO make this conditional to dev / prod using settings
 
 origins = ["http://localhost:3000", "https://shareyourcloning.netlify.app"]
 app.add_middleware(

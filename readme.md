@@ -13,7 +13,7 @@ This API provides a series of entry points. The API documentation can be accesse
 
 ## Getting started
 
-If you want to quickly set up a local instance of the frontend and backend of the application, check [getting started in 5 minutes](https://shareyourcloning.netlify.app/) in the main repository.
+If you want to quickly set up a local instance of the frontend and backend of the application, check [getting started in 5 minutes](https://github.com/manulera/ShareYourCloning#timer_clock-getting-started-in-5-minutes) in the main repository.
 
 ### Local installation
 
@@ -59,6 +59,17 @@ docker run -d --name apicontainer -p 8000:80 manulera/shareyourcloningapi
 ```
 
 The api will be running at `http://localhost:8000`, so you should be able to access the docs at [http://localhost:8000/docs](http://localhost:8000/docs0).
+
+### Connecting to the frontend
+
+If you want to receive requests from the [frontend](https://github.com/manulera/ShareYourCloning_frontend), or from another web application that is not served at `http://localhost:3000`, you must include the url of the frontend application it in the CORS exceptions, by adding it to the list `origins` in `main.py`:
+
+```python
+# at the beginning of main.py file
+origins = ["http://localhost:3000", "https://shareyourcloning.netlify.app"]
+```
+
+Finally, if you are running your api at an address other than `http://127.0.0.1:8000/docs`, you have to configure your frontend to send request to your api address ([see here](https://github.com/manulera/ShareYourCloning_backend#connecting-to-the-frontend)).
 
 ## Contributing
 
