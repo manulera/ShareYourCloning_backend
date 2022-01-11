@@ -17,7 +17,7 @@ If you want to quickly set up a local instance of the frontend and backend of th
 
 ### Local installation
 
-You should have python 3.9 installed in your machine. For the management of the dependencies I used `pipenv`, if you don't have it:
+You should have python 3.9 installed in your machine. For the management of the dependencies `pipenv` is used, if you don't have it:
 
 ```
 pip install pipenv
@@ -42,7 +42,7 @@ uvicorn main:app --reload
 
 Then you should be able to open the API docs at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) to know that your API is working.
 
-### Running locally with docker
+### Running locally with docker :whale:
 
 You can build the docker image and run it:
 
@@ -62,28 +62,28 @@ The api will be running at `http://localhost:8000`, so you should be able to acc
 
 ### Connecting to the frontend
 
-If you want to receive requests from the [frontend](https://github.com/manulera/ShareYourCloning_frontend), or from another web application that is not served at `http://localhost:3000`, you must include the url of the frontend application it in the CORS exceptions, by adding it to the list `origins` in `main.py`:
+If you want to receive requests from the [frontend](https://github.com/manulera/ShareYourCloning_frontend), or from another web application that is not served at `http://localhost:3000`, you must include the url of the frontend application in the CORS exceptions, by adding it to the list `origins` in `main.py`:
 
 ```python
 # at the beginning of main.py file
 origins = ["http://localhost:3000", "https://shareyourcloning.netlify.app"]
 ```
 
-Finally, if you are running your api at an address other than `http://127.0.0.1:8000/docs`, you have to configure your frontend to send request to your api address ([see here](https://github.com/manulera/ShareYourCloning_backend#connecting-to-the-frontend)).
+Finally, if you are running your api at an address other than `http://127.0.0.1:8000/`, you have to configure your frontend to send request to your api address ([see here](https://github.com/manulera/ShareYourCloning_backend#connecting-to-the-frontend)).
 
 ## Contributing
 
 Check [contribution guidelines in the main repository](https://github.com/manulera/ShareYourCloning/blob/master/CONTRIBUTING.md).
 
-## Acknowledgements
+## Acknowledgements :pray:
 
 Thanks to [@maratumba](https://github.com/maratumba) for recommending the usage of FastAPI and for giving some general guidelines for the development.
 
-## My settings for vscode
+## Settings for vscode :desktop_computer:
 
-If you are interested in the settings that I use for vscode, you can create a folder in the directory of the project called `.vscode`, and create a `settings.json` as below.
+Going to develop in vscode, you can create a folder in the directory of the project called `.vscode`, and create a `settings.json` as below.
 
-You will have to change `path/to/python/environment/bin/` by the location of the bin folder of the virtual environment created by pipenv. For that, run `pipenv shell` in the project directory to activate the virtual environment (after you have installed the dependencies), and then run `which python`.
+You will have to change `path/to/python/environment/bin/` by the location of the bin folder of the virtual environment created by pipenv. For that, run `pipenv shell` in the project directory to activate the virtual environment (after you have installed the dependencies), and then run `which python`. Once you do that, you will have autocompletion for the python libraries installed for the project and code linting.
 
 ```json
 {
