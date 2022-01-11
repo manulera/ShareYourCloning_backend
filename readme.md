@@ -4,7 +4,7 @@
 This API is part of a bigger application, before going further, please go to the [main project readme](https://github.com/manulera/ShareYourCloning), where you can find an introduction.
 
 This python API is built with [FastAPI](https://fastapi.tiangolo.com/) and is for *in silico* cloning.
- 
+
 ## Summary
 
 Read [main project readme](https://github.com/manulera/ShareYourCloning) first.
@@ -12,6 +12,8 @@ Read [main project readme](https://github.com/manulera/ShareYourCloning) first.
 This API provides a series of entry points. The API documentation can be accessed [here](https://shareyourcloning.api.genestorian.org/docs). You can use the documentation page to try some request directly on the browser. Otherwise, the API is open for you to make requests from a python script or command line at: [https://shareyourcloning.api.genestorian.org/](https://shareyourcloning.api.genestorian.org/).
 
 ## Getting started
+
+If you want to quickly set up a local instance of the frontend and backend of the application, check [getting started in 5 minutes](https://shareyourcloning.netlify.app/) in the main repository.
 
 ### Local installation
 
