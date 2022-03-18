@@ -5,7 +5,7 @@ from pydna.parsers import parse as pydna_parse
 from Bio.SeqIO import read as seqio_read
 from pydna.genbank import Genbank
 from dna_functions import get_restriction_enzyme_products_list, \
-    format_sequence_genbank, get_sticky_ligation_products_list, \
+    format_sequence_genbank, get_sticky_ligation_products_list, perform_given_assembly, \
     read_dsrecord_from_json
 from pydantic_models import SequenceEntity, SequenceFileFormat, \
     GenbankIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource,\
@@ -131,20 +131,26 @@ async def restriction(source: RestrictionEnzymeDigestionSource,
 ))
 async def sticky_ligation(source: StickyLigationSource,
                           sequences: conlist(SequenceEntity, min_items=1)):
-
+    """Return `output_list` if `source.fragments_inverted` is not set, and `output` otherwise."""
     dseqs = [read_dsrecord_from_json(seq) for seq in sequences]
-
-    products_dseq, assemblies = get_sticky_ligation_products_list(
-        dseqs)
-    if len(products_dseq) == 0:
-        raise HTTPException(
-            400, 'Fragments are not compatible for sticky ligation')
-
-    source.output_list = [format_sequence_genbank(seq) for seq
-                          in products_dseq]
-
-    if source.output_index is not None:
-        output_sequence = source.output_list[source.output_index]
+    if len(source.fragments_inverted) > 0:
+        # TODO Error if the list has different order or the ids are wrong.
+        # TODO It is problematic that both output_index and fragments_inverted could be set.
+        # TODO check input for unique ids
+        output_sequence = format_sequence_genbank(perform_given_assembly(dseqs, source))
     else:
-        output_sequence = None
+
+        products_dseq, assemblies = get_sticky_ligation_products_list(
+            dseqs)
+        if len(products_dseq) == 0:
+            raise HTTPException(
+                400, 'Fragments are not compatible for sticky ligation')
+
+        source.output_list = [format_sequence_genbank(seq) for seq
+                              in products_dseq]
+
+        if source.output_index is not None:
+            output_sequence = source.output_list[source.output_index]
+        else:
+            output_sequence = None
     return {'sequence': output_sequence, 'source': source}

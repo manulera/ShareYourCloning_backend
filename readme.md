@@ -75,6 +75,12 @@ Finally, if you are running your api at an address other than `http://127.0.0.1:
 
 Check [contribution guidelines in the main repository](https://github.com/manulera/ShareYourCloning/blob/master/CONTRIBUTING.md).
 
+## Running the tests
+
+```
+python -m unittest
+```
+
 ## Settings for vscode :desktop_computer:
 
 If you are going to develop using vscode, you can create a folder in the directory of the project called `.vscode`, and create a `settings.json` as below.

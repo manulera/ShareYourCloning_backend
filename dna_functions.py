@@ -10,7 +10,7 @@ from itertools import permutations, product, chain
 
 
 def sum_is_sticky(seq1: Dseq, seq2: Dseq) -> bool:
-    """Returns true if the 3' end of seq1 and 5' end of seq2 ends are sticky and compatible for ligation"""
+    """Return true if the 3' end of seq1 and 5' end of seq2 ends are sticky and compatible for ligation."""
     # TODO: add support for restriction sites that partially overlap
     type_seq1, sticky_seq1 = seq1.three_prime_end()
     type_seq2, sticky_seq2 = seq2.five_prime_end()
@@ -114,17 +114,18 @@ def assemblies_are_circular_permutations(assembly_1: StickyLigationSource, assem
 def eliminate_assembly_duplicates(assemblies_in: List[StickyLigationSource],
                                   products_in: List[Dseqrecord]) -> \
         tuple[List[StickyLigationSource], List[Dseqrecord]]:
-    """Circular assemblies can be equivalent: [1,2,3] == [2,3,1] == [3,1,2]"""
+    """
+    Eliminate equivalent assemblies.
+
+    For linear assemblies we apply the constrain that first fragment is not inverted.
+    For circular assemblies, we apply that constrain, plus that the smallest id comes first.
+    """
     assemblies_out = list()
     products_out = list()
     while(len(assemblies_in)):
         assembly = assemblies_in.pop()
         product = products_in.pop()
-        # For the linear assemblies, we apply the constrain that the
-        # first fragment is not inverted
-        # For the circular assemblies, we apply the constrain that the
-        # smallest id comes first, and that is not inverted. This eliminates
-        # all equivalent assemblies.
+
         if not assembly.fragments_inverted[0]:
             if not assembly.circularised or (min(assembly.input) == assembly.input[0]):
                 assemblies_out.append(assembly)
@@ -159,6 +160,20 @@ def sum_assembly_fragments(assembly: tuple[Dseqrecord]) -> Dseqrecord:
         return out
 
 
+def perform_given_assembly(seqs: List[Dseqrecord], source: StickyLigationSource) -> Dseqrecord:
+
+    assembly: List[Dseqrecord] = list()
+    for index, id in enumerate(source.input):
+        # Find the element in the list that has that id and add it to the assembly
+        assembly.append(next(seq for seq in seqs if int(seq.id) == id))
+
+        # Invert it necessary
+        if source.fragments_inverted[index]:
+            assembly[-1].reverse_complement()
+
+    return sum_assembly_fragments(assembly)
+
+
 def get_sticky_ligation_products_list(seqs: List[Dseqrecord]) -> tuple[List[Dseqrecord], List[StickyLigationSource]]:
 
     # TODO: include also partial ligations, it could also be made more performant by creating
@@ -181,7 +196,8 @@ def get_sticky_ligation_products_list(seqs: List[Dseqrecord]) -> tuple[List[Dseq
                     assembly_is_valid = False
                     break
             if assembly_is_valid:
-
+                # TODO here it would be better to not execute. First eliminate duplicates
+                # and then call perform_given_assembly
                 linear_ligation = sum_assembly_fragments(assembly)
                 assembly_summary = get_assembly_summary_from_fragment_list(
                     assembly)
