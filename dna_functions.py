@@ -6,7 +6,7 @@ from typing import List
 from pydantic_models import RestrictionEnzymeDigestionSource,\
     GenbankSequence, SequenceEntity, StickyLigationSource
 from pydna.parsers import parse as pydna_parse
-from itertools import permutations, product, chain
+from itertools import permutations, product
 
 
 def sum_is_sticky(seq1: Dseq, seq2: Dseq) -> bool:
@@ -83,58 +83,18 @@ def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnz
     return output_list, fragment_boundaries
 
 
-def assemblies_are_circular_permutations(assembly_1: StickyLigationSource, assembly_2: StickyLigationSource):
-    """Check if lists are circular permutations of one another"""
-    # TODO either fix or remove this function. As of now it fails to detect the same circular assembly when all
-    # fragments are inverted
-    # We multiply the inputs by -1 to indicate the inversion, and then compare circular list
-    inputs1 = assembly_1.input
-    inverted1 = assembly_1.fragments_inverted
-    values1 = [[-inputs1[i], inputs1[i]] if inverted1[i] else [inputs1[i], -inputs1[i]]
-               for i in range(len(inputs1))]
-
-    values1 = list(chain.from_iterable(values1))
-
-    inputs2 = assembly_2.input
-    inverted2 = assembly_2.fragments_inverted
-    values2 = [[-inputs2[i], inputs2[i]] if inverted2[i] else [inputs2[i], -inputs2[i]]
-               for i in range(len(inputs2))]
-    values2 = list(chain.from_iterable(values2))
-
-    list_len = len(values1)
-
-    # We concatenate a list with itself to compare the circular permutation
-    summed_list = values1 + values1
-    for i in range(list_len):
-        if values2 == summed_list[i:i + list_len]:
+def assembly_is_duplicate(assembly: StickyLigationSource) -> bool:
+    """
+    For linear assemblies we apply the constrain that first fragment is not inverted.
+    For circular assemblies, we apply that constrain, plus that the smallest id comes first.
+    """
+    if not assembly.fragments_inverted[0]:
+        if not assembly.circularised or (min(assembly.input) == assembly.input[0]):
             return True
     return False
 
 
-def eliminate_assembly_duplicates(assemblies_in: List[StickyLigationSource],
-                                  products_in: List[Dseqrecord]) -> \
-        tuple[List[StickyLigationSource], List[Dseqrecord]]:
-    """
-    Eliminate equivalent assemblies.
-
-    For linear assemblies we apply the constrain that first fragment is not inverted.
-    For circular assemblies, we apply that constrain, plus that the smallest id comes first.
-    """
-    assemblies_out = list()
-    products_out = list()
-    while(len(assemblies_in)):
-        assembly = assemblies_in.pop()
-        product = products_in.pop()
-
-        if not assembly.fragments_inverted[0]:
-            if not assembly.circularised or (min(assembly.input) == assembly.input[0]):
-                assemblies_out.append(assembly)
-                products_out.append(product)
-
-    return assemblies_out, products_out
-
-
-def get_assembly_summary_from_fragment_list(assembly: tuple[Dseqrecord]) -> StickyLigationSource:
+def get_sticky_ligation_source_from_fragment_list(assembly: tuple[Dseqrecord]) -> StickyLigationSource:
     fragments_inverted = list()
     fragments_order = list()
     for i in range(len(assembly)):
@@ -174,6 +134,13 @@ def perform_given_assembly(seqs: List[Dseqrecord], source: StickyLigationSource)
     return sum_assembly_fragments(assembly)
 
 
+def assembly_is_valid(assembly: tuple[Dseqrecord]) -> bool:
+    for i in range(0, len(assembly) - 1):
+        if not sum_is_sticky(assembly[i].seq, assembly[i + 1].seq):
+            return False
+    return True
+
+
 def get_sticky_ligation_products_list(seqs: List[Dseqrecord]) -> tuple[List[Dseqrecord], List[StickyLigationSource]]:
 
     # TODO: include also partial ligations, it could also be made more performant by creating
@@ -190,26 +157,19 @@ def get_sticky_ligation_products_list(seqs: List[Dseqrecord]) -> tuple[List[Dseq
 
         assembly: tuple[Dseqrecord]
         for assembly in product(*arrangements):
-            assembly_is_valid = True
-            for i in range(0, len(assembly) - 1):
-                if not sum_is_sticky(assembly[i].seq, assembly[i + 1].seq):
-                    assembly_is_valid = False
-                    break
-            if assembly_is_valid:
-                # TODO here it would be better to not execute. First eliminate duplicates
-                # and then call perform_given_assembly
-                linear_ligation = sum_assembly_fragments(assembly)
-                assembly_summary = get_assembly_summary_from_fragment_list(
+            if assembly_is_valid(assembly):
+
+                source = get_sticky_ligation_source_from_fragment_list(
                     assembly)
+
                 # Sometimes they can be circularised, for now, we circularise by
                 # default if possible
-                if sum_is_sticky(linear_ligation.seq, linear_ligation.seq):
-                    possible_products.append(linear_ligation.looped())
-                    assembly_summary.circularised = True
-                else:
-                    possible_products.append(linear_ligation)
-                    assembly_summary.circularised = False
-                possible_assemblies.append(assembly_summary)
-    possible_assemblies, possible_products = eliminate_assembly_duplicates(
-        possible_assemblies, possible_products)
+                source.circularised = sum_is_sticky(assembly[-1].seq, assembly[0].seq)
+
+                if assembly_is_duplicate(source):
+                    continue
+
+                possible_assemblies.append(source)
+                possible_products.append(perform_given_assembly(seqs, source))
+
     return possible_products, possible_assemblies

@@ -1,13 +1,11 @@
 from dna_functions import dseq_from_both_overhangs, both_overhangs_from_dseq, \
-    format_sequence_genbank, read_dsrecord_from_json, assemblies_are_circular_permutations
+    format_sequence_genbank, read_dsrecord_from_json
 import unittest
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
 from Bio.SeqFeature import FeatureLocation
 from pydna.seqfeature import SeqFeature
 from typing import OrderedDict
-
-from pydantic_models import StickyLigationSource
 
 
 class DseqFromBothOverhangsTest(unittest.TestCase):
@@ -72,13 +70,3 @@ class DseqFromBothOverhangsTest(unittest.TestCase):
                         self.assertEqual(
                             feature_original.extract(dseq_original),
                             feature_3.extract(dseq_3))
-
-
-class assemblyComparisonTest(unittest.TestCase):
-
-    def test_sticky(self):
-        assembly1 = StickyLigationSource(
-            input=[1, 2, 3], fragments_inverted=[False, False, False])
-        assembly2 = StickyLigationSource(
-            input=[2, 3, 1], fragments_inverted=[False, False, False])
-        assert assemblies_are_circular_permutations(assembly1, assembly2)

@@ -1,6 +1,4 @@
 from typing import List
-
-from pydantic import create_model
 from dna_functions import format_sequence_genbank, read_dsrecord_from_json
 from main import app
 from fastapi.testclient import TestClient
