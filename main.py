@@ -138,7 +138,7 @@ async def sticky_ligation(source: StickyLigationSource,
         # TODO It is problematic that both output_index and fragments_inverted could be set.
         # TODO check input for unique ids
         assembly = get_assembly_list_from_sticky_ligation_source(dseqs, source)
-        if not assembly_is_valid(assembly):
+        if not assembly_is_valid(assembly, source.circularised):
             raise HTTPException(
                 400, 'Fragments are not compatible for sticky ligation')
         output_sequence = format_sequence_genbank(perform_assembly(assembly, source.circularised))

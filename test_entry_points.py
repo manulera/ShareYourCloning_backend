@@ -46,3 +46,27 @@ class StickyLigationTest(unittest.TestCase):
 
         # No extra field should have been set on the source
         self.assertEqual(resulting_source, source)
+
+        # Check that the inverse assembly will not pass
+        source = StickyLigationSource(
+            input=[2, 1],
+            fragments_inverted=[False, False],
+            circularised=False
+        )
+        data = {'source': source.dict(), 'sequences': json_seqs}
+        response = client.post("/sticky_ligation", json=data)
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertEqual(data['detail'], 'Fragments are not compatible for sticky ligation')
+
+        # Check that the circular assembly does not pass either
+        source = StickyLigationSource(
+            input=[1, 2],
+            fragments_inverted=[False, False],
+            circularised=True
+        )
+        data = {'source': source.dict(), 'sequences': json_seqs}
+        response = client.post("/sticky_ligation", json=data)
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertEqual(data['detail'], 'Fragments are not compatible for sticky ligation')

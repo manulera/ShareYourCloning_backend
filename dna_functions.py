@@ -130,10 +130,14 @@ def perform_assembly(assembly: tuple[Dseqrecord], circularise) -> Dseqrecord:
     return out
 
 
-def assembly_is_valid(assembly: tuple[Dseqrecord]) -> bool:
+def assembly_is_valid(assembly: tuple[Dseqrecord], circularise=False) -> bool:
     for i in range(0, len(assembly) - 1):
         if not sum_is_sticky(assembly[i].seq, assembly[i + 1].seq):
             return False
+
+    if circularise:
+        return sum_is_sticky(assembly[-1].seq, assembly[0].seq)
+
     return True
 
 
