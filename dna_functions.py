@@ -94,7 +94,7 @@ def assembly_is_duplicate(assembly: StickyLigationSource) -> bool:
     return False
 
 
-def get_sticky_ligation_source_from_fragment_list(assembly: tuple[Dseqrecord]) -> StickyLigationSource:
+def get_sticky_ligation_source_from_assembly_list(assembly: tuple[Dseqrecord]) -> StickyLigationSource:
     fragments_inverted = list()
     fragments_order = list()
     for i in range(len(assembly)):
@@ -110,17 +110,7 @@ def get_sticky_ligation_source_from_fragment_list(assembly: tuple[Dseqrecord]) -
     return assembly_summary
 
 
-def sum_assembly_fragments(assembly: tuple[Dseqrecord]) -> Dseqrecord:
-    if len(assembly) == 1:
-        return assembly[0]
-    else:
-        out = assembly[0]
-        for f in assembly[1:]:
-            out += f
-        return out
-
-
-def perform_given_assembly(seqs: List[Dseqrecord], source: StickyLigationSource) -> Dseqrecord:
+def get_assembly_list_from_sticky_ligation_source(seqs: List[Dseqrecord], source: StickyLigationSource) -> List[Dseqrecord]:
 
     assembly: List[Dseqrecord] = list()
     for index, id in enumerate(source.input):
@@ -130,8 +120,14 @@ def perform_given_assembly(seqs: List[Dseqrecord], source: StickyLigationSource)
         # Invert it necessary
         if source.fragments_inverted[index]:
             assembly[-1].reverse_complement()
+    return assembly
 
-    return sum_assembly_fragments(assembly)
+
+def perform_assembly(assembly: tuple[Dseqrecord], circularise) -> Dseqrecord:
+    out = sum((f for f in assembly), Dseqrecord(''))
+    if circularise:
+        out = out.looped()
+    return out
 
 
 def assembly_is_valid(assembly: tuple[Dseqrecord]) -> bool:
@@ -159,7 +155,7 @@ def get_sticky_ligation_products_list(seqs: List[Dseqrecord]) -> tuple[List[Dseq
         for assembly in product(*arrangements):
             if assembly_is_valid(assembly):
 
-                source = get_sticky_ligation_source_from_fragment_list(
+                source = get_sticky_ligation_source_from_assembly_list(
                     assembly)
 
                 # Sometimes they can be circularised, for now, we circularise by
@@ -170,6 +166,6 @@ def get_sticky_ligation_products_list(seqs: List[Dseqrecord]) -> tuple[List[Dseq
                     continue
 
                 possible_assemblies.append(source)
-                possible_products.append(perform_given_assembly(seqs, source))
+                possible_products.append(perform_assembly(assembly, source.circularised))
 
     return possible_products, possible_assemblies

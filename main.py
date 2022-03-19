@@ -4,8 +4,8 @@ from pydantic import conlist, create_model
 from pydna.parsers import parse as pydna_parse
 from Bio.SeqIO import read as seqio_read
 from pydna.genbank import Genbank
-from dna_functions import get_restriction_enzyme_products_list, \
-    format_sequence_genbank, get_sticky_ligation_products_list, perform_given_assembly, \
+from dna_functions import assembly_is_valid, get_assembly_list_from_sticky_ligation_source, get_restriction_enzyme_products_list, \
+    format_sequence_genbank, get_sticky_ligation_products_list, perform_assembly, \
     read_dsrecord_from_json
 from pydantic_models import SequenceEntity, SequenceFileFormat, \
     GenbankIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource,\
@@ -137,14 +137,19 @@ async def sticky_ligation(source: StickyLigationSource,
         # TODO Error if the list has different order or the ids are wrong.
         # TODO It is problematic that both output_index and fragments_inverted could be set.
         # TODO check input for unique ids
-        output_sequence = format_sequence_genbank(perform_given_assembly(dseqs, source))
+        assembly = get_assembly_list_from_sticky_ligation_source(dseqs, source)
+        if not assembly_is_valid(assembly):
+            raise HTTPException(
+                400, 'Fragments are not compatible for sticky ligation')
+        output_sequence = format_sequence_genbank(perform_assembly(assembly, source.circularised))
+
     else:
 
         products_dseq, assemblies = get_sticky_ligation_products_list(
             dseqs)
         if len(products_dseq) == 0:
             raise HTTPException(
-                400, 'Fragments are not compatible for sticky ligation')
+                400, 'No combination of these fragments is compatible for sticky ligation')
 
         source.output_list = [format_sequence_genbank(seq) for seq
                               in products_dseq]
