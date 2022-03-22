@@ -4,10 +4,10 @@ from pydantic import conlist, create_model
 from pydna.parsers import parse as pydna_parse
 from Bio.SeqIO import read as seqio_read
 from pydna.genbank import Genbank
-from dna_functions import assembly_is_valid, get_assembly_list_from_sticky_ligation_source, get_restriction_enzyme_products_list, \
+from dna_functions import assembly_is_valid, get_assembly_list_from_sticky_ligation_source, get_pcr_products_list, get_restriction_enzyme_products_list, \
     format_sequence_genbank, get_sticky_ligation_products_list, perform_assembly, \
-    read_dsrecord_from_json
-from pydantic_models import SequenceEntity, SequenceFileFormat, \
+    read_dsrecord_from_json, read_primer_from_json
+from pydantic_models import PCRSource, PrimerAnnealingSettings, PrimerModel, SequenceEntity, SequenceFileFormat, \
     GenbankIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource,\
     UploadedFileSource
 from fastapi.middleware.cors import CORSMiddleware
@@ -158,4 +158,52 @@ async def sticky_ligation(source: StickyLigationSource,
             output_sequence = source.output_list[source.output_index]
         else:
             output_sequence = None
+    return {'sequence': output_sequence, 'source': source}
+
+
+@ app.post('/pcr', response_model=create_model(
+    'PCRResponse',
+    source=(PCRSource, ...),
+    sequence=(SequenceEntity, None)
+))
+async def pcr(source: PCRSource,
+              sequences: conlist(SequenceEntity, min_items=1, max_items=1),
+              primers: conlist(PrimerModel, min_items=1, max_items=2),):
+    dseq = read_dsrecord_from_json(sequences[0])
+    primers_pydna = [read_primer_from_json(p) for p in primers]
+
+    # If the primer_pair is set the sender already knows what they want as the output
+    output_is_known = source.primer_pair is not None
+
+    # Here we set the annealing settings to match the input. If we send the exact annealing,
+    # there is no point in sending these settings as well.
+    if output_is_known:
+        source.primer_annealing_settings = PrimerAnnealingSettings(
+            minimum_annealing=min(source.primer_pair.forward.footprint_length,
+                                  source.primer_pair.reverse.footprint_length)
+        )
+
+    # TODO: return error if the id of the sequence does not correspond.
+    # TODO: return error if the ids not present in the list.
+
+    # Error if no pair is generated.
+    products, primer_pairs = get_pcr_products_list(dseq, source, primers_pydna)
+    if len(products) == 0:
+        raise HTTPException(
+            400, 'No pair of annealing primers was found.' + ('' if output_is_known else ' Try changing the annealing settings.')
+        )
+
+    if output_is_known:
+        dseq_output = next((products[i] for i, pair in enumerate(primer_pairs) if pair == source.primer_pair), None)
+        if dseq_output is None:
+            raise HTTPException(
+                400, 'The annealing positions of the primers seem to be wrong.'
+            )
+        output_sequence = format_sequence_genbank(dseq_output)
+    else:
+        source.possible_primer_pairs = primer_pairs
+        output_sequence = None
+        source.output_list = [format_sequence_genbank(seq) for seq
+                              in products]
+
     return {'sequence': output_sequence, 'source': source}

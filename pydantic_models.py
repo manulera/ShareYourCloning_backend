@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from enum import Enum
 from typing import List, Optional
+from Bio.SeqFeature import SeqFeature, FeatureLocation
 
 from pydantic.types import conlist
 
@@ -12,6 +13,7 @@ class SourceType(str, Enum):
     file = 'file',
     restriction = 'restriction'
     sticky_ligation = 'sticky_ligation'
+    PCR = 'PCR'
 
 
 class SequenceFileFormat(str, Enum):
@@ -40,6 +42,49 @@ class SequenceEntity(BaseModel):
     id: Optional[int]
     kind: str = 'entity'
     sequence: GenbankSequence = None
+
+
+class PrimerModel(BaseModel):
+    """Called PrimerModel not to be confused with the class from pydna."""
+
+    id: int
+    name: str
+    sequence: str
+
+
+class PrimerAnnealing(BaseModel):
+    """A class to represent the annealing of a primer. Minimal version of pydna's Primer."""
+
+    primer_id: int = Field(..., description='The id of the primer that anneals.')
+    position: int = Field(..., description='The position of the 3\' end of the\
+        primer in the template sequence.')
+    footprint_length: int = Field(..., description='The number of basepairs that are anealed\
+        in the primer. Missmatch support should be added in the future.')
+
+
+# The next two models are unused for now
+
+
+class SequenceFeature(BaseModel):
+    id: str
+    type: str
+    start: int
+    end: int
+    strand: int = None
+
+
+def seq_feature2pydantic(sf: SeqFeature) -> SequenceFeature:
+    if not isinstance(sf.location, FeatureLocation):
+        raise TypeError(
+            'Compound locations are not yet supported.'
+        )
+    return SequenceFeature(
+        id=sf.id,
+        type=sf.type,
+        strand=sf.location.strand,
+        start=sf.location.start,
+        end=sf.location.end
+    )
 
 # Sources =========================================
 
@@ -74,10 +119,11 @@ class GenbankIdSource(Source):
     type: SourceType = SourceType('genbank_id')
 
 
+# TODO There is some abstract common thing between restriction and PCR, since
+# they select a subset of the molecule, perhaps they can be merged in some way.
+
 class RestrictionEnzymeDigestionSource(Source):
-    """Documents a restriction enzyme digestion, and the selection of
-    one of the fragments
-    """
+    """Documents a restriction enzyme digestion, and the selection of one of the fragments."""
 
     type: SourceType = SourceType('restriction')
     # This can only take one input
@@ -88,6 +134,35 @@ class RestrictionEnzymeDigestionSource(Source):
 
     # Field for client-side functionality
     fragment_boundaries: List[int] = []
+
+
+class PrimerAnnealingSettings(BaseModel):
+    """Settings to find annealing sites for the primer"""
+    minimum_annealing: int = Field(..., description='The minimum number of \
+    overlaping basepairs for an annealing to be considered.')
+
+
+class PrimerPair(BaseModel):
+    forward: PrimerAnnealing
+    reverse: PrimerAnnealing
+
+
+class PCRSource(Source):
+    """Documents a PCR, and the selection of one of the products."""
+
+    type: SourceType = SourceType('PCR')
+
+    # This can only take one input
+    input: conlist(int, min_items=1, max_items=1)
+
+    primer_pair: PrimerPair = None
+
+    # TODO test this
+    primer_annealing_settings: PrimerAnnealingSettings = Field(None, description='This does not have\
+        to be specified if the primer annealing fields are provided.')
+
+    # Field for client-side functionality
+    possible_primer_pairs: List[PrimerPair] = []
 
 
 class StickyLigationSource(Source):

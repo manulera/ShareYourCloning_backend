@@ -3,10 +3,13 @@ from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
 from typing import List
-from pydantic_models import RestrictionEnzymeDigestionSource,\
+from pydantic_models import PCRSource, PrimerAnnealing, PrimerModel, PrimerPair, RestrictionEnzymeDigestionSource,\
     GenbankSequence, SequenceEntity, StickyLigationSource
 from pydna.parsers import parse as pydna_parse
 from itertools import permutations, product
+from pydna.primer import Primer
+from pydna.amplify import Anneal
+from pydna.amplicon import Amplicon
 
 
 def sum_is_sticky(seq1: Dseq, seq2: Dseq) -> bool:
@@ -26,6 +29,22 @@ def format_sequence_genbank(seq: Dseqrecord) -> SequenceEntity:
                              overhang_crick_3prime=overhang_crick_3prime,
                              overhang_watson_3prime=overhang_watson_3prime)
     return SequenceEntity(sequence=gb_seq)
+
+
+def read_primer_from_json(primer: PrimerModel) -> Primer:
+    return Primer(
+        primer.sequence,
+        id=str(primer.id),
+        name=primer.name,
+    )
+
+
+def from_primer_to_annealing(primer: Primer) -> PrimerAnnealing:
+    return PrimerAnnealing(
+        primer_id=int(primer.id),
+        position=primer.position,
+        footprint_length=primer._fp,
+    )
 
 
 def read_dsrecord_from_json(seq: SequenceEntity) -> Dseqrecord:
@@ -81,6 +100,18 @@ def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnz
         fragment_boundaries.append(fragment_boundaries[0])
 
     return output_list, fragment_boundaries
+
+
+def get_pcr_products_list(template: Dseqrecord, source: PCRSource, primers: List[Primer]) -> tuple[List[Dseqrecord], List[PrimerPair]]:
+    anneal = Anneal(primers, template, limit=source.primer_annealing_settings.minimum_annealing)
+    primer_pairs = list()
+    amplicon: Amplicon
+    for amplicon in anneal.products:
+        primer_pairs.append(PrimerPair(
+            forward=from_primer_to_annealing(amplicon.forward_primer),
+            reverse=from_primer_to_annealing(amplicon.reverse_primer)
+        ))
+    return anneal.products, primer_pairs
 
 
 def assembly_is_duplicate(assembly: StickyLigationSource) -> bool:
