@@ -42,14 +42,16 @@ class StickyLigationTest(unittest.TestCase):
         data = {'source': source.dict(), 'sequences': json_seqs}
         response = client.post("/sticky_ligation", json=data)
         payload = response.json()
-        resulting_sequence = read_dsrecord_from_json(SequenceEntity.parse_obj(payload['sequence']))
+
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+        sources = [StickyLigationSource.parse_obj(s) for s in payload['sources']]
+
+        self.assertEqual(len(resulting_sequences), 1)
+        self.assertEqual(len(sources), 1)
 
         # Check that the assembly is correct
-        self.assertEqual(resulting_sequence.seq, initial_sequence.seq)
-        resulting_source = StickyLigationSource.parse_obj(payload['source'])
-
-        # No extra field should have been set on the source
-        self.assertEqual(resulting_source, source)
+        self.assertEqual(resulting_sequences[0].seq, initial_sequence.seq)
+        self.assertEqual(sources[0], source)
 
         # Check that the inverse assembly will not pass
         source = StickyLigationSource(
@@ -366,7 +368,6 @@ class PCRTest(unittest.TestCase):
         # To compare, we unset the annealing settings (see PCRSource)
         source1.primer_annealing_settings = None
         source2.primer_annealing_settings = None
-        print(source1)
         self.assertEqual(source1, source2)
         self.assertEqual(dseq2.seq, predicted_seq.seq)
 

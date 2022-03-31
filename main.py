@@ -160,22 +160,17 @@ async def sticky_ligation(source: StickyLigationSource,
                 400, 'Fragments are not compatible for sticky ligation')
         output_sequence = format_sequence_genbank(perform_assembly(assembly_list, source.circularised))
 
-    else:
+        return {'sequences': [output_sequence], 'sources': [source]}
 
-        products_dseq, assemblies = get_sticky_ligation_products_list(
-            dseqs)
-        if len(products_dseq) == 0:
-            raise HTTPException(
-                400, 'No combination of these fragments is compatible for sticky ligation')
+    products_dseq, out_sources = get_sticky_ligation_products_list(dseqs)
+    if len(products_dseq) == 0:
+        raise HTTPException(
+            400, 'No combination of these fragments is compatible for sticky ligation')
 
-        source.output_list = [format_sequence_genbank(seq) for seq
-                              in products_dseq]
+    out_sequences = [format_sequence_genbank(seq) for seq
+                     in products_dseq]
 
-        if source.output_index is not None:
-            output_sequence = source.output_list[source.output_index]
-        else:
-            output_sequence = None
-    return {'sequence': output_sequence, 'source': source}
+    return {'sequences': out_sequences, 'sources': out_sources}
 
 
 @ app.post('/pcr', response_model=create_model(
