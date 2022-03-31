@@ -30,18 +30,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# TODO limit the maximum size of submitted files
+
 
 @ app.post('/read_from_file', response_model=create_model(
     'UploadedFileResponse',
-    source=(UploadedFileSource, ...),
-    sequence=(SequenceEntity, None)
+    sources=(list[UploadedFileSource], ...),
+    sequences=(list[SequenceEntity], ...)
 ))
 async def read_from_file(file: UploadFile = File(...),
                          file_format: SequenceFileFormat = Query(
                              None,
                              description='Format of the sequence file. \
                                 Unless specified, it will be guessed\
-                                from the extension')
+                                from the extension'),
+                         index_in_file: int = Query(None, description='The index\
+                             of the sequence in the file for multi-sequence files')
                          ):
     """Return a json sequence from a sequence file
     """
@@ -61,19 +65,25 @@ async def read_from_file(file: UploadFile = File(...),
     if file_format in ['fasta', 'genbank']:
         # Read the whole file to a string
         file_content = (await file.read()).decode()
-        dseq = pydna_parse(file_content)[0]
+        dseqs = pydna_parse(file_content)
 
     elif file_format == 'snapgene':
         seq = seqio_read(file.file, file_format)
         iscircular = 'topology' in seq.annotations.keys(
         ) and seq.annotations['topology'] == 'circular'
-        dseq = Dseqrecord(seq, circular=iscircular)
+        dseqs = [Dseqrecord(seq, circular=iscircular)]
 
-    output_sequence = format_sequence_genbank(dseq)
-    source = UploadedFileSource(
-        file_format=file_format, file_name=file.filename, output_list=[output_sequence])
+    # The common part
+    parent_source = UploadedFileSource(file_format=file_format, file_name=file.filename)
+    out_sources = list()
+    for i in range(len(dseqs)):
+        new_source = parent_source.copy()
+        new_source.index_in_file = i
+        out_sources.append(new_source)
 
-    return {'sequence': output_sequence, 'source': source}
+    out_sequences = [format_sequence_genbank(s) for s in dseqs]
+
+    return {'sequences': out_sequences, 'sources': out_sources}
 
 
 @ app.post('/genebank_id', response_model=create_model(
@@ -152,7 +162,6 @@ async def sticky_ligation(source: StickyLigationSource,
     dseqs = [read_dsrecord_from_json(seq) for seq in sequences]
     if len(source.fragments_inverted) > 0:
         # TODO Error if the list has different order or the ids are wrong.
-        # TODO It is problematic that both output_index and fragments_inverted could be set.
         # TODO check input for unique ids
         assembly_list = get_assembly_list_from_sticky_ligation_source(dseqs, source)
         if not assembly_list_is_valid(assembly_list, source.circularised):

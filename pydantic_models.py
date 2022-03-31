@@ -86,11 +86,6 @@ class Source(BaseModel):
     input: list[int] = []
     output: int = None
     type: SourceType = None
-    output_index: int = None
-
-    # Fields used to choose between multiple outputs
-    # and other client-side functionality
-    output_list: list[SequenceEntity] = []
 
 
 class UploadedFileSource(Source):
@@ -99,6 +94,7 @@ class UploadedFileSource(Source):
     file_name: str
     file_format: SequenceFileFormat
     type: SourceType = SourceType('file')
+    index_in_file: int = None
 
 
 class GenbankIdSource(Source):
