@@ -51,17 +51,6 @@ class PrimerModel(BaseModel):
     name: str
     sequence: str
 
-
-class PrimerAnnealing(BaseModel):
-    """A class to represent the annealing of a primer. Minimal version of pydna's Primer."""
-
-    primer_id: int = Field(..., description='The id of the primer that anneals.')
-    position: int = Field(..., description='The position of the 3\' end of the\
-        primer in the template sequence.')
-    footprint_length: int = Field(..., description='The number of basepairs that are anealed\
-        in the primer. Missmatch support should be added in the future.')
-
-
 # The next two models are unused for now
 
 
@@ -129,7 +118,11 @@ class SequenceSubsetSource(Source):
     input: conlist(int, min_items=1, max_items=1)
 
     # Boundaries of a fragment (length should be either empty, or length = 2)
-    fragment_boundaries: list[int] = []
+    fragment_boundaries: list[int] = Field([], description='Edges of the fragment that will be taken:\n \
+    * For a PCR, these are the positions of the 3\' binding sites of the primers, such that sequence[start:end]\
+    would be the part of the sequence where primers don\'t align.\n\
+    * For restriction enzymes the extremes of the overhangs\n\
+    For both, 0-based indexing, [first,second)')
 
 
 class RestrictionEnzymeDigestionSource(SequenceSubsetSource):
@@ -149,27 +142,21 @@ class PrimerAnnealingSettings(BaseModel):
     overlaping basepairs for an annealing to be considered.')
 
 
-class PrimerPair(BaseModel):
-    forward: PrimerAnnealing
-    reverse: PrimerAnnealing
-
-
-class PCRSource(Source):
+class PCRSource(SequenceSubsetSource):
     """Documents a PCR, and the selection of one of the products."""
 
     type: SourceType = SourceType('PCR')
 
-    # This can only take one input
-    input: conlist(int, min_items=1, max_items=1)
+    primers: conlist(int, max_items=2) = Field([], description='id of\
+        the forward and reverse primer (in that order). If the reverse and forward is the same,\
+        the id should be submitted twice. It accepts a single input if primer_footprints is not set.')
 
-    primer_pair: PrimerPair = None
+    primer_footprints: conlist(int, max_items=2) = Field([], description='The number of basepairs that are anealed\
+    in each primer (same order as in `primers`). Missmatch support should be added in the future.')
 
     # TODO test this
     primer_annealing_settings: PrimerAnnealingSettings = Field(None, description='This does not have\
-        to be specified if the primer annealing fields are provided.')
-
-    # Field for client-side functionality
-    possible_primer_pairs: list[PrimerPair] = []
+        to be specified if the primers and primer_footprints are provided.')
 
 
 class StickyLigationSource(Source):

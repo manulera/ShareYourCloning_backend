@@ -3,7 +3,7 @@ from Bio.Restriction.Restriction import RestrictionBatch, RestrictionType
 from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from pydantic_models import PCRSource, PrimerAnnealing, PrimerModel, PrimerPair, RestrictionEnzymeDigestionSource,\
+from pydantic_models import PCRSource, PrimerModel, RestrictionEnzymeDigestionSource,\
     GenbankSequence, SequenceEntity, StickyLigationSource
 from pydna.parsers import parse as pydna_parse
 from itertools import permutations, product
@@ -36,14 +36,6 @@ def read_primer_from_json(primer: PrimerModel) -> Primer:
         primer.sequence,
         id=str(primer.id),
         name=primer.name,
-    )
-
-
-def from_primer_to_annealing(primer: Primer) -> PrimerAnnealing:
-    return PrimerAnnealing(
-        primer_id=int(primer.id),
-        position=primer.position,
-        footprint_length=primer._fp,
     )
 
 
@@ -169,16 +161,19 @@ def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnz
     return fragments, sources
 
 
-def get_pcr_products_list(template: Dseqrecord, source: PCRSource, primers: list[Primer]) -> tuple[list[Dseqrecord], list[PrimerPair]]:
+def get_pcr_products_list(template: Dseqrecord, source: PCRSource, primers: list[Primer]) -> tuple[list[Dseqrecord], list[PCRSource]]:
     anneal = Anneal(primers, template, limit=source.primer_annealing_settings.minimum_annealing)
-    primer_pairs = list()
     amplicon: Amplicon
+    sources = list()
+
     for amplicon in anneal.products:
-        primer_pairs.append(PrimerPair(
-            forward=from_primer_to_annealing(amplicon.forward_primer),
-            reverse=from_primer_to_annealing(amplicon.reverse_primer)
-        ))
-    return anneal.products, primer_pairs
+        new_source = source.copy()
+        new_source.primers = [int(amplicon.forward_primer.id), int(amplicon.reverse_primer.id)]
+        new_source.fragment_boundaries = [amplicon.forward_primer.position, amplicon.reverse_primer.position]
+        new_source.primer_footprints = [amplicon.forward_primer._fp, amplicon.reverse_primer._fp]
+        sources.append(new_source)
+
+    return anneal.products, sources
 
 
 def assembly_is_duplicate(assembly: StickyLigationSource) -> bool:

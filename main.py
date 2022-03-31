@@ -113,12 +113,12 @@ async def restriction(source: RestrictionEnzymeDigestionSource,
     # TODO: issue warning if number of enzymes>2 or if one does not cut
 
     # If the request provides the fragment_boundaries, the program should return only one output.
-    output_is_set = False
+    output_is_known = False
     if len(source.fragment_boundaries) > 0:
         if len(source.fragment_boundaries) != 2 or len(source.restriction_enzymes) != 2:
             raise HTTPException(
                 400, 'If `fragment_boundaries` are provided, the length of `fragment_boundaries` and `restriction_enzymes` must be 2.')
-        output_is_set = True
+        output_is_known = True
 
     fragments, out_sources = get_restriction_enzyme_products_list(
         dseq, source)
@@ -131,7 +131,7 @@ async def restriction(source: RestrictionEnzymeDigestionSource,
             400, 'The enzymes do not cut.')
 
     # If the user has provided boundaries, we verify that they are correct, and return only those as the output
-    if output_is_set:
+    if output_is_known:
         for i, out_source in enumerate(out_sources):
             if out_source == source:
                 return {'sequences': [out_sequences[i]], 'sources': [out_source]}
@@ -181,8 +181,8 @@ async def sticky_ligation(source: StickyLigationSource,
 
 @ app.post('/pcr', response_model=create_model(
     'PCRResponse',
-    source=(PCRSource, ...),
-    sequence=(SequenceEntity, None)
+    sources=(list[PCRSource], ...),
+    sequences=(list[SequenceEntity], ...)
 ))
 async def pcr(source: PCRSource,
               sequences: conlist(SequenceEntity, min_items=1, max_items=1),
@@ -190,38 +190,36 @@ async def pcr(source: PCRSource,
     dseq = read_dsrecord_from_json(sequences[0])
     primers_pydna = [read_primer_from_json(p) for p in primers]
 
-    # If the primer_pair is set the sender already knows what they want as the output
-    output_is_known = source.primer_pair is not None
+    # If the footprints are set, the output should be known
+    output_is_known = len(source.primer_footprints) > 0 or len(source.primers) > 0 or len(source.fragment_boundaries) > 0
 
     # Here we set the annealing settings to match the input. If we send the exact annealing,
     # there is no point in sending these settings as well.
     if output_is_known:
         source.primer_annealing_settings = PrimerAnnealingSettings(
-            minimum_annealing=min(source.primer_pair.forward.footprint_length,
-                                  source.primer_pair.reverse.footprint_length)
+            minimum_annealing=min(source.primer_footprints)
         )
 
     # TODO: return error if the id of the sequence does not correspond.
     # TODO: return error if the ids not present in the list.
 
     # Error if no pair is generated.
-    products, primer_pairs = get_pcr_products_list(dseq, source, primers_pydna)
+    products, out_sources = get_pcr_products_list(dseq, source, primers_pydna)
     if len(products) == 0:
         raise HTTPException(
             400, 'No pair of annealing primers was found.' + ('' if output_is_known else ' Try changing the annealing settings.')
         )
 
-    if output_is_known:
-        dseq_output = next((products[i] for i, pair in enumerate(primer_pairs) if pair == source.primer_pair), None)
-        if dseq_output is None:
-            raise HTTPException(
-                400, 'The annealing positions of the primers seem to be wrong.'
-            )
-        output_sequence = format_sequence_genbank(dseq_output)
-    else:
-        source.possible_primer_pairs = primer_pairs
-        output_sequence = None
-        source.output_list = [format_sequence_genbank(seq) for seq
-                              in products]
+    out_sequences = [format_sequence_genbank(seq) for seq
+                     in products]
 
-    return {'sequence': output_sequence, 'source': source}
+    # If the user has provided boundaries, we verify that they are correct. We have to
+    if output_is_known:
+        for i, out_source in enumerate(out_sources):
+            if out_source == source:
+                return {'sequences': [out_sequences[i]], 'sources': [out_source]}
+        # If we don't find it, there was a mistake
+        raise HTTPException(
+            400, 'The annealing positions of the primers seem to be wrong.')
+
+    return {'sources': out_sources, 'sequences': out_sequences}

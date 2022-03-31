@@ -4,7 +4,8 @@ from main import app
 from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
-from pydantic_models import PCRSource, PrimerAnnealing, PrimerAnnealingSettings, PrimerModel, PrimerPair, RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource
+from pydantic_models import PCRSource, PrimerAnnealingSettings, PrimerModel,\
+    RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource
 from pydna.dseqrecord import Dseqrecord
 import unittest
 from pydna.dseq import Dseq
@@ -329,30 +330,45 @@ class PCRTest(unittest.TestCase):
         response = client.post("/pcr", json=data)
         payload = response.json()
 
-        source1 = PCRSource.parse_obj(payload['source'])
+        sources = [PCRSource.parse_obj(s) for s in payload['sources']]
+        sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
 
         # Only one possible output
-        self.assertEqual(len(source1.output_list), 1)
-        self.assertEqual(len(source1.possible_primer_pairs), 1)
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(len(sequences), 1)
+        dseq1 = sequences[0]
+        source1 = sources[0]
 
         # The sequence matches what we expect
-        dseq1 = read_dsrecord_from_json(source1.output_list[0])
-        primer_pair = source1.possible_primer_pairs[0]
-        predicted_seq = primer_fwd.sequence + template[primer_pair.forward.position:primer_pair.reverse.position] + Dseq(primer_rvs.sequence).reverse_complement()
+        predicted_seq = primer_fwd.sequence + template[source1.fragment_boundaries[0]:source1.fragment_boundaries[1]] + Dseq(primer_rvs.sequence).reverse_complement()
         self.assertEqual(dseq1.seq, predicted_seq.seq)
-        self.assertEqual(primer_pair.forward.primer_id, primer_fwd.id)
-        self.assertEqual(primer_pair.reverse.primer_id, primer_rvs.id)
+        self.assertEqual(source1.primers[0], primer_fwd.id)
+        self.assertEqual(source1.primers[1], primer_rvs.id)
 
         # Now we submit the deterministic PCR (we already know which fragment we want)
-        submitted_source.primer_pair = primer_pair
-        data = {'source': submitted_source.dict(), 'sequences': [json_seq.dict()], 'primers': [primer_fwd.dict(), primer_rvs.dict()]}
+
+        data = {'source': source1.dict(), 'sequences': [json_seq.dict()], 'primers': [primer_fwd.dict(), primer_rvs.dict()]}
         response = client.post("/pcr", json=data)
         payload = response.json()
-        source2 = PCRSource.parse_obj(payload['source'])
-        dseq2 = read_dsrecord_from_json(SequenceEntity.parse_obj(payload['sequence']))
+
+        sources = [PCRSource.parse_obj(s) for s in payload['sources']]
+        sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+
+        # Only one possible output
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(len(sequences), 1)
+        dseq2 = sequences[0]
+        source2 = sources[0]
+
+        # When we submit the information, the annealing_settings are changed
+        self.assertEqual(source2.primer_annealing_settings.minimum_annealing, min(source1.primer_footprints))
+
+        # To compare, we unset the annealing settings (see PCRSource)
+        source1.primer_annealing_settings = None
+        source2.primer_annealing_settings = None
+        print(source1)
+        self.assertEqual(source1, source2)
         self.assertEqual(dseq2.seq, predicted_seq.seq)
-        self.assertEqual(len(source2.output_list), 0)
-        self.assertEqual(len(source2.possible_primer_pairs), 0)
 
     def test_wrong_primers(self):
 
@@ -393,11 +409,10 @@ class PCRTest(unittest.TestCase):
             name='ase1_forward'
         )
 
-        # This is the correct annealing info
-        submitted_source.primer_pair = PrimerPair(
-            forward=PrimerAnnealing(primer_id=2, position=59, footprint_length=21),
-            reverse=PrimerAnnealing(primer_id=3, position=1718, footprint_length=20)
-        )
+        # This would be the correct annealing info
+        submitted_source.primers = [2, 3]
+        submitted_source.fragment_boundaries = [59, 1718]
+        submitted_source.primer_footprints = [21, 20]
 
         data = {'source': submitted_source.dict(), 'sequences': [json_seq.dict()], 'primers': [primer_fwd.dict(), primer_rvs.dict()]}
         response = client.post("/pcr", json=data)
@@ -405,11 +420,23 @@ class PCRTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
         # This is the wrong annealing info
-        submitted_source.primer_pair = PrimerPair(
-            forward=PrimerAnnealing(primer_id=2, position=59, footprint_length=21),
-            reverse=PrimerAnnealing(primer_id=3, position=1710, footprint_length=20)
-        )
+        submitted_source.primers = [2, 3]
+        submitted_source.fragment_boundaries = [59, 1200]  # 1200 instead of 1718
+        submitted_source.primer_footprints = [21, 20]
 
+        data = {'source': submitted_source.dict(), 'sequences': [json_seq.dict()], 'primers': [primer_fwd.dict(), primer_rvs.dict()]}
+        response = client.post("/pcr", json=data)
+        payload = response.json()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(payload['detail'], 'The annealing positions of the primers seem to be wrong.')
+
+        # This is the wrong annealing info
+        submitted_source.primers = [2, 3]
+        submitted_source.fragment_boundaries = [59, 1718]
+
+        # Wrong footprint (To return this error, the 'wrong one' cannot mess with the annealing settings
+        # e.g. it could not be [21,40] since it would not align with footprint 20)
+        submitted_source.primer_footprints = [21, 12]
         data = {'source': submitted_source.dict(), 'sequences': [json_seq.dict()], 'primers': [primer_fwd.dict(), primer_rvs.dict()]}
         response = client.post("/pcr", json=data)
         payload = response.json()
