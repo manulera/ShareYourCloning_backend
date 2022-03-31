@@ -4,7 +4,7 @@ from pydantic import conlist, create_model
 from pydna.parsers import parse as pydna_parse
 from Bio.SeqIO import read as seqio_read
 from pydna.genbank import Genbank
-from dna_functions import assembly_is_valid, get_assembly_list_from_sticky_ligation_source, get_pcr_products_list, get_restriction_enzyme_products_list, \
+from dna_functions import assembly_list_is_valid, get_assembly_list_from_sticky_ligation_source, get_pcr_products_list, get_restriction_enzyme_products_list, \
     format_sequence_genbank, get_sticky_ligation_products_list, perform_assembly, \
     read_dsrecord_from_json, read_primer_from_json
 from pydantic_models import PCRSource, PrimerAnnealingSettings, PrimerModel, SequenceEntity, SequenceFileFormat, \
@@ -144,22 +144,21 @@ async def restriction(source: RestrictionEnzymeDigestionSource,
 
 @ app.post('/sticky_ligation', response_model=create_model(
     'StickyLigationResponse',
-    source=(StickyLigationSource, ...),
-    sequence=(SequenceEntity, None)
+    sources=(list[StickyLigationSource], ...),
+    sequences=(list[SequenceEntity], ...)
 ))
 async def sticky_ligation(source: StickyLigationSource,
                           sequences: conlist(SequenceEntity, min_items=1)):
-    """Return `output_list` if `source.fragments_inverted` is not set, and `output` otherwise."""
     dseqs = [read_dsrecord_from_json(seq) for seq in sequences]
     if len(source.fragments_inverted) > 0:
         # TODO Error if the list has different order or the ids are wrong.
         # TODO It is problematic that both output_index and fragments_inverted could be set.
         # TODO check input for unique ids
-        assembly = get_assembly_list_from_sticky_ligation_source(dseqs, source)
-        if not assembly_is_valid(assembly, source.circularised):
+        assembly_list = get_assembly_list_from_sticky_ligation_source(dseqs, source)
+        if not assembly_list_is_valid(assembly_list, source.circularised):
             raise HTTPException(
                 400, 'Fragments are not compatible for sticky ligation')
-        output_sequence = format_sequence_genbank(perform_assembly(assembly, source.circularised))
+        output_sequence = format_sequence_genbank(perform_assembly(assembly_list, source.circularised))
 
     else:
 
@@ -213,7 +212,7 @@ async def pcr(source: PCRSource,
     out_sequences = [format_sequence_genbank(seq) for seq
                      in products]
 
-    # If the user has provided boundaries, we verify that they are correct. We have to
+    # If the user has provided boundaries, we verify that they are correct.
     if output_is_known:
         for i, out_source in enumerate(out_sources):
             if out_source == source:

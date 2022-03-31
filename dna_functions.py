@@ -148,12 +148,6 @@ def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnz
 
         if (3 * str(seq.seq))[start:end] != str(fragment.seq):
             extra = 'from cutsites: ' + (3 * str(seq.seq))[start:end] + '\nfrom fragment: ' + str(fragment.seq)
-            print(fragment_boundaries)
-            print([f.pos for f in seq.seq.cut(enzymes)])
-            print(cutsites, cutsites_positions)
-            print(seq.seq)
-            print(extra)
-            exit()
             raise ValueError(f'Something is wrong with cutsite processing:\n{extra}')
         newsource.restriction_enzymes = [cutsites[i], cutsites[i + 1]]
         sources.append(newsource)
@@ -187,22 +181,6 @@ def assembly_is_duplicate(assembly: StickyLigationSource) -> bool:
     return False
 
 
-def get_sticky_ligation_source_from_assembly_list(assembly: tuple[Dseqrecord]) -> StickyLigationSource:
-    fragments_inverted = list()
-    fragments_order = list()
-    for i in range(len(assembly)):
-        fragments_inverted.append(
-            assembly[i].id.endswith('_rc'))
-        fragments_order.append(
-            int(assembly[i].id[:-3]) if fragments_inverted[i]
-            else int(assembly[i].id)
-        )
-        assembly_summary = StickyLigationSource(
-            input=fragments_order,
-            fragments_inverted=fragments_inverted)
-    return assembly_summary
-
-
 def get_assembly_list_from_sticky_ligation_source(seqs: list[Dseqrecord], source: StickyLigationSource) -> list[Dseqrecord]:
 
     assembly: list[Dseqrecord] = list()
@@ -223,46 +201,50 @@ def perform_assembly(assembly: tuple[Dseqrecord], circularise) -> Dseqrecord:
     return out
 
 
-def assembly_is_valid(assembly: tuple[Dseqrecord], circularise=False) -> bool:
+def assembly_list_is_valid(assembly: tuple[Dseqrecord], circularise=False) -> bool:
     for i in range(0, len(assembly) - 1):
         if not sum_is_sticky(assembly[i].seq, assembly[i + 1].seq):
             return False
 
     if circularise:
-        return sum_is_sticky(assembly[-1].seq, assembly[0].seq)
+        return assembly_list_can_be_circularised(assembly)
 
     return True
 
 
+def assembly_list_can_be_circularised(assembly: tuple[Dseqrecord]):
+    return sum_is_sticky(assembly[-1].seq, assembly[0].seq)
+
+
 def get_sticky_ligation_products_list(seqs: list[Dseqrecord]) -> tuple[list[Dseqrecord], list[StickyLigationSource]]:
 
-    # TODO: include also partial ligations, it could also be made more performant by creating
-    # a class with only the minimal information, rather than reverse-complementing everything,
-    # but this is not a priority, I would say.
-    possible_products = list()
-    possible_assemblies: list[StickyLigationSource] = list()
+    sequence_ids = [s.id for s in seqs]
 
-    # We try all permutations of fragments
-    for perm in permutations(seqs):
-        # We generate all possible arrangements of fragments in this particular order
-        arrangements = [(fragment, fragment.reverse_complement())
-                        for fragment in perm]
+    # We generate all possible combinations of sequence ids, fragment_inverted and circularised
+    # without duplicates (see assembly_is_duplicate).
 
-        assembly: tuple[Dseqrecord]
-        for assembly in product(*arrangements):
-            if assembly_is_valid(assembly):
-
-                source = get_sticky_ligation_source_from_assembly_list(
-                    assembly)
-
-                # Sometimes they can be circularised, for now, we circularise by
-                # default if possible
-                source.circularised = sum_is_sticky(assembly[-1].seq, assembly[0].seq)
-
-                if assembly_is_duplicate(source):
+    possible_sources = list()
+    for _input in permutations(sequence_ids):
+        for fragments_inverted in product([True, False], repeat=len(_input)):
+            for circularised in [True, False]:
+                possible_source = StickyLigationSource(input=_input, fragments_inverted=fragments_inverted,
+                                                       circularised=circularised)
+                if assembly_is_duplicate(possible_source):
                     continue
+                possible_sources.append(possible_source)
 
-                possible_assemblies.append(source)
-                possible_products.append(perform_assembly(assembly, source.circularised))
+    # Here we filter those that are compatible
+    valid_sources = list()
+    products = list()
+    for source in possible_sources:
+        assembly_list = get_assembly_list_from_sticky_ligation_source(seqs, source)
+        if assembly_list_is_valid(assembly_list, source.circularised):
 
-    return possible_products, possible_assemblies
+            # For now, if the assembly can be circularised, we make it happen
+            # (we exclude linear assemblies that could be circularised)
+            if not source.circularised and assembly_list_can_be_circularised(assembly_list):
+                continue
+            valid_sources.append(source)
+            products.append(perform_assembly(assembly_list, source.circularised))
+
+    return products, valid_sources
