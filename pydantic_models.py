@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from enum import Enum
-from typing import List, Optional
+from typing import Optional
 from Bio.SeqFeature import SeqFeature, FeatureLocation
 
 from pydantic.types import conlist
@@ -94,14 +94,14 @@ class Source(BaseModel):
     """
     # Fields required to execute a source step
     id: int = None
-    input: List[int] = []
+    input: list[int] = []
     output: int = None
     type: SourceType = None
     output_index: int = None
 
     # Fields used to choose between multiple outputs
     # and other client-side functionality
-    output_list: List[SequenceEntity] = []
+    output_list: list[SequenceEntity] = []
 
 
 class UploadedFileSource(Source):
@@ -122,18 +122,25 @@ class GenbankIdSource(Source):
 # TODO There is some abstract common thing between restriction and PCR, since
 # they select a subset of the molecule, perhaps they can be merged in some way.
 
-class RestrictionEnzymeDigestionSource(Source):
-    """Documents a restriction enzyme digestion, and the selection of one of the fragments."""
+class SequenceSubsetSource(Source):
+    """An abstract class for sources that select a subset of a sequence, such as PCR and digestion."""
 
-    type: SourceType = SourceType('restriction')
     # This can only take one input
     input: conlist(int, min_items=1, max_items=1)
 
-    # Field required to execute the source step
-    restriction_enzymes: conlist(str, min_items=1)
+    # Boundaries of a fragment (length should be either empty, or length = 2)
+    fragment_boundaries: list[int] = []
 
-    # Field for client-side functionality
-    fragment_boundaries: List[int] = []
+
+class RestrictionEnzymeDigestionSource(SequenceSubsetSource):
+    """Documents a restriction enzyme digestion, and the selection of one of the fragments."""
+
+    type: SourceType = SourceType('restriction')
+
+    # The order of the enzymes in the list corresponds to the fragment_boundaries.
+    # For instance, if a fragment 5' is cut with EcoRI and the 3' with BamHI,
+    # restriction_enzymes = ['EcoRI', 'BamHI']
+    restriction_enzymes: conlist(str, min_items=1)
 
 
 class PrimerAnnealingSettings(BaseModel):
@@ -162,7 +169,7 @@ class PCRSource(Source):
         to be specified if the primer annealing fields are provided.')
 
     # Field for client-side functionality
-    possible_primer_pairs: List[PrimerPair] = []
+    possible_primer_pairs: list[PrimerPair] = []
 
 
 class StickyLigationSource(Source):
@@ -173,7 +180,7 @@ class StickyLigationSource(Source):
     # of the assembly + whether there is circularization.
     input: conlist(int, min_items=1)
     type: SourceType = SourceType('sticky_ligation')
-    fragments_inverted: List[bool] = []
+    fragments_inverted: list[bool] = []
     circularised: bool = None
 
     # TODO include this

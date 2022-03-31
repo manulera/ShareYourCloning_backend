@@ -103,25 +103,43 @@ async def get_from_genebank_id(source: GenbankIdSource):
 
 @ app.post('/restriction', response_model=create_model(
     'RestrictionEnzymeDigestionResponse',
-    source=(RestrictionEnzymeDigestionSource, ...),
-    sequence=(SequenceEntity, None)
+    sources=(list[RestrictionEnzymeDigestionSource], ...),
+    sequences=(list[SequenceEntity], ...)
 ))
 async def restriction(source: RestrictionEnzymeDigestionSource,
                       sequences: conlist(SequenceEntity, min_items=1, max_items=1)):
     dseq = read_dsrecord_from_json(sequences[0])
     # TODO: return error if the id of the sequence does not correspond
-    products_dseq, fragment_boundaries = get_restriction_enzyme_products_list(
+    # TODO: issue warning if number of enzymes>2 or if one does not cut
+
+    # If the request provides the fragment_boundaries, the program should return only one output.
+    output_is_set = False
+    if len(source.fragment_boundaries) > 0:
+        if len(source.fragment_boundaries) != 2 or len(source.restriction_enzymes) != 2:
+            raise HTTPException(
+                400, 'If `fragment_boundaries` are provided, the length of `fragment_boundaries` and `restriction_enzymes` must be 2.')
+        output_is_set = True
+
+    fragments, out_sources = get_restriction_enzyme_products_list(
         dseq, source)
 
-    source.output_list = [format_sequence_genbank(seq) for seq
-                          in products_dseq]
-    source.fragment_boundaries = fragment_boundaries
+    out_sequences = [format_sequence_genbank(seq) for seq
+                     in fragments]
 
-    if source.output_index is not None:
-        output_sequence = source.output_list[source.output_index]
-    else:
-        output_sequence = None
-    return {'sequence': output_sequence, 'source': source}
+    if len(out_sequences) == 0:
+        raise HTTPException(
+            400, 'The enzymes do not cut.')
+
+    # If the user has provided boundaries, we verify that they are correct, and return only those as the output
+    if output_is_set:
+        for i, out_source in enumerate(out_sources):
+            if out_source == source:
+                return {'sequences': [out_sequences[i]], 'sources': [out_source]}
+        # If we don't find it, there was a mistake
+        raise HTTPException(
+            400, 'The fragment boundaries / enzymes provided do not correspond to the ones predicted.')
+
+    return {'sources': out_sources, 'sequences': out_sequences}
 
 
 @ app.post('/sticky_ligation', response_model=create_model(

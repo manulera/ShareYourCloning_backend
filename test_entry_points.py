@@ -1,10 +1,10 @@
-from typing import List
+
 from dna_functions import format_sequence_genbank, read_dsrecord_from_json
 from main import app
 from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
-from pydantic_models import PCRSource, PrimerAnnealing, PrimerAnnealingSettings, PrimerModel, PrimerPair, SequenceEntity, StickyLigationSource
+from pydantic_models import PCRSource, PrimerAnnealing, PrimerAnnealingSettings, PrimerModel, PrimerPair, RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource
 from pydna.dseqrecord import Dseqrecord
 import unittest
 from pydna.dseq import Dseq
@@ -24,7 +24,7 @@ class StickyLigationTest(unittest.TestCase):
 
         # Restriction cut
         enzyme = CommOnly.format('EcoRI')
-        output_list: List[Dseqrecord] = initial_sequence.cut([enzyme])
+        output_list: list[Dseqrecord] = initial_sequence.cut([enzyme])
 
         # Convert to json to use as input
         json_seqs = [format_sequence_genbank(seq) for seq in output_list]
@@ -73,6 +73,232 @@ class StickyLigationTest(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         data = response.json()
         self.assertEqual(data['detail'], 'Fragments are not compatible for sticky ligation')
+
+
+class RestrictionTest(unittest.TestCase):
+
+    def test_linear_single_restriction(self):
+
+        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', linear=True)
+        json_seq = format_sequence_genbank(dseq)
+        json_seq.id = 1
+
+        # See if we get the right responses
+        source = RestrictionEnzymeDigestionSource(
+            input=[1],
+            restriction_enzymes=['EcoRI'],
+        )
+        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        response = client.post('/restriction', json=data)
+        payload = response.json()
+
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+        sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+
+        # The right sequences are returned in the right order
+        self.assertEqual(resulting_sequences[0].seq.watson.upper(), 'AAAAAAG')
+        self.assertEqual(resulting_sequences[1].seq.watson.upper(), 'AATTCTTTTTT')
+
+        # The edges of the fragments are correct:
+        self.assertEqual(sources[0].fragment_boundaries, [0, 11])
+        self.assertEqual(sources[1].fragment_boundaries, [7, 18])
+
+        # The enzyme names are correctly returned:
+        self.assertEqual(sources[0].restriction_enzymes, ['', 'EcoRI'])
+        self.assertEqual(sources[1].restriction_enzymes, ['EcoRI', ''])
+
+        # Now we specify the output
+        source = RestrictionEnzymeDigestionSource(
+            input=[1],
+            restriction_enzymes=['', 'EcoRI'],
+            fragment_boundaries=[0, 11]
+        )
+        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        response = client.post('/restriction', json=data)
+        payload = response.json()
+
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+        sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+
+        self.assertEqual(len(resulting_sequences), 1)
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0].fragment_boundaries, [0, 11])
+        self.assertEqual(sources[0].restriction_enzymes, ['', 'EcoRI'])
+
+    def test_circular_single_restriction(self):
+
+        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', linear=False)
+        json_seq = format_sequence_genbank(dseq)
+        json_seq.id = 1
+
+        # See if we get the right responses
+        source = RestrictionEnzymeDigestionSource(
+            input=[1],
+            restriction_enzymes=['EcoRI'],
+        )
+        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        response = client.post('/restriction', json=data)
+        payload = response.json()
+
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+        sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+
+        self.assertEqual(len(resulting_sequences), 1)
+        self.assertEqual(len(sources), 1)
+
+        # The right sequences are returned in the right order
+        self.assertEqual(resulting_sequences[0].seq.watson.upper(), 'AATTCTTTTTTAAAAAAG')
+
+        # The edges of the fragments are correct:
+        self.assertEqual(sources[0].fragment_boundaries, [7, 7 + len(resulting_sequences[0].seq)])
+
+        # The enzyme names are correctly returned:
+        self.assertEqual(sources[0].restriction_enzymes, ['EcoRI', 'EcoRI'])
+
+        # When the cutting site spans the origin
+        sequences = ['AATTCTTTTTTG', 'ATTCTTTTTTGA']
+        cut_positions = [0, 11]
+
+        for s, pos in zip(sequences, cut_positions):
+            dseq = Dseqrecord(s, linear=False)
+            json_seq = format_sequence_genbank(dseq)
+            json_seq.id = 1
+
+            # See if we get the right responses
+            source = RestrictionEnzymeDigestionSource(
+                input=[1],
+                restriction_enzymes=['EcoRI'],
+            )
+            data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+            response = client.post('/restriction', json=data)
+            payload = response.json()
+
+            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+            sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+
+            self.assertEqual(len(resulting_sequences), 1)
+            self.assertEqual(len(sources), 1)
+
+            # The right sequences are returned in the right order
+            self.assertEqual(resulting_sequences[0].seq.watson.upper(), 'AATTCTTTTTTG')
+
+            # The edges of the fragments are correct:
+            self.assertEqual(sources[0].fragment_boundaries, [pos, pos + len(resulting_sequences[0].seq)])
+
+            # The enzyme names are correctly returned:
+            self.assertEqual(sources[0].restriction_enzymes, ['EcoRI', 'EcoRI'])
+
+    def test_linear_multiple_restriction(self):
+
+        dseq = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', linear=True)
+        json_seq = format_sequence_genbank(dseq)
+        json_seq.id = 1
+
+        # We try EcoRV, which gives blunt ends
+        source = RestrictionEnzymeDigestionSource(
+            input=[1],
+            restriction_enzymes=['BamHI', 'EcoRV'],
+        )
+        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        response = client.post('/restriction', json=data)
+        payload = response.json()
+
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+        sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+
+        self.assertEqual(len(resulting_sequences), 3)
+        self.assertEqual(len(sources), 3)
+
+        # The right sequences are returned in the right order
+        fragment_sequences = 'AAAG^GATCCAAAAGAT^ATCAAAAA'.split('^')
+        for i, s in enumerate(fragment_sequences):
+            self.assertEqual(resulting_sequences[i].seq.watson.upper(), s)
+
+        # The edges of the fragments are correct:
+        # AAAG^GATC_CAAAAGAT^ATCAAAAA
+        fragment_boundaries = [[0, 8], [4, 16], [16, len(dseq)]]
+        for i, e in enumerate(fragment_boundaries):
+            self.assertEqual(sources[i].fragment_boundaries, e)
+
+        # The enzyme names are correct
+        restriction_enzymes = [['', 'BamHI'], ['BamHI', 'EcoRV'], ['EcoRV', '']]
+        for i, e in enumerate(restriction_enzymes):
+            self.assertEqual(sources[i].restriction_enzymes, e)
+
+        # Submitting the known fragments
+
+        for i in range(len(fragment_boundaries)):
+            source = RestrictionEnzymeDigestionSource(
+                input=[1],
+                restriction_enzymes=restriction_enzymes[i],
+                fragment_boundaries=fragment_boundaries[i],
+            )
+            data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+            response = client.post('/restriction', json=data)
+            payload = response.json()
+
+            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+            sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+
+            self.assertEqual(len(resulting_sequences), 1)
+            self.assertEqual(len(sources), 1)
+            self.assertEqual(resulting_sequences[0].seq.watson, fragment_sequences[i])
+
+    def test_circular_multiple_restriction(self):
+
+        dseq = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', linear=False)
+        json_seq = format_sequence_genbank(dseq)
+        json_seq.id = 1
+
+        # We try EcoRV, which gives blunt ends
+        source = RestrictionEnzymeDigestionSource(
+            input=[1],
+            restriction_enzymes=['BamHI', 'EcoRV'],
+        )
+        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        response = client.post('/restriction', json=data)
+        payload = response.json()
+
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+        sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+
+        self.assertEqual(len(resulting_sequences), 2)
+        self.assertEqual(len(sources), 2)
+
+        fragment_sequences = 'GATCCAAAAGAT^ATCAAAAAAAAG'.split('^')
+        # The right sequences are returned in the right order
+        for i, s in enumerate(fragment_sequences):
+            self.assertEqual(resulting_sequences[i].seq.watson.upper(), s)
+
+        # The edges of the fragments are correct:
+        # AAAG^GATC_CAAAAGAT^ATCAAAAA
+        # We use 8 + len because it's an origin-spanning sequence
+        fragment_boundaries = [[4, 16], [16, 8 + len(dseq)]]
+        for i, e in enumerate(fragment_boundaries):
+            self.assertEqual(sources[i].fragment_boundaries, e)
+
+        # The enzyme names are correct
+        restriction_enzymes = [['BamHI', 'EcoRV'], ['EcoRV', 'BamHI']]
+        for i, e in enumerate(restriction_enzymes):
+            self.assertEqual(sources[i].restriction_enzymes, e)
+
+        # Submitting the known fragments
+        for i in range(len(fragment_boundaries)):
+            source = RestrictionEnzymeDigestionSource(
+                input=[1],
+                restriction_enzymes=restriction_enzymes[i],
+                fragment_boundaries=fragment_boundaries[i],
+            )
+            data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+            response = client.post('/restriction', json=data)
+            payload = response.json()
+
+            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+            sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+
+            self.assertEqual(len(resulting_sequences), 1)
+            self.assertEqual(len(sources), 1)
+            self.assertEqual(resulting_sequences[0].seq.watson, fragment_sequences[i])
 
 
 class PCRTest(unittest.TestCase):
@@ -189,3 +415,7 @@ class PCRTest(unittest.TestCase):
         payload = response.json()
         self.assertEqual(response.status_code, 400)
         self.assertEqual(payload['detail'], 'The annealing positions of the primers seem to be wrong.')
+
+
+if __name__ == "__main__":
+    unittest.main()

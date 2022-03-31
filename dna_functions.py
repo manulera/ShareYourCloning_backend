@@ -1,8 +1,8 @@
-from Bio.Restriction.Restriction import CommOnly
+
+from Bio.Restriction.Restriction import RestrictionBatch, RestrictionType
 from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from typing import List
 from pydantic_models import PCRSource, PrimerAnnealing, PrimerModel, PrimerPair, RestrictionEnzymeDigestionSource,\
     GenbankSequence, SequenceEntity, StickyLigationSource
 from pydna.parsers import parse as pydna_parse
@@ -87,22 +87,89 @@ def both_overhangs_from_dseq(dseq: Dseq):
     return dseq.ovhg, len(dseq.watson) - len(dseq.crick) + dseq.ovhg
 
 
-def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnzymeDigestionSource) -> tuple[List[Dseqrecord], List[int]]:
+def sort_by(list2sort, reference_list):
+    argsort = sorted(range(len(reference_list)), key=reference_list.__getitem__)
+    return [list2sort[i] for i in argsort]
 
+
+def get_cutsite_order(dseqrecord: Dseqrecord, enzymes: RestrictionBatch) -> tuple[list[RestrictionType], list[int]]:
+    """Return the cutsites in order."""
+    cuts = enzymes.search(dseqrecord.seq, linear=dseqrecord.linear)
+    positions = list()
+    cutsites = list()
+    for enzyme in cuts:
+        for position in cuts[enzyme]:
+            # batch.search returns 1-based indexes
+            positions.append(position - 1)
+            cutsites.append(str(enzyme))
+
+    # Sort both lists by position
+    cutsites = sort_by(cutsites, positions)
+    positions = sorted(positions)
+
+    # For digestion of linear sequences, the first one and last one are the molecule ends
+    if dseqrecord.linear:
+        cutsites.insert(0, '')
+        cutsites.append('')
+        positions.insert(0, 0)
+        positions.append(len(dseqrecord))
+
+    # For digestion of circular sequences, the first one and last one are the same
+    if not dseqrecord.linear:
+        cutsites.append(cutsites[0])
+        positions.append(positions[0])
+
+    return cutsites, positions
+
+
+def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnzymeDigestionSource) -> tuple[list[Dseqrecord], list[RestrictionEnzymeDigestionSource]]:
+
+    # The output is known, so we remove empty strings
+    enzyme_list = source.restriction_enzymes
+    if len(source.fragment_boundaries) > 0:
+        enzyme_list = [e for e in source.restriction_enzymes if e != '']
+    # enzyme_list = sorted(enzyme_list)
     # TODO: error if enzyme does not exist
-    enzymes = [CommOnly.format(e) for e in source.restriction_enzymes]
+    enzymes = RestrictionBatch(first=enzyme_list)
 
-    output_list: List[Dseqrecord] = seq.cut(enzymes)
-    fragment_boundaries = [fragment.pos for fragment in seq.seq.cut(enzymes)]
-    if not seq.circular:
-        fragment_boundaries.append(len(seq))
-    else:
-        fragment_boundaries.append(fragment_boundaries[0])
+    fragments: list[Dseqrecord] = seq.cut(enzymes)
+    cutsites, cutsites_positions = get_cutsite_order(seq, enzymes)
 
-    return output_list, fragment_boundaries
+    sources = list()
+
+    # We extract the fragment boundaries like this, because the dseqrecord shifts the
+    # origin
+    fragment_boundaries = [fragment.pos % len(seq) for fragment in seq.seq.cut(enzymes)]
+
+    # Sort fragments by their position in the sequence
+    fragments = sort_by(fragments, fragment_boundaries)
+
+    for i, fragment in enumerate(fragments):
+        newsource = source.copy()
+        start = cutsites_positions[i]
+        end = (start + len(fragment))
+        newsource.fragment_boundaries = [start, end]
+
+        # In a circular molecule with a single cut, the length of the fragment is
+        # bigger than the length of the molecule (there are overhang of both sides)
+        # so it is necessary to stack the sequence three times in order to check
+
+        if (3 * str(seq.seq))[start:end] != str(fragment.seq):
+            extra = 'from cutsites: ' + (3 * str(seq.seq))[start:end] + '\nfrom fragment: ' + str(fragment.seq)
+            print(fragment_boundaries)
+            print([f.pos for f in seq.seq.cut(enzymes)])
+            print(cutsites, cutsites_positions)
+            print(seq.seq)
+            print(extra)
+            exit()
+            raise ValueError(f'Something is wrong with cutsite processing:\n{extra}')
+        newsource.restriction_enzymes = [cutsites[i], cutsites[i + 1]]
+        sources.append(newsource)
+
+    return fragments, sources
 
 
-def get_pcr_products_list(template: Dseqrecord, source: PCRSource, primers: List[Primer]) -> tuple[List[Dseqrecord], List[PrimerPair]]:
+def get_pcr_products_list(template: Dseqrecord, source: PCRSource, primers: list[Primer]) -> tuple[list[Dseqrecord], list[PrimerPair]]:
     anneal = Anneal(primers, template, limit=source.primer_annealing_settings.minimum_annealing)
     primer_pairs = list()
     amplicon: Amplicon
@@ -141,9 +208,9 @@ def get_sticky_ligation_source_from_assembly_list(assembly: tuple[Dseqrecord]) -
     return assembly_summary
 
 
-def get_assembly_list_from_sticky_ligation_source(seqs: List[Dseqrecord], source: StickyLigationSource) -> List[Dseqrecord]:
+def get_assembly_list_from_sticky_ligation_source(seqs: list[Dseqrecord], source: StickyLigationSource) -> list[Dseqrecord]:
 
-    assembly: List[Dseqrecord] = list()
+    assembly: list[Dseqrecord] = list()
     for index, id in enumerate(source.input):
         # Find the element in the list that has that id and add it to the assembly
         assembly.append(next(seq for seq in seqs if int(seq.id) == id))
@@ -172,13 +239,13 @@ def assembly_is_valid(assembly: tuple[Dseqrecord], circularise=False) -> bool:
     return True
 
 
-def get_sticky_ligation_products_list(seqs: List[Dseqrecord]) -> tuple[List[Dseqrecord], List[StickyLigationSource]]:
+def get_sticky_ligation_products_list(seqs: list[Dseqrecord]) -> tuple[list[Dseqrecord], list[StickyLigationSource]]:
 
     # TODO: include also partial ligations, it could also be made more performant by creating
     # a class with only the minimal information, rather than reverse-complementing everything,
     # but this is not a priority, I would say.
     possible_products = list()
-    possible_assemblies: List[StickyLigationSource] = list()
+    possible_assemblies: list[StickyLigationSource] = list()
 
     # We try all permutations of fragments
     for perm in permutations(seqs):

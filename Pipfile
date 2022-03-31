@@ -6,9 +6,9 @@ name = "pypi"
 [packages]
 fastapi = "*"
 uvicorn = "*"
-pydna = "*"
 biopython = "*"
 python-multipart = "*"
+pydna = {editable = true, git = "https://github.com/manulera/pydna"}
 
 [dev-packages]
 flake8 = "*"
