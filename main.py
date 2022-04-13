@@ -85,13 +85,16 @@ async def read_from_file(file: UploadFile = File(...),
 
     return {'sequences': out_sequences, 'sources': out_sources}
 
+# TODO: a bit inconsistent that here you don't put {source: {...}} in the request, but
+# directly the object.
 
-@ app.post('/genebank_id', response_model=create_model(
+
+@ app.post('/genbank_id', response_model=create_model(
     'GenbankIdResponse',
     sources=(list[GenbankIdSource], ...),
     sequences=(list[SequenceEntity], ...)
 ))
-async def get_from_genebank_id(source: GenbankIdSource):
+async def get_from_genbank_id(source: GenbankIdSource):
     gb = Genbank("example@gmail.com")
     try:
         seq = Dseqrecord(gb.nucleotide(source.genbank_id))

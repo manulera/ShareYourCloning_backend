@@ -4,7 +4,7 @@ from main import app
 from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
-from pydantic_models import PCRSource, PrimerAnnealingSettings, PrimerModel,\
+from pydantic_models import GenbankIdSource, PCRSource, PrimerAnnealingSettings, PrimerModel,\
     RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource
 from pydna.dseqrecord import Dseqrecord
 import unittest
@@ -19,7 +19,19 @@ class GenbankTest(unittest.TestCase):
 
     def test_request_gene(self):
         """Test whether the gene is requested from GenBank"""
-        pass
+        source = GenbankIdSource(
+            genbank_id='NM_001018957.2',
+        )
+        response = client.post("/genbank_id", json=source.dict())
+        self.assertEqual(response.status_code, 200)
+
+    def test_request_wrong_id(self):
+        """Test a wrong Genbank id"""
+        source = GenbankIdSource(
+            genbank_id='wrong_id',
+        )
+        response = client.post("/genbank_id", json=source.dict())
+        self.assertEqual(response.status_code, 404)
 
 
 class StickyLigationTest(unittest.TestCase):
