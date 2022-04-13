@@ -88,8 +88,8 @@ async def read_from_file(file: UploadFile = File(...),
 
 @ app.post('/genebank_id', response_model=create_model(
     'GenbankIdResponse',
-    source=(GenbankIdSource, ...),
-    sequence=(SequenceEntity, None)
+    sources=(list[GenbankIdSource], ...),
+    sequences=(list[SequenceEntity], ...)
 ))
 async def get_from_genebank_id(source: GenbankIdSource):
     gb = Genbank("example@gmail.com")
@@ -107,8 +107,8 @@ async def get_from_genebank_id(source: GenbankIdSource):
         raise HTTPException(504, f'Unable to connect to GenBank: {exception}')
 
     output_sequence = format_sequence_genbank(seq)
-    source.output_list = [output_sequence]
-    return {'sequence': output_sequence, 'source': source}
+
+    return {'sequences': [output_sequence], 'sources': [source]}
 
 
 @ app.post('/restriction', response_model=create_model(

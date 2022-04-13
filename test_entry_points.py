@@ -15,6 +15,13 @@ client = TestClient(app)
 # TODO further tests are needed (combinations)
 
 
+class GenbankTest(unittest.TestCase):
+
+    def test_request_gene(self):
+        """Test whether the gene is requested from GenBank"""
+        pass
+
+
 class StickyLigationTest(unittest.TestCase):
 
     def test_sticky_ligation(self):
