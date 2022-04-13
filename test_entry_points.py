@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
 from pydantic_models import GenbankIdSource, PCRSource, PrimerAnnealingSettings, PrimerModel,\
-    RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource
+    RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource, UploadedFileSource
 from pydna.dseqrecord import Dseqrecord
 import unittest
 from pydna.dseq import Dseq
@@ -13,6 +13,82 @@ from pydna.dseq import Dseq
 client = TestClient(app)
 
 # TODO further tests are needed (combinations)
+
+
+class ReadFileTest(unittest.TestCase):
+
+    def test_read_files(self):
+        """Test that uploading files with single and multiple sequences works."""
+
+        examples = [
+            {
+                'file': './examples/sequences/pFA6a-hphMX6.gb',
+                'format': 'genbank',
+                'nb_sequences': 1
+            },
+            {
+                'file': './examples/sequences/dummy_EcoRI.fasta',
+                'format': 'fasta',
+                'nb_sequences': 1
+            },
+            {
+                'file': './examples/sequences/dummy_multi_fasta.fasta',
+                'format': 'fasta',
+                'nb_sequences': 2
+            },
+            {
+                'file': './examples/sequences/addgene-plasmid-39296-sequence-49545.dna',
+                'format': 'snapgene',
+                'nb_sequences': 1
+            }
+
+        ]
+
+        for example in examples:
+            with open(example['file'], 'rb') as f:
+                response = client.post("/read_from_file", files={"file": f})
+
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+
+            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+            sources = [UploadedFileSource.parse_obj(s) for s in payload['sources']]
+
+            self.assertEqual(len(sources), example['nb_sequences'])
+            self.assertEqual(len(resulting_sequences), example['nb_sequences'])
+            for seq in resulting_sequences:
+                self.assertGreater(len(seq), 3)
+            for source in sources:
+                self.assertEqual(source.file_format, example['format'])
+
+    def test_errors_read_files(self):
+
+        examples = [
+            {
+                'file': './test_entry_points.py',
+                'format': None,
+                'error_message': 'could not guess',
+            },
+            {
+                'file': './test_entry_points.py',
+                'format': 'snapgene',
+                'error_message': 'snapgene reader cannot',
+            },
+            {
+                'file': './test_entry_points.py',
+                'format': 'genbank',
+                'error_message': 'Pydna parser',
+            }
+        ]
+        for example in examples:
+            with open(example['file'], 'rb') as f:
+                if example["format"] is not None:
+                    response = client.post(f'/read_from_file?file_format={example["format"]}', files={'file': f})
+                else:
+                    response = client.post('/read_from_file', files={'file': f})
+
+            self.assertEqual(response.status_code, 422)
+            self.assertTrue(example['error_message'] in response.json()['detail'])
 
 
 class GenbankTest(unittest.TestCase):

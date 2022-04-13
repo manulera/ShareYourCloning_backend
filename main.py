@@ -57,18 +57,30 @@ async def read_from_file(file: UploadFile = File(...),
             'dna': 'snapgene',
             'fasta': 'fasta'
         }
+        extension = file.filename.split('.')[-1]
+        if extension not in extension_dict:
+            raise HTTPException(
+                422, 'We could not guess the format of the file from its extension.\
+                     Please provide file_format as a query parameter.')
 
         # We guess the file type from the extension
-        file_format = SequenceFileFormat(
-            extension_dict[file.filename.split('.')[-1]])
+        file_format = SequenceFileFormat(extension_dict[extension])
 
     if file_format in ['fasta', 'genbank']:
         # Read the whole file to a string
         file_content = (await file.read()).decode()
         dseqs = pydna_parse(file_content)
+        if len(dseqs) == 0:
+            raise HTTPException(
+                422, 'Pydna parser reader cannot process this file.')
 
     elif file_format == 'snapgene':
-        seq = seqio_read(file.file, file_format)
+        try:
+            seq = seqio_read(file.file, file_format)
+        except ValueError:
+            raise HTTPException(
+                422, 'Biopython snapgene reader cannot process this file.')
+
         iscircular = 'topology' in seq.annotations.keys(
         ) and seq.annotations['topology'] == 'circular'
         dseqs = [Dseqrecord(seq, circular=iscircular)]
