@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, constr
 from enum import Enum
 from typing import Optional
 from Bio.SeqFeature import SeqFeature, FeatureLocation
@@ -49,7 +49,8 @@ class PrimerModel(BaseModel):
 
     id: int
     name: str
-    sequence: str
+    # TODO: add this to the flake8 exceptions
+    sequence: constr(regex='^[acgtACGT]+$')
 
 # The next two models are unused for now
 
