@@ -1,4 +1,4 @@
-[![Python tests](https://github.com/manulera/ShareYourCloning_backend_fastAPI/actions/workflows/ci.yml/badge.svg)](https://github.com/manulera/ShareYourCloning_backend_fastAPI/actions/workflows/ci.yml)
+[![Python tests](https://github.com/manulera/ShareYourCloning_backend/actions/workflows/ci.yml/badge.svg)](https://github.com/manulera/ShareYourCloning_backend/actions/workflows/ci.yml)
 # ShareYourCloning Backend API
 
 This API is part of a bigger application, before going further, please go to the [main project readme](https://github.com/manulera/ShareYourCloning), where you can find an introduction.
