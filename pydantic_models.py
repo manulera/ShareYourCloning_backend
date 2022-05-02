@@ -84,6 +84,7 @@ class Source(BaseModel):
     """
     # Fields required to execute a source step
     id: int = None
+    kind: str = 'source'
     input: list[int] = []
     output: int = None
     type: SourceType = None
