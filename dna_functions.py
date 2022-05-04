@@ -152,6 +152,10 @@ def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnz
         newsource.restriction_enzymes = [cutsites[i], cutsites[i + 1]]
         sources.append(newsource)
 
+        # Name the fragment:
+        fragment.name = f'{seq.name}_{newsource.restriction_enzymes[0]}[{start}-{end}]{newsource.restriction_enzymes[1]}'
+
+
     return fragments, sources
 
 
