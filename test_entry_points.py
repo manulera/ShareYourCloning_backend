@@ -198,17 +198,11 @@ class StickyLigationTest(unittest.TestCase):
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
         sources = [StickyLigationSource.parse_obj(s) for s in payload['sources']]
 
-        print(output_list[0])
-        print('>nn')
-        print(output_list[0].reverse_complement())
-        # for s in sources:
-        #     print(s.fr)
-        # print(sources[0].input, sources[0].fragments_inverted)
-        # self.assertEqual(len(resulting_sequences), 1)
-        # self.assertEqual(len(sources), 1)
+        self.assertEqual(len(resulting_sequences), 1)
+        self.assertEqual(len(sources), 1)
 
-        # # Check that the assembly is correct
-        # self.assertEqual(resulting_sequences[0].seq, initial_sequence.seq)
+        # Check that the assembly is correct
+        self.assertEqual(resulting_sequences[0].seq, initial_sequence.seq)
 
 
 class RestrictionTest(unittest.TestCase):

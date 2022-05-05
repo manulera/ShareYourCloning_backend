@@ -155,7 +155,6 @@ def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnz
         # Name the fragment:
         fragment.name = f'{seq.name}_{newsource.restriction_enzymes[0]}[{start}-{end}]{newsource.restriction_enzymes[1]}'
 
-
     return fragments, sources
 
 
@@ -194,7 +193,7 @@ def get_assembly_list_from_sticky_ligation_source(seqs: list[Dseqrecord], source
 
         # Invert it necessary
         if source.fragments_inverted[index]:
-            assembly[-1].reverse_complement()
+            assembly[-1] = assembly[-1].reverse_complement()
     return assembly
 
 
