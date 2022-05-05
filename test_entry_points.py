@@ -172,6 +172,44 @@ class StickyLigationTest(unittest.TestCase):
         data = response.json()
         self.assertEqual(data['detail'], 'Fragments are not compatible for sticky ligation')
 
+    def test_sticky_ligation_ase1(self):
+        """Test whether assembly is executed when the order is provided"""
+        # Load Ase1 sequence
+        initial_sequence = pydna_parse('examples/sequences/dummy_EcoRI.fasta')[0]
+
+        # Restriction cut
+        enzyme = CommOnly.format('EcoRI')
+        output_list: list[Dseqrecord] = initial_sequence.cut([enzyme])
+
+        # Convert to json to use as input
+        json_seqs = [format_sequence_genbank(seq) for seq in output_list]
+        json_seqs[0].id = 1
+        json_seqs[1].id = 2
+        json_seqs = [seq.dict() for seq in json_seqs]
+
+        # Assign ids to define deterministic assembly
+        source = StickyLigationSource(
+            input=[1, 2],
+        )
+        data = {'source': source.dict(), 'sequences': json_seqs}
+        response = client.post("/sticky_ligation", json=data)
+        payload = response.json()
+
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+        sources = [StickyLigationSource.parse_obj(s) for s in payload['sources']]
+
+        print(output_list[0])
+        print('>nn')
+        print(output_list[0].reverse_complement())
+        # for s in sources:
+        #     print(s.fr)
+        # print(sources[0].input, sources[0].fragments_inverted)
+        # self.assertEqual(len(resulting_sequences), 1)
+        # self.assertEqual(len(sources), 1)
+
+        # # Check that the assembly is correct
+        # self.assertEqual(resulting_sequences[0].seq, initial_sequence.seq)
+
 
 class RestrictionTest(unittest.TestCase):
 
