@@ -9,6 +9,7 @@ uvicorn = "*"
 biopython = "*"
 python-multipart = "*"
 pydna = {editable = true, git = "https://github.com/manulera/pydna"}
+beautifulsoup4 = "*"
 
 [dev-packages]
 flake8 = "*"

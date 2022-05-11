@@ -9,6 +9,7 @@ sys.path.append('../../')
 from pydantic_models import GenbankIdSource, PrimerAnnealingSettings, PrimerModel, PCRSource, RestrictionEnzymeDigestionSource  # noqa
 from fastapi.testclient import TestClient  # noqa
 from main import app  # noqa
+import json  # noqa
 # %%
 
 # lists to collect sources and sequences
@@ -88,4 +89,42 @@ sequences.append(sequence)
 
 # 4. Load plasmid from file ==========================
 
+with open('addgene-plasmid-39296-sequence-49545.dna', 'rb') as f:
+    payload = client.post("/read_from_file", files={"file": f}).json()
 
+source = payload['sources'][0]
+source['id'] = 9
+source['output'] = 10
+sequence = payload['sequences'][0]
+sequence['id'] = 10
+sources.append(source)
+sequences.append(sequence)
+
+
+# 5. Digest the plasmid ==========================
+
+input_source = RestrictionEnzymeDigestionSource(
+    input=[10],
+    restriction_enzymes=['AscI', 'SalI'],
+)
+
+data = {'source': input_source.dict(), 'sequences': [sequences[-1]]}
+payload = client.post("/restriction", json=data).json()
+
+source = payload['sources'][1]
+source['id'] = 11
+source['output'] = 12
+sequence = payload['sequences'][1]
+sequence['id'] = 12
+sources.append(source)
+sequences.append(sequence)
+
+output_dict = {
+    'sequences': sequences,
+    'sources': sources,
+    'primers': primers
+}
+
+
+with open('history.json', 'w') as fp:
+    json.dump(output_dict, fp)
