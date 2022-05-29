@@ -3,19 +3,15 @@ FROM python:3.9
 
 WORKDIR /api
 
-# Use the pipenv files to create a requirements.txt file with the dependencies
-# since we do not want to use virtual environments in production
-# The pipenv lock already exclude dev dependencies
+RUN pip install poetry
 
-RUN pip install pipenv
+COPY ./poetry.lock /api/poetry.lock
+COPY ./pyproject.toml /api/pyproject.toml
+RUN poetry config virtualenvs.create false
+RUN poetry install --no-dev
 
-COPY ./Pipfile /api/Pipfile
-COPY ./Pipfile.lock /api/Pipfile.lock
-
-RUN pipenv lock --keep-outdated --requirements > requirements.txt
-# Keeping the pipfile files would give an error
-RUN rm Pipfile Pipfile.lock
-RUN pip install --upgrade --no-cache-dir -r requirements.txt
+RUN rm poetry.lock pyproject.toml
+RUN pip uninstall --yes poetry
 
 COPY . /api
 

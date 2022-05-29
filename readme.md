@@ -46,18 +46,22 @@ Then you should be able to open the API docs at [http://127.0.0.1:8000/docs](htt
 You can build the docker image and run it:
 
 ```bash
-docker build -t shareyourcloningapi .
-docker run -d --name apicontainer -p 8000:80 shareyourcloningapi
+docker build -t manulera/shareyourcloningapi .
+docker run -d --name apicontainer -p 8000:80 manulera/shareyourcloningapi
+
+# To update
 ```
 
 If you don't want to download the repository and build the image, you can fetch the latest image from dockerhub (same image that is used in [https://shareyourcloning.api.genestorian.org/](https://shareyourcloning.api.genestorian.org/))
 
-```
+```bash
 docker pull manulera/shareyourcloningapi
 docker run -d --name apicontainer -p 8000:80 manulera/shareyourcloningapi
 ```
 
 The api will be running at `http://localhost:8000`, so you should be able to access the docs at [http://localhost:8000/docs](http://localhost:8000/docs0).
+
+> Admin only:<br>to update the image in dockerhub<br> `docker image push manulera/shareyourcloningapi`
 
 ### Connecting to the frontend
 
