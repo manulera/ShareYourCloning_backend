@@ -17,22 +17,21 @@ If you want to quickly set up a local instance of the frontend and backend of th
 
 ### Local installation
 
-You should have python 3.9 installed in your machine. For the management of the dependencies `pipenv` is used, if you don't have it:
-
-```
-pip install pipenv
-```
+You should have python 3.9 installed in your machine. For the management of the dependencies `poetry` is used, if you don't have it, visit https://python-poetry.org/.
 
 In the project directory:
 
 ```bash
 # This should install the dependencies and create a virtual environment
-pipenv install
+poetry install
 
 # Activate the virtual environment
-pipenv shell
+poetry shell
 
 ```
+
+The virtual environment is install in the project folder. This is convenient if you are using an IDE for development. For settings of vscode see the folder `.vscode`.
+
 Now you should be able to run the api by running:
 
 ```bash
@@ -75,32 +74,8 @@ Finally, if you are running your api at an address other than `http://127.0.0.1:
 
 Check [contribution guidelines in the main repository](https://github.com/manulera/ShareYourCloning/blob/master/CONTRIBUTING.md).
 
-## Running the tests
+## Running the tests locally
 
 ```
-python -m unittest
-```
-
-## Settings for vscode :desktop_computer:
-
-If you are going to develop using vscode, you can create a folder in the directory of the project called `.vscode`, and create a `settings.json` as below.
-
-You will have to change `path/to/python/environment/bin/` by the location of the bin folder of the virtual environment created by pipenv. For that, run `pipenv shell` in the project directory to activate the virtual environment (after you have installed the dependencies), and then run `which python`. Once you do that, you will have autocompletion for the python libraries installed for the project and code linting.
-
-```json
-{
-    "files.exclude": {
-        "**/.git": true,
-        "**/.svn": true,
-        "**/.hg": true,
-        "**/CVS": true,
-        "**/.DS_Store": true,
-        "**/*.pyc": true,
-        "**/__pycache__": true
-    },
-    "python.linting.enabled": true,
-    "python.linting.flake8Enabled": true,
-    "python.linting.flake8Path": "path/to/python/environment/bin/flake8",
-    "python.defaultInterpreterPath": "path/to/python/environment/bin/python",
-}
+poetry run python -m unittest
 ```

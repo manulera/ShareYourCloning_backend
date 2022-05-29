@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "shareyourcloning_backend"
+version = "0.1.0"
+description = "Backend of ShareYourCloning, a web application to generate molecular cloning strategies in json format, and share them with others."
+authors = ["Your Name <you@example.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+fastapi = "*"
+uvicorn = "*"
+biopython = "*"
+python-multipart = "*"
+pydna = {git = "https://github.com/manulera/pydna", develop = true}
+beautifulsoup4 = "^4.11.1"
+
+[tool.poetry.dev-dependencies]
+flake8 = "*"
+autopep8 = "*"
+ipykernel = "*"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
