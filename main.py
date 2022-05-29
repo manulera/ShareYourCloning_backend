@@ -12,6 +12,7 @@ from pydantic_models import PCRSource, PrimerAnnealingSettings, PrimerModel, Seq
     UploadedFileSource
 from fastapi.middleware.cors import CORSMiddleware
 from urllib.error import HTTPError, URLError
+from fastapi.responses import HTMLResponse
 
 # Instance of the API object
 app = FastAPI()
@@ -31,6 +32,22 @@ app.add_middleware(
 )
 
 # TODO limit the maximum size of submitted files
+
+
+@app.get('/')
+async def greeting():
+    html_content = """
+        <html>
+            <head>
+                <title>Welcome to ShareYourCloning API</title>
+            </head>
+            <body>
+                <h1>Welcome to ShareYourCloning API</h1>
+                <p>Visit /docs to see the documentation</p>
+            </body>
+        </html>
+        """
+    return HTMLResponse(content=html_content, status_code=200)
 
 
 @ app.post('/read_from_file', response_model=create_model(
