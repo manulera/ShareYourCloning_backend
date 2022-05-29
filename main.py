@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException
+from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request
 from pydna.dseqrecord import Dseqrecord
 from pydantic import conlist, create_model
 from pydna.parsers import parse as pydna_parse
@@ -35,15 +35,15 @@ app.add_middleware(
 
 
 @app.get('/')
-async def greeting():
-    html_content = """
+async def greeting(request: Request):
+    html_content = f"""
         <html>
             <head>
                 <title>Welcome to ShareYourCloning API</title>
             </head>
             <body>
                 <h1>Welcome to ShareYourCloning API</h1>
-                <p>Visit /docs to see the documentation</p>
+                <p>You can access the endpoints documentation <a href="{request.url._url}docs">here</a></p>
             </body>
         </html>
         """

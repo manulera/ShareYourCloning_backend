@@ -49,7 +49,6 @@ You can build the docker image and run it:
 docker build -t manulera/shareyourcloningapi .
 docker run -d --name apicontainer -p 8000:80 manulera/shareyourcloningapi
 
-# To update
 ```
 
 If you don't want to download the repository and build the image, you can fetch the latest image from dockerhub (same image that is used in [https://shareyourcloning.api.genestorian.org/](https://shareyourcloning.api.genestorian.org/))
