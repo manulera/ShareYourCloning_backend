@@ -1,0 +1,30 @@
+<Node name="Cloned.dna" type="DNA" seqLen="6112" strandedness="double" ID="3" circular="1" operation="insertFragment">
+    <RegeneratedSite name="SalI" pos="37" siteCount="1" />
+    <RegeneratedSite name="AscI" pos="2237" siteCount="1" />
+    <InputSummary manipulation="replace" name1="AscI" name2="SalI" val1="63" val2="37" siteCount1="1" siteCount2="1" />
+    <InputSummary manipulation="insert" name1="SalI" name2="AscI" val1="7" val2="2207" siteCount1="1" siteCount2="1" />
+    <Node name="addgene-plasmid-39296-sequence-49545.dna" type="DNA" seqLen="3938" strandedness="double" ID="0" circular="1" useCustomMapLabel="1" customMapLabel="pFA6a-kanMX6" resurrectable="1" operation="invalid"></Node>
+    <Node name="pcr_product.dna" type="DNA" seqLen="2219" strandedness="double" ID="2" circular="0" upstreamModification="Unmodified" downstreamModification="Unmodified" resurrectable="1" operation="amplifyFragment">
+        <Oligo name="Primer 1" sequence="TAAGCAGTCGACatgcaaacagtaatgatggatg" />
+        <Oligo name="Primer 2" sequence="TAAGCAGGCGCGCCaaagccttcttctccccatt" />
+        <Parameter name="polymerase" val="polymerase that creates blunt ends" />
+        <InputSummary manipulation="amplify" val1="353" val2="2545" />
+        <Node name="ase1.dna" type="DNA" seqLen="2671" strandedness="double" ID="1" circular="0" upstreamModification="Unmodified" downstreamModification="Unmodified" resurrectable="1" operation="invalid">
+            <Primers>
+                <HybridizationParams minContinuousMatchLen="10" allowMismatch="1" minMeltingTemperature="40" showAdditionalFivePrimeMatches="1" minimumFivePrimeAnnealing="15" />
+                <Primer recentID="0" name="Primer 1" sequence="TAAGCAGTCGACatgcaaacagtaatgatggatg">
+                    <BindingSite simplified="1" location="353-374" boundStrand="0" annealedBases="atgcaaacagtaatgatggatg" meltingTemperature="54">
+                        <Component bases="TAAGCAGTCGAC" />
+                        <Component hybridizedRange="353-374" bases="atgcaaacagtaatgatggatg" />
+                    </BindingSite>
+                </Primer>
+                <Primer recentID="1" name="Primer 2" sequence="TAAGCAGGCGCGCCaaagccttcttctccccatt">
+                    <BindingSite simplified="1" location="2526-2545" boundStrand="1" annealedBases="aaagccttcttctccccatt" meltingTemperature="57">
+                        <Component bases="TAAGCAGGCGCGCC" />
+                        <Component hybridizedRange="2526-2545" bases="aaagccttcttctccccatt" />
+                    </BindingSite>
+                </Primer>
+            </Primers>
+        </Node>
+    </Node>
+</Node>

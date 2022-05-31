@@ -1,0 +1,92 @@
+{
+    "sources": [
+        {
+            "id": 1,
+            "kind": "source",
+            "input": [],
+            "output": 2,
+            "type": "genbank_id",
+            "genbank_id": "NM_001018957.2"
+        },
+        {
+            "id": 5,
+            "kind": "source",
+            "input": [
+                2
+            ],
+            "output": 6,
+            "type": "PCR",
+            "fragment_boundaries": [
+                375,
+                2526
+            ],
+            "primers": [
+                3,
+                4
+            ],
+            "primer_footprints": [
+                22,
+                20
+            ],
+            "primer_annealing_settings": {
+                "minimum_annealing": 13
+            }
+        },
+        {
+            "id": 7,
+            "kind": "source",
+            "input": [
+                6
+            ],
+            "output": 8,
+            "type": "restriction",
+            "fragment_boundaries": [
+                7,
+                2211
+            ],
+            "restriction_enzymes": [
+                "SalI",
+                "AscI"
+            ]
+        },
+        {
+            "id": 9,
+            "kind": "source",
+            "input": [],
+            "output": 10,
+            "type": "file",
+            "file_name": "addgene-plasmid-39296-sequence-49545.dna",
+            "file_format": "snapgene",
+            "index_in_file": 0
+        },
+        {
+            "id": 11,
+            "kind": "source",
+            "input": [
+                10
+            ],
+            "output": 12,
+            "type": "restriction",
+            "fragment_boundaries": [
+                63,
+                3979
+            ],
+            "restriction_enzymes": [
+                "AscI",
+                "SalI"
+            ]
+        }
+    ],
+    "primers": [
+        {
+            "id": 3,
+            "name": "ase1_forward",
+            "sequence": "TAAGCAGTCGACatgcaaacagtaatgatggatg"
+        },
+        {
+            "id": 4,
+            "name": "ase1_rvs",
+            "sequence": "TAAGCAGGCGCGCCaaagccttcttctccccatt"
+        }
+    ]
+}

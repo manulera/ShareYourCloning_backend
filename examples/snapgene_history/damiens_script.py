@@ -15,7 +15,7 @@ snapfile = open(sys.argv[1], 'rb')
 iterator = _iterate(snapfile)
 
 for (ptype, length, data) in iterator:
-    if ptype != 7: # Not a history packet
+    if ptype != 7:  # Not a history packet
         continue
 
     if data[0:6] == XZ_SIGNATURE:
@@ -30,4 +30,3 @@ for (ptype, length, data) in iterator:
         print("Unexpected payload in history packet", file=sys.stderr)
 
 snapfile.close()
-print(history)
