@@ -178,10 +178,10 @@ def assembly_is_duplicate(assembly: StickyLigationSource) -> bool:
     For linear assemblies we apply the constrain that first fragment is not inverted.
     For circular assemblies, we apply that constrain, plus that the smallest id comes first.
     """
-    if not assembly.fragments_inverted[0]:
-        if not assembly.circularised or (min(assembly.input) == assembly.input[0]):
-            return True
-    return False
+    if assembly.circularised:
+        return assembly.fragments_inverted[0] or min(assembly.input) != assembly.input[0]
+    else:
+        return assembly.fragments_inverted[0]
 
 
 def get_assembly_list_from_sticky_ligation_source(seqs: list[Dseqrecord], source: StickyLigationSource) -> list[Dseqrecord]:
