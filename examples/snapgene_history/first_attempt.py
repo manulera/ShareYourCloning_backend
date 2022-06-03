@@ -13,16 +13,16 @@ from typing import List
 
 
 # Read file to object:
-with open('snapgene_history_minimal.xml') as ins:
-    whole_file = ins.read()
+# with open('snapgene_history_minimal.xml') as ins:
+#     whole_file = ins.read()
 
-xml = lxml.objectify.fromstring(str(whole_file))
+# xml = lxml.objectify.fromstring(str(whole_file))
 
-# We start from the newest molecule, and we have to build up the history from that
-# This means that the length of xml.Node should always be 1
+# # We start from the newest molecule, and we have to build up the history from that
+# # This means that the length of xml.Node should always be 1
 
-if len(xml.Node) != 1:
-    sys.exit('there is more than one initial node')
+# if len(xml.Node) != 1:
+#     sys.exit('there is more than one initial node')
 
 
 # def appendHistory(parent_node):
@@ -33,7 +33,7 @@ if len(xml.Node) != 1:
 #     kind = parent_node.
 
 
-xml.Node.values()
+# xml.Node.values()
 
 # %%
 
@@ -72,8 +72,8 @@ class Node(BaseModel):
     ID: str
     circular: str
     operation: str
-    Node: Optional[list[Node]]
-    InputSummary: Optional[list[InputSummary]]
+    Node: Optional[list] = []
+    InputSummary: Optional[list] = []
 
 
 # user = Node.from_orm(fromstring(xmlstring))
