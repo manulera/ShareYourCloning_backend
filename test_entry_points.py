@@ -93,6 +93,7 @@ class ReadFileTest(unittest.TestCase):
 
 class GenbankTest(unittest.TestCase):
 
+    # TODO these tests will not work off-line, so the case where connection cannot be established should be handled in some way
     def test_request_gene(self):
         """Test whether the gene is requested from GenBank"""
         source = GenbankIdSource(
@@ -172,8 +173,9 @@ class StickyLigationTest(unittest.TestCase):
         data = response.json()
         self.assertEqual(data['detail'], 'Fragments are not compatible for sticky ligation')
 
-    def test_sticky_ligation_ase1(self):
-        """Test whether assembly is executed when the order is provided"""
+    def test_linear_assembly_no_order(self):
+        """Test that when order is not provided, no duplicate sequences are returned as options."""
+
         # Load Ase1 sequence
         initial_sequence = pydna_parse('examples/sequences/dummy_EcoRI.fasta')[0]
 
@@ -187,7 +189,7 @@ class StickyLigationTest(unittest.TestCase):
         json_seqs[1].id = 2
         json_seqs = [seq.dict() for seq in json_seqs]
 
-        # Assign ids to define deterministic assembly
+        # We don't set the fragments_inverted, so we will get all possibilities (in this case only one)
         source = StickyLigationSource(
             input=[1, 2],
         )
@@ -203,6 +205,37 @@ class StickyLigationTest(unittest.TestCase):
 
         # Check that the assembly is correct
         self.assertEqual(resulting_sequences[0].seq, initial_sequence.seq)
+
+    def test_circular_assembly_no_order(self):
+        initial_sequence = pydna_parse('examples/sequences/pFA6a-hphMX6.gb')[0]
+
+        # Restriction cut
+        output_list: list[Dseqrecord] = initial_sequence.cut([CommOnly.format('AscI'), CommOnly.format('SacI')])
+
+        # Convert to json to use as input
+        json_seqs = [format_sequence_genbank(seq) for seq in output_list]
+        json_seqs[0].id = 1
+        json_seqs[1].id = 2
+        json_seqs = [seq.dict() for seq in json_seqs]
+
+        # We don't set the fragments_inverted, so we will get all possibilities (in this case only one)
+        source = StickyLigationSource(
+            input=[1, 2],
+        )
+        data = {'source': source.dict(), 'sequences': json_seqs}
+        response = client.post("/sticky_ligation", json=data)
+        payload = response.json()
+
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+        sources = [StickyLigationSource.parse_obj(s) for s in payload['sources']]
+
+        self.assertEqual(len(resulting_sequences), 1)
+        self.assertEqual(len(sources), 1)
+
+        # Check that the assembly is correct, the sequences cannot be compared with the equal operator since their origin is different
+        # TODO there should be something in pydna to test circular molecules being equal but having different frames
+
+        self.assertEqual(len(resulting_sequences[0]), len(initial_sequence))
 
 
 class RestrictionTest(unittest.TestCase):
