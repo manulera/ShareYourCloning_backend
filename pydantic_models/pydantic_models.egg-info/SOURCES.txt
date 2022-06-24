@@ -1,0 +1,6 @@
+setup.py
+pydantic_models/__init__.py
+pydantic_models.egg-info/PKG-INFO
+pydantic_models.egg-info/SOURCES.txt
+pydantic_models.egg-info/dependency_links.txt
+pydantic_models.egg-info/top_level.txt

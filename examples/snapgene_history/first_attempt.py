@@ -1,42 +1,10 @@
 # %%
-
+from typing import Optional
 import xmltodict
-from xml.etree.ElementTree import fromstring
-from pydantic.utils import GetterDict
-from typing import Any, List, Optional
-import lxml.objectify
-import sys
 from pydantic import BaseModel, Field
-from typing import List
-# We can use models for type-hinting
-# class Node(BaseModel):
-
-
-# Read file to object:
-# with open('snapgene_history_minimal.xml') as ins:
-#     whole_file = ins.read()
-
-# xml = lxml.objectify.fromstring(str(whole_file))
-
-# # We start from the newest molecule, and we have to build up the history from that
-# # This means that the length of xml.Node should always be 1
-
-# if len(xml.Node) != 1:
-#     sys.exit('there is more than one initial node')
-
-
-# def appendHistory(parent_node):
-#     # print(type(parent_node))
-
-#     # for child_node in parent_node.Node:
-#     #     print(type(child_node))
-#     kind = parent_node.
-
-
-# xml.Node.values()
-
+from pydantic_models import RestrictionEnzymeDigestionSource
+from dna_functions import get_restriction_enzyme_products_list
 # %%
-
 
 """
 <User Id="2138">
@@ -50,6 +18,7 @@ xmlstring = """
     <InputSummary manipulation="replace" name1="AscI" name2="SalI" val1="63" val2="37" siteCount1="1" siteCount2="1" />
     <InputSummary manipulation="insert" name1="SalI" name2="AscI" val1="7" val2="2207" siteCount1="1" siteCount2="1" />
     <Node name="addgene-plasmid-39296-sequence-49545.dna" type="DNA" seqLen="3938" strandedness="double" ID="0" circular="1" useCustomMapLabel="1" customMapLabel="pFA6a-kanMX6" resurrectable="1" operation="invalid"></Node>
+    <Node name="pcr_product.dna" type="DNA" seqLen="2219" strandedness="double" ID="2" circular="0" upstreamModification="Unmodified" downstreamModification="Unmodified" resurrectable="1" operation="amplifyFragment"></Node>
 </Node>
 """
 
@@ -72,8 +41,11 @@ class Node(BaseModel):
     ID: str
     circular: str
     operation: str
-    Node: Optional[list] = []
-    InputSummary: Optional[list] = []
+    # Self-referencing fields have to be declared as strings!
+    # https://pydantic-docs.helpmanual.io/usage/postponed_annotations/#self-referencing-models
+    node: Optional[list['Node']] = Field([])
+    # We cannot have camelCase in field names
+    input_summary: Optional[list[InputSummary]] = Field([])
 
 
 # user = Node.from_orm(fromstring(xmlstring))
@@ -88,7 +60,14 @@ def replace_at_symbols_in_dict(input_dict):
         if key[0] == "@":
             input_dict[key[1:]] = input_dict[key]
             del input_dict[key]
-
+    for key in dict_keys:
+        # We cannot have camelCase in field names
+        if key == 'InputSummary':
+            input_dict['input_summary'] = input_dict[key]
+            del input_dict[key]
+        if key == 'Node':
+            input_dict['node'] = input_dict[key]
+            del input_dict[key]
     for key in input_dict:
         if type(input_dict[key]) == list:
             for d in input_dict[key]:
@@ -98,6 +77,30 @@ def replace_at_symbols_in_dict(input_dict):
 the_dict = the_dict['Node'][0]
 replace_at_symbols_in_dict(the_dict)
 
-first_node = Node.parse_obj(the_dict)
+node = Node.parse_obj(the_dict)
 
-first_node.InputSummary
+# It seems that each input summary corresponds to a Node (in the same order as the list, I guess?)
+# For restriction and ligation (it seems):
+
+# For now, let's assume 'replace' can only be a restriction-ligation
+
+# It seems the edges of fragments are always the 5', but I wonder what would happen in a partial ligation
+# Example: SalI gtcgac
+# Cut: g^tcgac
+# What happens if we would hybridate with a shorter one (only overlaping with gac). Then I guess they would just indicate the one furthest
+# after cgc()
+if node.input_summary[0].manipulation == 'replace':
+    restriction_enzymes = [node.input_summary[0].name1, node.input_summary[0].name2]
+    fragment_boundaries = list()
+
+    # We look for the closest ones to the ones indicated in val1. This could be problematic if sites are overlaping, but that would be
+    # an unlikely scenario. In any case, we will always check that the cloning works fine.
+    snapgene_boundaries = [int(node.input_summary[0].val1), int(node.input_summary[0].val2)]
+
+    source = RestrictionEnzymeDigestionSource(
+        restriction_enzymes=[node.input_summary[0].name1, node.input_summary[0].name2],
+        fragment_boundaries=[int(node.input_summary[0].val1), int(node.input_summary[0].val2)],
+        input=[1]
+    )
+
+    # %%

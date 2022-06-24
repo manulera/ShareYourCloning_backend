@@ -10,10 +10,12 @@ beautifulsoup4 = "^4.11.1"
 biopython = "*"
 dna_functions = {path = "./dna_functions", develop = true}
 fastapi = "*"
+pydantic_models = {path = "./pydantic_models", develop = true}
 pydna = {git = "https://github.com/manulera/pydna", develop = true}
 python = "^3.9"
 python-multipart = "*"
 uvicorn = "*"
+xmltodict = "^0.13.0"
 
 [tool.poetry.dev-dependencies]
 autopep8 = "*"
