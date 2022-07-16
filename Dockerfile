@@ -7,6 +7,7 @@ RUN pip install poetry
 
 COPY ./poetry.lock /api/poetry.lock
 COPY ./pyproject.toml /api/pyproject.toml
+COPY ./dna_functions /api/dna_functions
 RUN poetry config virtualenvs.create false
 RUN poetry install --no-dev
 
