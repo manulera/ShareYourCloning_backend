@@ -295,3 +295,9 @@ def request_from_addgene(source: RepositoryIdSource) -> tuple[list[Dseqrecord], 
                 products.append(get_sequences_from_gb_file_url(seq_url)[0])
             break
     return products, sources
+
+
+def correct_name(dseq: Dseqrecord):
+    # Can set the name from keyword if locus is set to Exported
+    if dseq.name.lower() == 'exported' and dseq.locus.lower() == 'exported' and 'keywords' in dseq.annotations:
+        dseq.name = dseq.annotations['keywords'][0]
