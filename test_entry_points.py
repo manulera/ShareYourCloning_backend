@@ -113,6 +113,75 @@ class GenbankTest(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class AddGeneTest(unittest.TestCase):
+    def test_request_plasmid(self):
+        """Test whether the gene is requested from AddGene and returns the right info"""
+        examples = [
+            {
+                'id': '39282',
+                'url': 'https://media.addgene.org/snapgene-media/v1.7.9-0-g88a3305/sequences/240599/4936a6ae-6b4d-4d24-b7ac-2339fad5755d/addgene-plasmid-39282-sequence-240599.gbk',
+                'type': 'addgene-full'
+            },
+            {
+                'id': '39289',
+                'url': 'https://media.addgene.org/snapgene-media/v1.7.9-0-g88a3305/sequences/49640/4fa9f18b-d5ca-4ac6-a50c-76a6cd15cbab/addgene-plasmid-39289-sequence-49640.gbk',
+                'type': 'depositor-full'
+            },
+        ]
+        for example in examples:
+            source = RepositoryIdSource(
+                repository='addgene',
+                repository_id=example['id'],
+            )
+
+            response = client.post("/repository_id", json=source.dict())
+
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+            sources = [RepositoryIdSource.parse_obj(s) for s in payload['sources']]
+
+            self.assertEqual(len(resulting_sequences), 1)
+            self.assertEqual(len(sources), 1)
+            self.assertEqual(sources[0].info['type'], example['type'])
+            self.assertEqual(sources[0].info['url'], example['url'])
+
+            # We get the same response when making the response with the url
+            response2 = client.post("/repository_id", json=payload['sources'][0])
+            self.assertEqual(response.json(), response2.json())
+
+    def test_missing_sequences(self):
+        # Non-existing id
+        source = RepositoryIdSource(
+            repository='addgene',
+            repository_id='DUMMYTEST',
+        )
+
+        response = client.post("/repository_id", json=source.dict())
+        self.assertEqual(response.status_code, 404)
+        self.assertIn('wrong addgene id', response.json()['detail'])
+
+        # Id that has no full-sequences
+        source = RepositoryIdSource(
+            repository='addgene',
+            repository_id='39291',
+        )
+        response = client.post("/repository_id", json=source.dict())
+        self.assertEqual(response.status_code, 404)
+        self.assertIn('does not have full sequences', response.json()['detail'])
+
+        # url does not exist
+        source = RepositoryIdSource(
+            repository='addgene',
+            repository_id='39282',
+            info={'url': 'https://media.addgene.org/snapgene-media/wrongggggggg.gbk'}
+        )
+        response = client.post("/repository_id", json=source.dict())
+        self.assertEqual(response.status_code, 404)
+
+        # TODO url exists but does not match id, or does not match
+
+
 class StickyLigationTest(unittest.TestCase):
 
     def test_sticky_ligation(self):

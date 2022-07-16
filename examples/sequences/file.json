@@ -99,6 +99,7 @@
                     }
                 }
             ],
+            "repository": "genbank",
             "repository_id": "NM_001018957.2",
             "kind": "source"
         },

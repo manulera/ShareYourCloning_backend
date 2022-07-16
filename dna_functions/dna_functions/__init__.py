@@ -1,15 +1,18 @@
 
+from urllib.error import HTTPError
 from Bio.Restriction.Restriction import RestrictionBatch, RestrictionType
 from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from pydantic_models import PCRSource, PrimerModel, RestrictionEnzymeDigestionSource,\
+from pydantic_models import PCRSource, PrimerModel, RepositoryIdSource, RestrictionEnzymeDigestionSource,\
     GenbankSequence, SequenceEntity, StickyLigationSource
 from pydna.parsers import parse as pydna_parse
 from itertools import permutations, product
 from pydna.primer import Primer
 from pydna.amplify import Anneal
 from pydna.amplicon import Amplicon
+import requests
+from bs4 import BeautifulSoup
 
 
 def sum_is_sticky(seq1: Dseq, seq2: Dseq) -> bool:
@@ -251,3 +254,44 @@ def get_sticky_ligation_products_list(seqs: list[Dseqrecord]) -> tuple[list[Dseq
             products.append(perform_assembly(assembly_list, source.circularised))
 
     return products, valid_sources
+
+
+def get_sequences_from_gb_file_url(url: str) -> Dseqrecord:
+    # TODO once pydna parse is fixed it should handle urls that point to non-gb files
+    resp = requests.get(url)
+    if resp.status_code != 200:
+        raise HTTPError(url, 404, 'file requested from url not found', 'file requested from url not found', None)
+    return pydna_parse(resp.text)
+
+
+def request_from_addgene(source: RepositoryIdSource) -> tuple[list[Dseqrecord], list[RepositoryIdSource]]:
+    # TODO here maybe it would be good to check that the addgeneID still returns the url requested.
+    if 'url' in source.info:
+        return [get_sequences_from_gb_file_url(source.info['url'])[0]], [source]
+
+    url = f'https://www.addgene.org/{source.repository_id}/sequences/'
+    resp = requests.get(url)
+    if resp.status_code == 404:
+        raise HTTPError(url, 404, 'entity not found', 'entity not found', None)
+    soup = BeautifulSoup(resp.content, 'html.parser')
+
+    sequence_file_url_dict = dict()
+    for _type in ['depositor-full', 'depositor-partial', 'addgene-full', 'addgene-partial']:
+        sequence_file_url_dict[_type] = []
+        if soup.find(id=_type) is not None:
+            sequence_file_url_dict[_type] = [a.get('href') for a in soup.find(id=_type).findAll(class_='genbank-file-download')]
+
+    # TODO provide addgene sequencing data supporting the sequence
+    # We prefer to return addgene full if both available
+    products = list()
+    sources = list()
+    for _type in ['addgene-full', 'depositor-full']:
+        if len(sequence_file_url_dict[_type]) > 0:
+            for seq_url in sequence_file_url_dict[_type]:
+                new_source = source.copy()
+                new_source.info = {'url': seq_url, 'type': _type}
+                sources.append(new_source)
+                # There should be only one sequence
+                products.append(get_sequences_from_gb_file_url(seq_url)[0])
+            break
+    return products, sources

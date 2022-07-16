@@ -6,7 +6,7 @@ from Bio.SeqIO import read as seqio_read
 from pydna.genbank import Genbank
 from dna_functions import assembly_list_is_valid, get_assembly_list_from_sticky_ligation_source, get_pcr_products_list, get_restriction_enzyme_products_list, \
     format_sequence_genbank, get_sticky_ligation_products_list, perform_assembly, \
-    read_dsrecord_from_json, read_primer_from_json
+    read_dsrecord_from_json, read_primer_from_json, request_from_addgene
 from pydantic_models import PCRSource, PrimerAnnealingSettings, PrimerModel, SequenceEntity, SequenceFileFormat, \
     RepositoryIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource,\
     UploadedFileSource
@@ -22,13 +22,13 @@ app = FastAPI()
 # allow for the draft websites to also work in netlify.
 # TODO make this conditional to dev / prod using settings
 
-origins = ["http://localhost:3000", "https://shareyourcloning.netlify.app"]
+origins = ['http://localhost:3000', 'https://shareyourcloning.netlify.app']
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=['*'],
+    allow_headers=['*'],
 )
 
 # TODO limit the maximum size of submitted files
@@ -124,23 +124,38 @@ async def read_from_file(file: UploadFile = File(...),
     sequences=(list[SequenceEntity], ...)
 ))
 async def get_from_repository_id(source: RepositoryIdSource):
-    gb = Genbank("example@gmail.com")
+
     try:
-        seq = Dseqrecord(gb.nucleotide(source.repository_id))
+        if source.repository == 'genbank':
+            # This only returns one
+            gb = Genbank("example@gmail.com")
+            seq = Dseqrecord(gb.nucleotide(source.repository_id))
+            dseqs = [seq]
+            sources = [source.copy()]
+        elif source.repository == 'addgene':
+            # This may return more than one? Not clear
+            dseqs, sources = request_from_addgene(source)
+            # Special addgene exception, they may have only partial sequences
+            if len(dseqs) == 0:
+                raise HTTPException(
+                    404, f'The requested plasmid does not have full sequences, see https://www.addgene.org/{source.repository_id}/sequences/')
+        else:
+            raise HTTPException(400, 'wrong repository name')
+
+        output_sequences = [format_sequence_genbank(s) for s in dseqs]
+
+        return {'sequences': output_sequences, 'sources': sources}
+
     except HTTPError as exception:
         if exception.code == 500:
             raise HTTPException(
-                503, f'GenBank returned: {exception} - GenBank might be down')
-        elif exception.code == 400:
+                503, f'{source.repository} returned: {exception} - {source.repository} might be down')
+        elif exception.code == 400 or exception.code == 404:
             raise HTTPException(
-                404, f'GenBank returned: {exception} - Likely you inserted\
-                     a wrong GenBank id')
+                404, f'{source.repository} returned: {exception} - Likely you inserted\
+                     a wrong {source.repository} id')
     except URLError as exception:
-        raise HTTPException(504, f'Unable to connect to GenBank: {exception}')
-
-    output_sequence = format_sequence_genbank(seq)
-
-    return {'sequences': [output_sequence], 'sources': [source]}
+        raise HTTPException(504, f'Unable to connect to {source.repository}: {exception}')
 
 
 @ app.post('/restriction', response_model=create_model(

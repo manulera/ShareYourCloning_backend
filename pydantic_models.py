@@ -92,6 +92,7 @@ class Source(BaseModel):
     input: list[int] = []
     output: int = None
     type: SourceType = None
+    info: dict = {}
 
 
 class UploadedFileSource(Source):
