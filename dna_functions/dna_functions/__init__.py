@@ -25,6 +25,8 @@ def sum_is_sticky(seq1: Dseq, seq2: Dseq) -> bool:
 
 def format_sequence_genbank(seq: Dseqrecord) -> SequenceEntity:
 
+    correct_name(seq)
+    print(seq.id)
     # In principle here we do not set the id from the id of the Dseqrecord
     overhang_crick_3prime, overhang_watson_3prime = both_overhangs_from_dseq(
         seq.seq)
@@ -295,3 +297,9 @@ def request_from_addgene(source: RepositoryIdSource) -> tuple[list[Dseqrecord], 
                 products.append(get_sequences_from_gb_file_url(seq_url)[0])
             break
     return products, sources
+
+
+def correct_name(dseq: Dseqrecord):
+    # Can set the name from keyword if locus is set to Exported
+    if dseq.name.lower() == 'exported' and dseq.locus.lower() == 'exported' and 'keywords' in dseq.annotations:
+        dseq.name = dseq.annotations['keywords'][0]
