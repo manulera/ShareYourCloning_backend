@@ -25,6 +25,8 @@ def sum_is_sticky(seq1: Dseq, seq2: Dseq) -> bool:
 
 def format_sequence_genbank(seq: Dseqrecord) -> SequenceEntity:
 
+    if seq.name.lower() == 'exported':
+        correct_name(seq)
     # In principle here we do not set the id from the id of the Dseqrecord
     overhang_crick_3prime, overhang_watson_3prime = both_overhangs_from_dseq(
         seq.seq)
