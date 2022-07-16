@@ -9,7 +9,7 @@ from pydantic.types import conlist
 # Enumerations:
 
 class SourceType(str, Enum):
-    genbank_id = 'genbank_id',
+    repository_id = 'repository_id',
     file = 'file',
     restriction = 'restriction'
     sticky_ligation = 'sticky_ligation'
@@ -21,6 +21,10 @@ class SequenceFileFormat(str, Enum):
     genbank = 'genbank'
     snapgene = 'snapgene'
 
+
+class RepositoryName(str, Enum):
+    genbank = 'genbank'
+    addgene = 'addgene'
 
 # Sequence: =========================================
 
@@ -99,11 +103,12 @@ class UploadedFileSource(Source):
     index_in_file: int = None
 
 
-class GenbankIdSource(Source):
-    """Documents a request to GenBank
+class RepositoryIdSource(Source):
+    """Documents a request to a repository
     """
-    genbank_id: str
-    type: SourceType = SourceType('genbank_id')
+    repository: RepositoryName
+    repository_id: str
+    type: SourceType = SourceType('repository_id')
 
 
 # TODO There is some abstract common thing between restriction and PCR, since

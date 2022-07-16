@@ -8,7 +8,7 @@ from dna_functions import assembly_list_is_valid, get_assembly_list_from_sticky_
     format_sequence_genbank, get_sticky_ligation_products_list, perform_assembly, \
     read_dsrecord_from_json, read_primer_from_json
 from pydantic_models import PCRSource, PrimerAnnealingSettings, PrimerModel, SequenceEntity, SequenceFileFormat, \
-    GenbankIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource,\
+    RepositoryIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource,\
     UploadedFileSource
 from fastapi.middleware.cors import CORSMiddleware
 from urllib.error import HTTPError, URLError
@@ -118,15 +118,15 @@ async def read_from_file(file: UploadFile = File(...),
 # directly the object.
 
 
-@ app.post('/genbank_id', response_model=create_model(
-    'GenbankIdResponse',
-    sources=(list[GenbankIdSource], ...),
+@ app.post('/repository_id', response_model=create_model(
+    'RepositoryIdResponse',
+    sources=(list[RepositoryIdSource], ...),
     sequences=(list[SequenceEntity], ...)
 ))
-async def get_from_genbank_id(source: GenbankIdSource):
+async def get_from_repository_id(source: RepositoryIdSource):
     gb = Genbank("example@gmail.com")
     try:
-        seq = Dseqrecord(gb.nucleotide(source.genbank_id))
+        seq = Dseqrecord(gb.nucleotide(source.repository_id))
     except HTTPError as exception:
         if exception.code == 500:
             raise HTTPException(

@@ -4,7 +4,7 @@ from main import app
 from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
-from pydantic_models import GenbankIdSource, PCRSource, PrimerAnnealingSettings, PrimerModel,\
+from pydantic_models import RepositoryIdSource, PCRSource, PrimerAnnealingSettings, PrimerModel,\
     RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource, UploadedFileSource
 from pydna.dseqrecord import Dseqrecord
 import unittest
@@ -96,18 +96,20 @@ class GenbankTest(unittest.TestCase):
     # TODO these tests will not work off-line, so the case where connection cannot be established should be handled in some way
     def test_request_gene(self):
         """Test whether the gene is requested from GenBank"""
-        source = GenbankIdSource(
-            genbank_id='NM_001018957.2',
+        source = RepositoryIdSource(
+            repository='genbank',
+            repository_id='NM_001018957.2',
         )
-        response = client.post("/genbank_id", json=source.dict())
+        response = client.post("/repository_id", json=source.dict())
         self.assertEqual(response.status_code, 200)
 
     def test_request_wrong_id(self):
         """Test a wrong Genbank id"""
-        source = GenbankIdSource(
-            genbank_id='wrong_id',
+        source = RepositoryIdSource(
+            repository='genbank',
+            repository_id='wrong_id',
         )
-        response = client.post("/genbank_id", json=source.dict())
+        response = client.post("/repository_id", json=source.dict())
         self.assertEqual(response.status_code, 404)
 
 
