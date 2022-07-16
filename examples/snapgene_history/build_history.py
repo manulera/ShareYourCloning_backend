@@ -6,7 +6,7 @@ and we will try to extract the snapgene history to match the documentation by Sh
 import sys
 sys.path.append('../../')
 
-from pydantic_models import GenbankIdSource, PrimerAnnealingSettings, PrimerModel, PCRSource, RestrictionEnzymeDigestionSource  # noqa
+from pydantic_models import RepositoryIdSource, PrimerAnnealingSettings, PrimerModel, PCRSource, RestrictionEnzymeDigestionSource  # noqa
 from fastapi.testclient import TestClient  # noqa
 from main import app  # noqa
 import json  # noqa
@@ -22,11 +22,12 @@ client = TestClient(app)
 
 # 1. Request Ase1 to genbank (a pombe gene) ==========================
 
-input_source = GenbankIdSource(
-    genbank_id='NM_001018957.2',
+input_source = RepositoryIdSource(
+    repository='genbank',
+    repository_id='NM_001018957.2',
 )
 
-payload = client.post('/genbank_id', json=input_source.dict()).json()
+payload = client.post('/repository_id', json=input_source.dict()).json()
 
 # There should only be one in the list, so we can simply sum them
 source = payload['sources'][0]
