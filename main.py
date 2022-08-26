@@ -4,7 +4,7 @@ from pydantic import conlist, create_model
 from pydna.parsers import parse as pydna_parse
 from Bio.SeqIO import read as seqio_read
 from pydna.genbank import Genbank
-from dna_functions import assembly_list_is_valid, get_assembly_list_from_sticky_ligation_source, get_pcr_products_list, get_restriction_enzyme_products_list, \
+from dna_functions import assembly_list_is_valid, get_assembly_list_from_sticky_ligation_source, get_invalid_enzyme_names, get_pcr_products_list, get_restriction_enzyme_products_list, \
     format_sequence_genbank, get_sticky_ligation_products_list, perform_assembly, \
     read_dsrecord_from_json, read_primer_from_json, request_from_addgene
 from pydantic_models import PCRSource, PrimerAnnealingSettings, PrimerModel, SequenceEntity, SequenceFileFormat, \
@@ -165,9 +165,14 @@ async def get_from_repository_id(source: RepositoryIdSource):
 ))
 async def restriction(source: RestrictionEnzymeDigestionSource,
                       sequences: conlist(SequenceEntity, min_items=1, max_items=1)):
+
+    # Validate enzyme names
+    invalid_enzymes = get_invalid_enzyme_names(source.restriction_enzymes)
+    if len(invalid_enzymes):
+        raise HTTPException(404, 'These enzymes do not exist: ' + ', '.join(invalid_enzymes))
+
     dseq = read_dsrecord_from_json(sequences[0])
     # TODO: return error if the id of the sequence does not correspond
-    # TODO: issue warning if number of enzymes>2 or if one does not cut
 
     # If the request provides the fragment_boundaries, the program should return only one output.
     output_is_known = False
@@ -177,15 +182,18 @@ async def restriction(source: RestrictionEnzymeDigestionSource,
                 400, 'If `fragment_boundaries` are provided, the length of `fragment_boundaries` and `restriction_enzymes` must be 2.')
         output_is_known = True
 
-    fragments, out_sources = get_restriction_enzyme_products_list(
-        dseq, source)
+    fragments, out_sources = get_restriction_enzyme_products_list(dseq, source)
 
-    out_sequences = [format_sequence_genbank(seq) for seq
-                     in fragments]
+    out_sequences = [format_sequence_genbank(seq) for seq in fragments]
 
+    # Return an error if some of the enzymes do not cut
     if len(out_sequences) == 0:
-        raise HTTPException(
-            400, 'The enzymes do not cut.')
+        raise HTTPException(400, 'The enzymes do not cut.')
+
+    all_enzymes = set(enzyme for s in out_sources for enzyme in s.restriction_enzymes)
+    enzymes_not_cutting = set(source.restriction_enzymes) - set(all_enzymes)
+    if len(enzymes_not_cutting):
+        raise HTTPException(400, 'These enzymes do not cut: ' + ', '.join(enzymes_not_cutting))
 
     # If the user has provided boundaries, we verify that they are correct, and return only those as the output
     if output_is_known:

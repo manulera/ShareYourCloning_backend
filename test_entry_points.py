@@ -311,6 +311,68 @@ class StickyLigationTest(unittest.TestCase):
 
 class RestrictionTest(unittest.TestCase):
 
+    def test_enzyme_doesnt_exist(self):
+        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', linear=True)
+        json_seq = format_sequence_genbank(dseq)
+        json_seq.id = 1
+
+        # One enzyme
+        source = RestrictionEnzymeDigestionSource(
+            input=[1],
+            restriction_enzymes=['helloworld'],
+        )
+        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        response = client.post('/restriction', json=data)
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(response.json()['detail'] == 'These enzymes do not exist: helloworld')
+
+        # More than one
+        source = RestrictionEnzymeDigestionSource(
+            input=[1],
+            restriction_enzymes=['helloworld', 'byebye'],
+        )
+        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        response = client.post('/restriction', json=data)
+        self.assertEqual(response.status_code, 404)
+        self.assertIn('byebye', response.json()['detail'])
+        self.assertIn('helloworld', response.json()['detail'])
+
+    def test_enzymes_dont_cut(self):
+        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', linear=True)
+        json_seq = format_sequence_genbank(dseq)
+        json_seq.id = 1
+
+        # See if we get the right responses
+        source = RestrictionEnzymeDigestionSource(
+            input=[1],
+            restriction_enzymes=['FbaI'],
+        )
+        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        response = client.post('/restriction', json=data)
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(response.json()['detail'] == 'The enzymes do not cut.')
+
+        # Returns when one does not cut
+        source = RestrictionEnzymeDigestionSource(
+            input=[1],
+            restriction_enzymes=['EcoRI', 'BamHI'],
+        )
+        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        response = client.post('/restriction', json=data)
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(response.json()['detail'] == 'These enzymes do not cut: BamHI')
+
+        # Returns all that don't cut
+        source = RestrictionEnzymeDigestionSource(
+            input=[1],
+            restriction_enzymes=['EcoRI', 'BamHI', 'FbaI'],
+        )
+        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        response = client.post('/restriction', json=data)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('BamHI', response.json()['detail'])
+        self.assertIn('FbaI', response.json()['detail'])
+
     def test_linear_single_restriction(self):
 
         dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', linear=True)

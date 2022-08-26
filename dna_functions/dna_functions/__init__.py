@@ -100,6 +100,9 @@ def get_cutsite_order(dseqrecord: Dseqrecord, enzymes: RestrictionBatch) -> tupl
             positions.append(position - 1)
             cutsites.append(str(enzyme))
 
+    if len(positions) == 0:
+        return cutsites, positions
+
     # Sort both lists by position
     cutsites = sort_by(cutsites, positions)
     positions = sorted(positions)
@@ -117,6 +120,19 @@ def get_cutsite_order(dseqrecord: Dseqrecord, enzymes: RestrictionBatch) -> tupl
         positions.append(positions[0])
 
     return cutsites, positions
+
+
+def get_invalid_enzyme_names(enzyme_names_list):
+    rest_batch = RestrictionBatch()
+    invalid_names = list()
+    for name in enzyme_names_list:
+        # Empty enzyme names are the natural edges of the molecule
+        if name != '':
+            try:
+                rest_batch.format(name)
+            except ValueError:
+                invalid_names.append(name)
+    return invalid_names
 
 
 def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnzymeDigestionSource) -> tuple[list[Dseqrecord], list[RestrictionEnzymeDigestionSource]]:
