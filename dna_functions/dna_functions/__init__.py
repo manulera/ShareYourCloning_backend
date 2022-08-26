@@ -121,8 +121,8 @@ def get_cutsite_order(dseqrecord: Dseqrecord, enzymes: RestrictionBatch) -> tupl
 
 def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnzymeDigestionSource) -> tuple[list[Dseqrecord], list[RestrictionEnzymeDigestionSource]]:
 
-    # The output is known, so we remove empty strings
     enzyme_list = source.restriction_enzymes
+    # If the output is known, we remove empty strings (representing pre-existing edges of the molecule)
     if len(source.fragment_boundaries) > 0:
         enzyme_list = [e for e in source.restriction_enzymes if e != '']
     # enzyme_list = sorted(enzyme_list)
@@ -130,6 +130,16 @@ def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnz
     enzymes = RestrictionBatch(first=enzyme_list)
 
     fragments: list[Dseqrecord] = seq.cut(enzymes)
+
+    # TODO: potential inconsistent behaviour
+    # cutsites_positions are the positions of the cut in the forward
+    # strand, so they may not match fragment.pos
+    # For example in this case cutsite would be 4,
+    # but the fragment.pos would be 2
+    # NNNN  NN
+    # NN  NNNN
+    # This may cause problem for overlapping sites, for now I just remove
+    # the check 
     cutsites, cutsites_positions = get_cutsite_order(seq, enzymes)
 
     sources = list()
@@ -147,18 +157,18 @@ def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnz
         end = (start + len(fragment))
         newsource.fragment_boundaries = [start, end]
 
+        # This check is removed, see TODO above
         # In a circular molecule with a single cut, the length of the fragment is
         # bigger than the length of the molecule (there are overhang of both sides)
         # so it is necessary to stack the sequence three times in order to check
-
-        if (3 * str(seq.seq))[start:end] != str(fragment.seq):
-            extra = 'from cutsites: ' + (3 * str(seq.seq))[start:end] + '\nfrom fragment: ' + str(fragment.seq)
-            raise ValueError(f'Something is wrong with cutsite processing:\n{extra}')
+        # if (3 * str(seq.seq))[start:end] != str(fragment.seq):
+        #     extra = 'from cutsites: ' + (3 * str(seq.seq))[start:end] + '\nfrom fragment: ' + str(fragment.seq)
+        #     raise ValueError(f'Something is wrong with cutsite processing:\n{extra}')
         newsource.restriction_enzymes = [cutsites[i], cutsites[i + 1]]
         sources.append(newsource)
 
         # Name the fragment:
-        fragment.name = f'{seq.name}_{newsource.restriction_enzymes[0]}[{start}-{end}]{newsource.restriction_enzymes[1]}'
+        fragment.annotations['keywords'] = f'{seq.name}_{newsource.restriction_enzymes[0]}[{start}-{end}]{newsource.restriction_enzymes[1]}'
 
     return fragments, sources
 
