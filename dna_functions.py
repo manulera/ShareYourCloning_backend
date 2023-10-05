@@ -168,7 +168,7 @@ def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnz
     fragments = sort_by(fragments, fragment_boundaries)
 
     for i, fragment in enumerate(fragments):
-        newsource = source.copy()
+        newsource = source.model_copy()
         start = cutsites_positions[i]
         end = (start + len(fragment))
         newsource.fragment_boundaries = [start, end]
@@ -195,7 +195,7 @@ def get_pcr_products_list(template: Dseqrecord, source: PCRSource, primers: list
     sources = list()
 
     for amplicon in anneal.products:
-        new_source = source.copy()
+        new_source = source.model_copy()
         new_source.primers = [int(amplicon.forward_primer.id), int(amplicon.reverse_primer.id)]
         new_source.fragment_boundaries = [amplicon.forward_primer.position, amplicon.reverse_primer.position]
         new_source.primer_footprints = [amplicon.forward_primer._fp, amplicon.reverse_primer._fp]
@@ -300,7 +300,7 @@ def request_from_addgene(source: RepositoryIdSource) -> tuple[list[Dseqrecord], 
     url = f'https://www.addgene.org/{source.repository_id}/sequences/'
     resp = requests.get(url)
     if resp.status_code == 404:
-        raise HTTPError(url, 404, 'entity not found', 'entity not found', None)
+        raise HTTPError(url, 404, 'wrong addgene id', 'wrong addgene id', None)
     soup = BeautifulSoup(resp.content, 'html.parser')
 
     sequence_file_url_dict = dict()
@@ -316,7 +316,7 @@ def request_from_addgene(source: RepositoryIdSource) -> tuple[list[Dseqrecord], 
     for _type in ['addgene-full', 'depositor-full']:
         if len(sequence_file_url_dict[_type]) > 0:
             for seq_url in sequence_file_url_dict[_type]:
-                new_source = source.copy()
+                new_source = source.model_copy()
                 new_source.info = {'url': seq_url, 'type': _type}
                 sources.append(new_source)
                 # There should be only one sequence

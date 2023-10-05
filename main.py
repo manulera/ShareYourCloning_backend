@@ -8,7 +8,7 @@ from dna_functions import assembly_list_is_valid, get_assembly_list_from_sticky_
     format_sequence_genbank, get_sticky_ligation_products_list, perform_assembly, \
     read_dsrecord_from_json, read_primer_from_json, request_from_addgene
 from pydantic_models import PCRSource, PrimerAnnealingSettings, PrimerModel, SequenceEntity, SequenceFileFormat, \
-    RepositoryIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource,\
+    RepositoryIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource, \
     UploadedFileSource
 from fastapi.middleware.cors import CORSMiddleware
 from urllib.error import HTTPError, URLError
@@ -106,7 +106,7 @@ async def read_from_file(file: UploadFile = File(...),
     parent_source = UploadedFileSource(file_format=file_format, file_name=file.filename)
     out_sources = list()
     for i in range(len(dseqs)):
-        new_source = parent_source.copy()
+        new_source = parent_source.model_copy()
         new_source.index_in_file = i
         out_sources.append(new_source)
 
@@ -131,7 +131,7 @@ async def get_from_repository_id(source: RepositoryIdSource):
             gb = Genbank("example@gmail.com")
             seq = Dseqrecord(gb.nucleotide(source.repository_id))
             dseqs = [seq]
-            sources = [source.copy()]
+            sources = [source.model_copy()]
         elif source.repository == 'addgene':
             # This may return more than one? Not clear
             dseqs, sources = request_from_addgene(source)
@@ -164,7 +164,7 @@ async def get_from_repository_id(source: RepositoryIdSource):
     sequences=(list[SequenceEntity], ...)
 ))
 async def restriction(source: RestrictionEnzymeDigestionSource,
-                      sequences: conlist(SequenceEntity, min_items=1, max_items=1)):
+                      sequences: conlist(SequenceEntity, min_length=1, max_length=1)):
 
     # Validate enzyme names
     invalid_enzymes = get_invalid_enzyme_names(source.restriction_enzymes)
@@ -213,7 +213,7 @@ async def restriction(source: RestrictionEnzymeDigestionSource,
     sequences=(list[SequenceEntity], ...)
 ))
 async def sticky_ligation(source: StickyLigationSource,
-                          sequences: conlist(SequenceEntity, min_items=1)):
+                          sequences: conlist(SequenceEntity, min_length=1)):
     dseqs = [read_dsrecord_from_json(seq) for seq in sequences]
     if len(source.fragments_inverted) > 0:
         # TODO Error if the list has different order or the ids are wrong.
@@ -243,8 +243,53 @@ async def sticky_ligation(source: StickyLigationSource,
     sequences=(list[SequenceEntity], ...)
 ))
 async def pcr(source: PCRSource,
-              sequences: conlist(SequenceEntity, min_items=1, max_items=1),
-              primers: conlist(PrimerModel, min_items=1, max_items=2),):
+              sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+              primers: conlist(PrimerModel, min_length=1, max_length=2),):
+    dseq = read_dsrecord_from_json(sequences[0])
+    primers_pydna = [read_primer_from_json(p) for p in primers]
+
+    # If the footprints are set, the output should be known
+    output_is_known = len(source.primer_footprints) > 0 or len(source.primers) > 0 or len(source.fragment_boundaries) > 0
+
+    # Here we set the annealing settings to match the input. If we send the exact annealing,
+    # there is no point in sending these settings as well.
+    if output_is_known:
+        source.primer_annealing_settings = PrimerAnnealingSettings(
+            minimum_annealing=min(source.primer_footprints)
+        )
+
+    # TODO: return error if the id of the sequence does not correspond.
+    # TODO: return error if the ids not present in the list.
+
+    # Error if no pair is generated.
+    products, out_sources = get_pcr_products_list(dseq, source, primers_pydna)
+    if len(products) == 0:
+        raise HTTPException(
+            400, 'No pair of annealing primers was found.' + ('' if output_is_known else ' Try changing the annealing settings.')
+        )
+
+    out_sequences = [format_sequence_genbank(seq) for seq
+                     in products]
+
+    # If the user has provided boundaries, we verify that they are correct.
+    if output_is_known:
+        for i, out_source in enumerate(out_sources):
+            if out_source == source:
+                return {'sequences': [out_sequences[i]], 'sources': [out_source]}
+        # If we don't find it, there was a mistake
+        raise HTTPException(
+            400, 'The annealing positions of the primers seem to be wrong.')
+
+    return {'sources': out_sources, 'sequences': out_sequences}
+
+@ app.post('/pcr_queen', response_model=create_model(
+    'PCRResponse',
+    sources=(list[PCRSource], ...),
+    sequences=(list[SequenceEntity], ...)
+))
+async def pcr_queen(source: PCRSource,
+              sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+              primers: conlist(PrimerModel, min_length=1, max_length=2),):
     dseq = read_dsrecord_from_json(sequences[0])
     primers_pydna = [read_primer_from_json(p) for p in primers]
 

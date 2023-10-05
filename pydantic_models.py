@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field, constr
+from pydantic import BaseModel, Field
+from pydantic.types import constr
 from enum import Enum
 from typing import Optional
 from Bio.SeqFeature import SeqFeature, FeatureLocation
@@ -43,9 +44,9 @@ class GenbankSequence(BaseModel):
 
 
 class SequenceEntity(BaseModel):
-    id: Optional[int]
+    id: Optional[int] = None
     kind: str = 'entity'
-    sequence: GenbankSequence = None
+    sequence: Optional[GenbankSequence]
 
 
 class PrimerModel(BaseModel):
@@ -54,7 +55,9 @@ class PrimerModel(BaseModel):
     id: int
     name: str
     # TODO: add this to the flake8 exceptions
-    sequence: constr(regex='^[acgtACGT]+$')
+    # TODO: implement constrains when there is an answer for https://github.com/pydantic/pydantic/issues/7745
+    sequence: constr(pattern='^[acgtACGT]+$')
+    # sequence: str
 
 # The next two models are unused for now
 
@@ -64,7 +67,7 @@ class SequenceFeature(BaseModel):
     type: str
     start: int
     end: int
-    strand: int = None
+    strand: Optional[int] = None
 
 
 def seq_feature2pydantic(sf: SeqFeature) -> SequenceFeature:
@@ -87,11 +90,11 @@ class Source(BaseModel):
     """A class to represent sources of DNA
     """
     # Fields required to execute a source step
-    id: int = None
+    id: Optional[int] = None
     kind: str = 'source'
     input: list[int] = []
-    output: int = None
-    type: SourceType = None
+    output: Optional[int] = None
+    type: Optional[SourceType]
     info: dict = {}
 
 
@@ -101,7 +104,7 @@ class UploadedFileSource(Source):
     file_name: str
     file_format: SequenceFileFormat
     type: SourceType = SourceType('file')
-    index_in_file: int = None
+    index_in_file: Optional[int] = None
 
 
 class RepositoryIdSource(Source):
@@ -119,7 +122,7 @@ class SequenceSubsetSource(Source):
     """An abstract class for sources that select a subset of a sequence, such as PCR and digestion."""
 
     # This can only take one input
-    input: conlist(int, min_items=1, max_items=1)
+    input: conlist(int, min_length=1, max_length=1)
 
     # Boundaries of a fragment (length should be either empty, or length = 2)
     fragment_boundaries: list[int] = Field([], description='Edges of the fragment that will be taken:\n \
@@ -137,7 +140,7 @@ class RestrictionEnzymeDigestionSource(SequenceSubsetSource):
     # The order of the enzymes in the list corresponds to the fragment_boundaries.
     # For instance, if a fragment 5' is cut with EcoRI and the 3' with BamHI,
     # restriction_enzymes = ['EcoRI', 'BamHI']
-    restriction_enzymes: conlist(str, min_items=1)
+    restriction_enzymes: conlist(str, min_length=1)
 
 
 class PrimerAnnealingSettings(BaseModel):
@@ -151,11 +154,11 @@ class PCRSource(SequenceSubsetSource):
 
     type: SourceType = SourceType('PCR')
 
-    primers: conlist(int, max_items=2) = Field([], description='id of\
+    primers: conlist(int, max_length=2) = Field([], description='id of\
         the forward and reverse primer (in that order). If the reverse and forward is the same,\
         the id should be submitted twice. It accepts a single input if primer_footprints is not set.')
 
-    primer_footprints: conlist(int, max_items=2) = Field([], description='The number of basepairs that are anealed\
+    primer_footprints: conlist(int, max_length=2) = Field([], description='The number of basepairs that are anealed\
     in each primer (same order as in `primers`). Missmatch support should be added in the future.')
 
     # TODO test this
@@ -169,10 +172,10 @@ class StickyLigationSource(Source):
 
     # TODO: this should support at some point specifying the order of the fragments
     # of the assembly + whether there is circularization.
-    input: conlist(int, min_items=1)
+    input: conlist(int, min_length=1)
     type: SourceType = SourceType('sticky_ligation')
     fragments_inverted: list[bool] = []
-    circularised: bool = None
+    circularised: Optional[bool] = None
 
     # TODO include this
     # @validator('fragments_inverted')
