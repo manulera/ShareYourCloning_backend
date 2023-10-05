@@ -27,7 +27,7 @@ input_source = RepositoryIdSource(
     repository_id='NM_001018957.2',
 )
 
-payload = client.post('/repository_id', json=input_source.dict()).json()
+payload = client.post('/repository_id', json=input_source.model_dump()).json()
 
 # There should only be one in the list, so we can simply sum them
 source = payload['sources'][0]
@@ -57,9 +57,9 @@ input_source = PCRSource(
     primer_annealing_settings=PrimerAnnealingSettings(minimum_annealing=13)
 )
 
-primers = [primer_fwd.dict(), primer_rvs.dict()]
+primers = [primer_fwd.model_dump(), primer_rvs.model_dump()]
 
-data = {'source': input_source.dict(), 'sequences': sequences, 'primers': primers}
+data = {'source': input_source.model_dump(), 'sequences': sequences, 'primers': primers}
 payload = client.post("/pcr", json=data).json()
 
 source = payload['sources'][0]
@@ -77,7 +77,7 @@ input_source = RestrictionEnzymeDigestionSource(
     restriction_enzymes=['AscI', 'SalI'],
 )
 
-data = {'source': input_source.dict(), 'sequences': [sequences[-1]]}
+data = {'source': input_source.model_dump(), 'sequences': [sequences[-1]]}
 payload = client.post("/restriction", json=data).json()
 
 source = payload['sources'][1]
@@ -109,7 +109,7 @@ input_source = RestrictionEnzymeDigestionSource(
     restriction_enzymes=['AscI', 'SalI'],
 )
 
-data = {'source': input_source.dict(), 'sequences': [sequences[-1]]}
+data = {'source': input_source.model_dump(), 'sequences': [sequences[-1]]}
 payload = client.post("/restriction", json=data).json()
 
 source = payload['sources'][1]

@@ -51,8 +51,8 @@ class ReadFileTest(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             payload = response.json()
 
-            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
-            sources = [UploadedFileSource.parse_obj(s) for s in payload['sources']]
+            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+            sources = [UploadedFileSource.model_validate(s) for s in payload['sources']]
 
             self.assertEqual(len(sources), example['nb_sequences'])
             self.assertEqual(len(resulting_sequences), example['nb_sequences'])
@@ -91,7 +91,7 @@ class ReadFileTest(unittest.TestCase):
             self.assertTrue(example['error_message'] in response.json()['detail'])
 
 
-class GenbankTest(unittest.TestCase):
+class GenBankTest(unittest.TestCase):
 
     # TODO these tests will not work off-line, so the case where connection cannot be established should be handled in some way
     def test_request_gene(self):
@@ -100,7 +100,7 @@ class GenbankTest(unittest.TestCase):
             repository='genbank',
             repository_id='NM_001018957.2',
         )
-        response = client.post("/repository_id", json=source.dict())
+        response = client.post("/repository_id", json=source.model_dump())
         self.assertEqual(response.status_code, 200)
 
     def test_request_wrong_id(self):
@@ -109,7 +109,7 @@ class GenbankTest(unittest.TestCase):
             repository='genbank',
             repository_id='wrong_id',
         )
-        response = client.post("/repository_id", json=source.dict())
+        response = client.post("/repository_id", json=source.model_dump())
         self.assertEqual(response.status_code, 404)
 
 
@@ -134,12 +134,12 @@ class AddGeneTest(unittest.TestCase):
                 repository_id=example['id'],
             )
 
-            response = client.post("/repository_id", json=source.dict())
+            response = client.post("/repository_id", json=source.model_dump())
 
             self.assertEqual(response.status_code, 200)
             payload = response.json()
-            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
-            sources = [RepositoryIdSource.parse_obj(s) for s in payload['sources']]
+            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+            sources = [RepositoryIdSource.model_validate(s) for s in payload['sources']]
 
             self.assertEqual(len(resulting_sequences), 1)
             self.assertEqual(len(sources), 1)
@@ -157,7 +157,7 @@ class AddGeneTest(unittest.TestCase):
             repository_id='DUMMYTEST',
         )
 
-        response = client.post("/repository_id", json=source.dict())
+        response = client.post("/repository_id", json=source.model_dump())
         self.assertEqual(response.status_code, 404)
         self.assertIn('wrong addgene id', response.json()['detail'])
 
@@ -166,7 +166,7 @@ class AddGeneTest(unittest.TestCase):
             repository='addgene',
             repository_id='39291',
         )
-        response = client.post("/repository_id", json=source.dict())
+        response = client.post("/repository_id", json=source.model_dump())
         self.assertEqual(response.status_code, 404)
         self.assertIn('does not have full sequences', response.json()['detail'])
 
@@ -176,7 +176,7 @@ class AddGeneTest(unittest.TestCase):
             repository_id='39282',
             info={'url': 'https://media.addgene.org/snapgene-media/wrongggggggg.gbk'}
         )
-        response = client.post("/repository_id", json=source.dict())
+        response = client.post("/repository_id", json=source.model_dump())
         self.assertEqual(response.status_code, 404)
 
         # TODO url exists but does not match id, or does not match
@@ -198,7 +198,7 @@ class StickyLigationTest(unittest.TestCase):
         json_seqs = [format_sequence_genbank(seq) for seq in output_list]
         json_seqs[0].id = 1
         json_seqs[1].id = 2
-        json_seqs = [seq.dict() for seq in json_seqs]
+        json_seqs = [seq.model_dump() for seq in json_seqs]
 
         # Assign ids to define deterministic assembly
         source = StickyLigationSource(
@@ -206,12 +206,12 @@ class StickyLigationTest(unittest.TestCase):
             fragments_inverted=[False, False],
             circularised=False
         )
-        data = {'source': source.dict(), 'sequences': json_seqs}
+        data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post("/sticky_ligation", json=data)
         payload = response.json()
 
-        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
-        sources = [StickyLigationSource.parse_obj(s) for s in payload['sources']]
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        sources = [StickyLigationSource.model_validate(s) for s in payload['sources']]
 
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(len(sources), 1)
@@ -226,7 +226,7 @@ class StickyLigationTest(unittest.TestCase):
             fragments_inverted=[False, False],
             circularised=False
         )
-        data = {'source': source.dict(), 'sequences': json_seqs}
+        data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post("/sticky_ligation", json=data)
         self.assertEqual(response.status_code, 400)
         data = response.json()
@@ -238,7 +238,7 @@ class StickyLigationTest(unittest.TestCase):
             fragments_inverted=[False, False],
             circularised=True
         )
-        data = {'source': source.dict(), 'sequences': json_seqs}
+        data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post("/sticky_ligation", json=data)
         self.assertEqual(response.status_code, 400)
         data = response.json()
@@ -258,18 +258,18 @@ class StickyLigationTest(unittest.TestCase):
         json_seqs = [format_sequence_genbank(seq) for seq in output_list]
         json_seqs[0].id = 1
         json_seqs[1].id = 2
-        json_seqs = [seq.dict() for seq in json_seqs]
+        json_seqs = [seq.model_dump() for seq in json_seqs]
 
         # We don't set the fragments_inverted, so we will get all possibilities (in this case only one)
         source = StickyLigationSource(
             input=[1, 2],
         )
-        data = {'source': source.dict(), 'sequences': json_seqs}
+        data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post("/sticky_ligation", json=data)
         payload = response.json()
 
-        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
-        sources = [StickyLigationSource.parse_obj(s) for s in payload['sources']]
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        sources = [StickyLigationSource.model_validate(s) for s in payload['sources']]
 
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(len(sources), 1)
@@ -287,18 +287,18 @@ class StickyLigationTest(unittest.TestCase):
         json_seqs = [format_sequence_genbank(seq) for seq in output_list]
         json_seqs[0].id = 1
         json_seqs[1].id = 2
-        json_seqs = [seq.dict() for seq in json_seqs]
+        json_seqs = [seq.model_dump() for seq in json_seqs]
 
         # We don't set the fragments_inverted, so we will get all possibilities (in this case only one)
         source = StickyLigationSource(
             input=[1, 2],
         )
-        data = {'source': source.dict(), 'sequences': json_seqs}
+        data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post("/sticky_ligation", json=data)
         payload = response.json()
 
-        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
-        sources = [StickyLigationSource.parse_obj(s) for s in payload['sources']]
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        sources = [StickyLigationSource.model_validate(s) for s in payload['sources']]
 
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(len(sources), 1)
@@ -321,7 +321,7 @@ class RestrictionTest(unittest.TestCase):
             input=[1],
             restriction_enzymes=['helloworld'],
         )
-        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data)
         self.assertEqual(response.status_code, 404)
         self.assertTrue(response.json()['detail'] == 'These enzymes do not exist: helloworld')
@@ -331,7 +331,7 @@ class RestrictionTest(unittest.TestCase):
             input=[1],
             restriction_enzymes=['helloworld', 'byebye'],
         )
-        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data)
         self.assertEqual(response.status_code, 404)
         self.assertIn('byebye', response.json()['detail'])
@@ -347,7 +347,7 @@ class RestrictionTest(unittest.TestCase):
             input=[1],
             restriction_enzymes=['FbaI'],
         )
-        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data)
         self.assertEqual(response.status_code, 400)
         self.assertTrue(response.json()['detail'] == 'The enzymes do not cut.')
@@ -357,7 +357,7 @@ class RestrictionTest(unittest.TestCase):
             input=[1],
             restriction_enzymes=['EcoRI', 'BamHI'],
         )
-        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data)
         self.assertEqual(response.status_code, 400)
         self.assertTrue(response.json()['detail'] == 'These enzymes do not cut: BamHI')
@@ -367,7 +367,7 @@ class RestrictionTest(unittest.TestCase):
             input=[1],
             restriction_enzymes=['EcoRI', 'BamHI', 'FbaI'],
         )
-        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data)
         self.assertEqual(response.status_code, 400)
         self.assertIn('BamHI', response.json()['detail'])
@@ -384,12 +384,12 @@ class RestrictionTest(unittest.TestCase):
             input=[1],
             restriction_enzymes=['EcoRI'],
         )
-        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data)
         payload = response.json()
 
-        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
-        sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        sources = [RestrictionEnzymeDigestionSource.model_validate(s) for s in payload['sources']]
 
         # The right sequences are returned in the right order
         self.assertEqual(resulting_sequences[0].seq.watson.upper(), 'AAAAAAG')
@@ -409,12 +409,12 @@ class RestrictionTest(unittest.TestCase):
             restriction_enzymes=['', 'EcoRI'],
             fragment_boundaries=[0, 11]
         )
-        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data)
         payload = response.json()
 
-        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
-        sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        sources = [RestrictionEnzymeDigestionSource.model_validate(s) for s in payload['sources']]
 
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(len(sources), 1)
@@ -432,12 +432,12 @@ class RestrictionTest(unittest.TestCase):
             input=[1],
             restriction_enzymes=['EcoRI'],
         )
-        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data)
         payload = response.json()
 
-        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
-        sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        sources = [RestrictionEnzymeDigestionSource.model_validate(s) for s in payload['sources']]
 
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(len(sources), 1)
@@ -465,12 +465,12 @@ class RestrictionTest(unittest.TestCase):
                 input=[1],
                 restriction_enzymes=['EcoRI'],
             )
-            data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+            data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
             response = client.post('/restriction', json=data)
             payload = response.json()
 
-            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
-            sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+            sources = [RestrictionEnzymeDigestionSource.model_validate(s) for s in payload['sources']]
 
             self.assertEqual(len(resulting_sequences), 1)
             self.assertEqual(len(sources), 1)
@@ -495,12 +495,12 @@ class RestrictionTest(unittest.TestCase):
             input=[1],
             restriction_enzymes=['BamHI', 'EcoRV'],
         )
-        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data)
         payload = response.json()
 
-        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
-        sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        sources = [RestrictionEnzymeDigestionSource.model_validate(s) for s in payload['sources']]
 
         self.assertEqual(len(resulting_sequences), 3)
         self.assertEqual(len(sources), 3)
@@ -529,12 +529,12 @@ class RestrictionTest(unittest.TestCase):
                 restriction_enzymes=restriction_enzymes[i],
                 fragment_boundaries=fragment_boundaries[i],
             )
-            data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+            data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
             response = client.post('/restriction', json=data)
             payload = response.json()
 
-            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
-            sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+            sources = [RestrictionEnzymeDigestionSource.model_validate(s) for s in payload['sources']]
 
             self.assertEqual(len(resulting_sequences), 1)
             self.assertEqual(len(sources), 1)
@@ -551,12 +551,12 @@ class RestrictionTest(unittest.TestCase):
             input=[1],
             restriction_enzymes=['BamHI', 'EcoRV'],
         )
-        data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+        data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data)
         payload = response.json()
 
-        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
-        sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        sources = [RestrictionEnzymeDigestionSource.model_validate(s) for s in payload['sources']]
 
         self.assertEqual(len(resulting_sequences), 2)
         self.assertEqual(len(sources), 2)
@@ -585,12 +585,12 @@ class RestrictionTest(unittest.TestCase):
                 restriction_enzymes=restriction_enzymes[i],
                 fragment_boundaries=fragment_boundaries[i],
             )
-            data = {'source': source.dict(), 'sequences': [json_seq.dict()]}
+            data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
             response = client.post('/restriction', json=data)
             payload = response.json()
 
-            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
-            sources = [RestrictionEnzymeDigestionSource.parse_obj(s) for s in payload['sources']]
+            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+            sources = [RestrictionEnzymeDigestionSource.model_validate(s) for s in payload['sources']]
 
             self.assertEqual(len(resulting_sequences), 1)
             self.assertEqual(len(sources), 1)
@@ -621,12 +621,12 @@ class PCRTest(unittest.TestCase):
             name='ase1_reverse'
         )
 
-        data = {'source': submitted_source.dict(), 'sequences': [json_seq.dict()], 'primers': [primer_fwd.dict(), primer_rvs.dict()]}
+        data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
         response = client.post("/pcr", json=data)
         payload = response.json()
 
-        sources = [PCRSource.parse_obj(s) for s in payload['sources']]
-        sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+        sources = [PCRSource.model_validate(s) for s in payload['sources']]
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
 
         # Only one possible output
         self.assertEqual(len(sources), 1)
@@ -642,12 +642,12 @@ class PCRTest(unittest.TestCase):
 
         # Now we submit the deterministic PCR (we already know which fragment we want)
 
-        data = {'source': source1.dict(), 'sequences': [json_seq.dict()], 'primers': [primer_fwd.dict(), primer_rvs.dict()]}
+        data = {'source': source1.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
         response = client.post("/pcr", json=data)
         payload = response.json()
 
-        sources = [PCRSource.parse_obj(s) for s in payload['sources']]
-        sequences = [read_dsrecord_from_json(SequenceEntity.parse_obj(s)) for s in payload['sequences']]
+        sources = [PCRSource.model_validate(s) for s in payload['sources']]
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
 
         # Only one possible output
         self.assertEqual(len(sources), 1)
@@ -689,7 +689,7 @@ class PCRTest(unittest.TestCase):
         )
 
         # Without specifying the pair
-        data = {'source': submitted_source.dict(), 'sequences': [json_seq.dict()], 'primers': [primer_fwd.dict(), primer_rvs.dict()]}
+        data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
         response = client.post("/pcr", json=data)
         payload = response.json()
         self.assertEqual(response.status_code, 400)
@@ -708,7 +708,7 @@ class PCRTest(unittest.TestCase):
         submitted_source.fragment_boundaries = [59, 1718]
         submitted_source.primer_footprints = [21, 20]
 
-        data = {'source': submitted_source.dict(), 'sequences': [json_seq.dict()], 'primers': [primer_fwd.dict(), primer_rvs.dict()]}
+        data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
         response = client.post("/pcr", json=data)
         payload = response.json()
         self.assertEqual(response.status_code, 200)
@@ -718,7 +718,7 @@ class PCRTest(unittest.TestCase):
         submitted_source.fragment_boundaries = [59, 1200]  # 1200 instead of 1718
         submitted_source.primer_footprints = [21, 20]
 
-        data = {'source': submitted_source.dict(), 'sequences': [json_seq.dict()], 'primers': [primer_fwd.dict(), primer_rvs.dict()]}
+        data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
         response = client.post("/pcr", json=data)
         payload = response.json()
         self.assertEqual(response.status_code, 400)
@@ -731,7 +731,7 @@ class PCRTest(unittest.TestCase):
         # Wrong footprint (To return this error, the 'wrong one' cannot mess with the annealing settings
         # e.g. it could not be [21,40] since it would not align with footprint 20)
         submitted_source.primer_footprints = [21, 12]
-        data = {'source': submitted_source.dict(), 'sequences': [json_seq.dict()], 'primers': [primer_fwd.dict(), primer_rvs.dict()]}
+        data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
         response = client.post("/pcr", json=data)
         payload = response.json()
         self.assertEqual(response.status_code, 400)
