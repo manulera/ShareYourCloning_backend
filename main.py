@@ -13,6 +13,7 @@ from pydantic_models import PCRSource, PrimerAnnealingSettings, PrimerModel, Seq
 from fastapi.middleware.cors import CORSMiddleware
 from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
+from queen_functions import queen_from_dseqrecord
 
 # Instance of the API object
 app = FastAPI()
@@ -282,47 +283,51 @@ async def pcr(source: PCRSource,
 
     return {'sources': out_sources, 'sequences': out_sequences}
 
-@ app.post('/pcr_queen', response_model=create_model(
-    'PCRResponse',
-    sources=(list[PCRSource], ...),
+
+@ app.post('/restriction_queen', response_model=create_model(
+    'RestrictionEnzymeDigestionResponse',
+    sources=(list[RestrictionEnzymeDigestionSource], ...),
     sequences=(list[SequenceEntity], ...)
 ))
-async def pcr_queen(source: PCRSource,
-              sequences: conlist(SequenceEntity, min_length=1, max_length=1),
-              primers: conlist(PrimerModel, min_length=1, max_length=2),):
+async def restriction_queen(source: RestrictionEnzymeDigestionSource,
+                      sequences: conlist(SequenceEntity, min_length=1, max_length=1)):
+
+    # Validate enzyme names
+    invalid_enzymes = get_invalid_enzyme_names(source.restriction_enzymes)
+    if len(invalid_enzymes):
+        raise HTTPException(404, 'These enzymes do not exist: ' + ', '.join(invalid_enzymes))
+
     dseq = read_dsrecord_from_json(sequences[0])
-    primers_pydna = [read_primer_from_json(p) for p in primers]
+    queen_seq = queen_from_dseqrecord(dseq)
 
-    # If the footprints are set, the output should be known
-    output_is_known = len(source.primer_footprints) > 0 or len(source.primers) > 0 or len(source.fragment_boundaries) > 0
+    # If the request provides the fragment_boundaries, the program should return only one output.
+    output_is_known = False
+    if len(source.fragment_boundaries) > 0:
+        if len(source.fragment_boundaries) != 2 or len(source.restriction_enzymes) != 2:
+            raise HTTPException(
+                400, 'If `fragment_boundaries` are provided, the length of `fragment_boundaries` and `restriction_enzymes` must be 2.')
+        output_is_known = True
 
-    # Here we set the annealing settings to match the input. If we send the exact annealing,
-    # there is no point in sending these settings as well.
-    if output_is_known:
-        source.primer_annealing_settings = PrimerAnnealingSettings(
-            minimum_annealing=min(source.primer_footprints)
-        )
+    fragments, out_sources = get_restriction_enzyme_products_list(dseq, source)
 
-    # TODO: return error if the id of the sequence does not correspond.
-    # TODO: return error if the ids not present in the list.
+    out_sequences = [format_sequence_genbank(seq) for seq in fragments]
 
-    # Error if no pair is generated.
-    products, out_sources = get_pcr_products_list(dseq, source, primers_pydna)
-    if len(products) == 0:
-        raise HTTPException(
-            400, 'No pair of annealing primers was found.' + ('' if output_is_known else ' Try changing the annealing settings.')
-        )
+    # Return an error if some of the enzymes do not cut
+    if len(out_sequences) == 0:
+        raise HTTPException(400, 'The enzymes do not cut.')
 
-    out_sequences = [format_sequence_genbank(seq) for seq
-                     in products]
+    all_enzymes = set(enzyme for s in out_sources for enzyme in s.restriction_enzymes)
+    enzymes_not_cutting = set(source.restriction_enzymes) - set(all_enzymes)
+    if len(enzymes_not_cutting):
+        raise HTTPException(400, 'These enzymes do not cut: ' + ', '.join(enzymes_not_cutting))
 
-    # If the user has provided boundaries, we verify that they are correct.
+    # If the user has provided boundaries, we verify that they are correct, and return only those as the output
     if output_is_known:
         for i, out_source in enumerate(out_sources):
             if out_source == source:
                 return {'sequences': [out_sequences[i]], 'sources': [out_source]}
         # If we don't find it, there was a mistake
         raise HTTPException(
-            400, 'The annealing positions of the primers seem to be wrong.')
+            400, 'The fragment boundaries / enzymes provided do not correspond to the ones predicted.')
 
     return {'sources': out_sources, 'sequences': out_sequences}

@@ -12,6 +12,12 @@ Some thoughts derived from looking at how QUEEN does things. Trying to capture t
     ```
 * Sticky ligation: looks alright, but maybe could be made more generic, in the end maybe it may not have to be different from the description of a gibson assembly.
 
+## Changes to pydna
+
+* Create a match function to find all matches in the sequence, use circular string approach: https://stackoverflow.com/questions/19943113/in-python-how-to-perform-regular-expression-search-on-circular-string
+* Option to instantiate Dseq and DseqRecord with both edges length.
+* Keep these in mind http://www.sequenceontology.org/browser/current_release/term/SO:0001932
+
 ## Genbank features
 
 https://www.insdc.org/submitting-standards/feature-table/
