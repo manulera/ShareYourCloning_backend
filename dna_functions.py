@@ -13,6 +13,7 @@ from pydna.amplify import Anneal
 from pydna.amplicon import Amplicon
 import requests
 from bs4 import BeautifulSoup
+import regex
 
 
 def sum_is_sticky(seq1: Dseq, seq2: Dseq) -> bool:
@@ -329,3 +330,13 @@ def correct_name(dseq: Dseqrecord):
     # Can set the name from keyword if locus is set to Exported
     if dseq.name.lower() == 'exported' and dseq.locus.lower() == 'exported' and 'keywords' in dseq.annotations:
         dseq.name = dseq.annotations['keywords'][0]
+
+
+def find_sequence_regex(dseq: Dseqrecord, pattern: str) -> list[int]:
+    match = regex.compile(pattern, pattern, )
+    # We get the feature location for each match, both for the
+    # forward and reverse strand
+    locations = list()
+    matches = regex.findall(str(dseq.seq))
+
+    

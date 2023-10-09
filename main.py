@@ -9,7 +9,7 @@ from dna_functions import assembly_list_is_valid, get_assembly_list_from_sticky_
     read_dsrecord_from_json, read_primer_from_json, request_from_addgene
 from pydantic_models import PCRSource, PrimerAnnealingSettings, PrimerModel, SequenceEntity, SequenceFileFormat, \
     RepositoryIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource, \
-    UploadedFileSource
+    UploadedFileSource, HomologousRecombinationSource
 from fastapi.middleware.cors import CORSMiddleware
 from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
@@ -284,50 +284,16 @@ async def pcr(source: PCRSource,
     return {'sources': out_sources, 'sequences': out_sequences}
 
 
-@ app.post('/restriction_queen', response_model=create_model(
-    'RestrictionEnzymeDigestionResponse',
-    sources=(list[RestrictionEnzymeDigestionSource], ...),
+@ app.post('/homologous_recombination', response_model=create_model(
+    'HomologousRecombinationResponse',
+    sources=(list[HomologousRecombinationSource], ...),
     sequences=(list[SequenceEntity], ...)
 ))
-async def restriction_queen(source: RestrictionEnzymeDigestionSource,
-                      sequences: conlist(SequenceEntity, min_length=1, max_length=1)):
+async def homologous_recombination(source: HomologousRecombinationSource,
+              sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+              minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.')):
+    
+    template = read_dsrecord_from_json(sequences[0])
+    insert = read_dsrecord_from_json(sequences[1])
 
-    # Validate enzyme names
-    invalid_enzymes = get_invalid_enzyme_names(source.restriction_enzymes)
-    if len(invalid_enzymes):
-        raise HTTPException(404, 'These enzymes do not exist: ' + ', '.join(invalid_enzymes))
-
-    dseq = read_dsrecord_from_json(sequences[0])
-    queen_seq = queen_from_dseqrecord(dseq)
-
-    # If the request provides the fragment_boundaries, the program should return only one output.
-    output_is_known = False
-    if len(source.fragment_boundaries) > 0:
-        if len(source.fragment_boundaries) != 2 or len(source.restriction_enzymes) != 2:
-            raise HTTPException(
-                400, 'If `fragment_boundaries` are provided, the length of `fragment_boundaries` and `restriction_enzymes` must be 2.')
-        output_is_known = True
-
-    fragments, out_sources = get_restriction_enzyme_products_list(dseq, source)
-
-    out_sequences = [format_sequence_genbank(seq) for seq in fragments]
-
-    # Return an error if some of the enzymes do not cut
-    if len(out_sequences) == 0:
-        raise HTTPException(400, 'The enzymes do not cut.')
-
-    all_enzymes = set(enzyme for s in out_sources for enzyme in s.restriction_enzymes)
-    enzymes_not_cutting = set(source.restriction_enzymes) - set(all_enzymes)
-    if len(enzymes_not_cutting):
-        raise HTTPException(400, 'These enzymes do not cut: ' + ', '.join(enzymes_not_cutting))
-
-    # If the user has provided boundaries, we verify that they are correct, and return only those as the output
-    if output_is_known:
-        for i, out_source in enumerate(out_sources):
-            if out_source == source:
-                return {'sequences': [out_sequences[i]], 'sources': [out_source]}
-        # If we don't find it, there was a mistake
-        raise HTTPException(
-            400, 'The fragment boundaries / enzymes provided do not correspond to the ones predicted.')
-
-    return {'sources': out_sources, 'sequences': out_sequences}
+    

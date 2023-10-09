@@ -1,11 +1,11 @@
-from pydantic import BaseModel, Field
-from pydantic.types import constr
+from pydantic import BaseModel, Field, model_serializer, PlainValidator
+from pydantic.types import constr, conlist
 from enum import Enum
 from typing import Optional
 from Bio.SeqFeature import SeqFeature, FeatureLocation
-
-from pydantic.types import conlist
-
+from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
+from typing_extensions import Annotated
+from Bio.GenBank import _FeatureConsumer
 
 # Enumerations:
 
@@ -15,6 +15,7 @@ class SourceType(str, Enum):
     restriction = 'restriction'
     sticky_ligation = 'sticky_ligation'
     PCR = 'PCR'
+    homologous_recombination = 'homologous_recombination'
 
 
 class SequenceFileFormat(str, Enum):
@@ -59,29 +60,33 @@ class PrimerModel(BaseModel):
     sequence: constr(pattern='^[acgtACGT]+$')
     # sequence: str
 
-# The next two models are unused for now
+
+def get_feature_location_from_string(location_str: str) -> FeatureLocation:
+    fc = _FeatureConsumer(use_fuzziness=False)
+    # We need to initialize a dummy feature
+    fc._cur_feature = FeatureLocation(1, 2, 1)
+    fc.location(location_str)
+    return fc._cur_feature.location
 
 
-class SequenceFeature(BaseModel):
-    id: str
+class SeqFeatureModel(BaseModel):
     type: str
-    start: int
-    end: int
-    strand: Optional[int] = None
+    qualifiers: dict[str, list[str]] = {}
+    location: str
 
-
-def seq_feature2pydantic(sf: SeqFeature) -> SequenceFeature:
-    if not isinstance(sf.location, FeatureLocation):
-        raise TypeError(
-            'Compound locations are not yet supported.'
+    def convert_to_seq_feature(self) -> SeqFeature:
+        return SeqFeature(
+            location=get_feature_location_from_string(self.location),
+            type=self.type,
+            qualifiers=self.qualifiers
         )
-    return SequenceFeature(
-        id=sf.id,
-        type=sf.type,
-        strand=sf.location.strand,
-        start=sf.location.start,
-        end=sf.location.end
-    )
+
+    def read_from_seq_feature(sf: SeqFeature) -> 'SeqFeatureModel':
+        return SeqFeatureModel(
+            type=sf.type,
+            qualifiers=sf.qualifiers,
+            location=format_feature_location(sf.location, None)
+        )
 
 # Sources =========================================
 
@@ -130,6 +135,14 @@ class SequenceSubsetSource(Source):
     would be the part of the sequence where primers don\'t align.\n\
     * For restriction enzymes the extremes of the overhangs\n\
     For both, 0-based indexing, [first,second)')
+
+
+class HomologousRecombinationSource(Source):
+
+    # This can only take two inputs, the first one is the template, the second one is the insert
+    type: SourceType = SourceType('homologous_recombination')
+    input: conlist(int, min_length=2, max_length=2)
+    replaced_region: SeqFeatureModel
 
 
 class RestrictionEnzymeDigestionSource(SequenceSubsetSource):

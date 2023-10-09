@@ -1,7 +1,18 @@
-from pydna.dseq import Dseq
+from pydantic_models import SeqFeatureModel
 
-dseq = Dseq('AAAA')
+sf = SeqFeatureModel.model_validate({
+    'type': 'CDS',
+    'location': '1..2',
+    'qualifiers': {
+        'gene': ['ase1'],
+        'product': ['Ase1']
+    }
+})
 
-a = dseq.find('TT')
+print(sf)
+sff = sf.convert_to_seq_feature()
+sff.strand
 
-print(a)
+print(SeqFeatureModel.read_from_seq_feature(sff))
+
+# print(sf.model_dump())
