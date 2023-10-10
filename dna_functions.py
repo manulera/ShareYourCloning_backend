@@ -14,7 +14,7 @@ from pydna.amplicon import Amplicon
 import requests
 from bs4 import BeautifulSoup
 import regex
-from Bio.SeqFeature import Location
+from Bio.SeqFeature import SimpleLocation, Location, CompoundLocation
 
 
 def sum_is_sticky(seq1: Dseq, seq2: Dseq) -> bool:
@@ -333,18 +333,69 @@ def correct_name(dseq: Dseqrecord):
         dseq.name = dseq.annotations['keywords'][0]
 
 
-def find_sequence_regex(pattern: str, seq: str, iscircular: bool) -> list[Location]:
+def create_location(start: int, end: int, strand: int, seq_len: int, is_circular: bool) -> Location:
 
-    subject = seq if iscircular else seq + seq
+    if not is_circular:
+        return SimpleLocation(start, end, strand)
+
+    coords = [start % seq_len, end % seq_len]
+    if coords[0] < coords[1]:
+        return SimpleLocation(*coords, strand)
+    print('coords', coords[1])
+    return SimpleLocation(coords[0] + 1, seq_len, strand) + SimpleLocation(0, coords[1] + 1, strand)
+
+
+def find_sequence_regex(pattern: str, seq: str, is_circular: bool) -> list[Location]:
+
     compiled_pattern = regex.compile(pattern, regex.IGNORECASE)
-    matches = list(regex.finditer(compiled_pattern, subject, overlapped=True))
-
     feature_locations = list()
-    for m in matches:
-        coords = [m.start() % len(seq), m.end() % len(seq)]
-        feature_locations.append(Location(*coords, strand=1))
 
-    return feature_locations
+    # For strand 1
+    strand = 1
+    subject = 2 * seq if is_circular else seq
+    matches = list(regex.finditer(compiled_pattern, subject, overlapped=True))
+    # In circular objects, the matches can span the sequence more than once, so we
+    # remove all matches longer than the sequence
+    matches = [m for m in matches if m.end() - m.start() <= len(seq)]
+    feature_locations += [create_location(m.start() % len(seq), m.end() % len(seq), strand, len(seq), is_circular) for m in matches]
+
+    # For strand -1
+    strand = -1
+    rev_seq = reverse_complement(seq)
+    subject = 2 * rev_seq if is_circular else rev_seq
+    matches = list(regex.finditer(compiled_pattern, subject, overlapped=True))
+    matches = [m for m in matches if m.end() - m.start() <= len(seq)]
+    # The match object end and start are a range, so we need to substract 1 from the end
+    # For the example below:
+    # AAAATGAAT
+    # TTTTACTTA
+    # If we look for ATT, the match objects will be: 0-3, 4-7
+    # But the location should be: 6-9, 2-5
+    feature_locations += [create_location(len(seq) - (m.end() % len(seq)), len(seq) - (m.start() % len(seq)), strand, len(seq), is_circular) for m in matches][::-1]
+
+    # We return a unique list, cannot use a set because Location is not hashable
+    return sorted([x for i, x in enumerate(feature_locations) if x not in feature_locations[:i]], key=lambda x: (x.start - x.strand * 0.5))
 
 
+def location_edges(location: Location):
+    if isinstance(location, SimpleLocation):
+        return location.start, location.end
+    if isinstance(location, CompoundLocation):
+        print(location.parts)
+        return location.parts[0].start, location.parts[-1].end
 
+
+def get_homologous_recombination_locations(template: Dseqrecord, insert: Dseqrecord, minimal_homology) -> list[Location]:
+    """Return the locations of the possible homologous recombination sites."""
+    template_seq = str(template.seq)
+    insert_seq = str(insert.seq)
+    regex_pattern = insert_seq[:minimal_homology] + '.*' + insert_seq[-minimal_homology:]
+    locations = find_sequence_regex(regex_pattern, template_seq, template.circular)
+    return locations
+
+
+def perform_homologous_recombination(template: Dseqrecord, insert: Dseqrecord, location: Location):
+    edges = location_edges(location)
+    if template.circular:
+        return template[0:edges[0]] + insert + template[edges[1]:]
+    return (template[edges[1]:edges[0]] + insert).looped()
