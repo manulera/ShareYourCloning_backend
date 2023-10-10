@@ -3,7 +3,7 @@ from dna_functions import dseq_from_both_overhangs, both_overhangs_from_dseq, \
 import unittest
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from Bio.SeqFeature import FeatureLocation, SeqFeature
+from Bio.SeqFeature import SimpleLocation, SeqFeature
 from typing import OrderedDict
 
 
@@ -38,7 +38,7 @@ class DseqFromBothOverhangsTest(unittest.TestCase):
                     for a, start, end in [('a', 0, 2), ('b', 1, 2), ('c', 4, 7)]:
                         dseq_original.features.append(
                             SeqFeature(
-                                location=FeatureLocation(start, end),
+                                location=SimpleLocation(start, end),
                                 type="misc_feature",
                                 qualifiers=OrderedDict({"label": [a]}),
                                 strand=1)

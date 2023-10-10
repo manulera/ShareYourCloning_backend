@@ -1,11 +1,9 @@
-from pydantic import BaseModel, Field, model_serializer, PlainValidator
+from pydantic import BaseModel, Field
 from pydantic.types import constr, conlist
 from enum import Enum
 from typing import Optional
-from Bio.SeqFeature import SeqFeature, FeatureLocation
+from Bio.SeqFeature import SeqFeature, Location
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
-from typing_extensions import Annotated
-from Bio.GenBank import _FeatureConsumer
 
 # Enumerations:
 
@@ -61,14 +59,6 @@ class PrimerModel(BaseModel):
     # sequence: str
 
 
-def get_feature_location_from_string(location_str: str) -> FeatureLocation:
-    fc = _FeatureConsumer(use_fuzziness=False)
-    # We need to initialize a dummy feature
-    fc._cur_feature = FeatureLocation(1, 2, 1)
-    fc.location(location_str)
-    return fc._cur_feature.location
-
-
 class SeqFeatureModel(BaseModel):
     type: str
     qualifiers: dict[str, list[str]] = {}
@@ -76,7 +66,7 @@ class SeqFeatureModel(BaseModel):
 
     def convert_to_seq_feature(self) -> SeqFeature:
         return SeqFeature(
-            location=get_feature_location_from_string(self.location),
+            location=Location.fromstring(self.location),
             type=self.type,
             qualifiers=self.qualifiers
         )

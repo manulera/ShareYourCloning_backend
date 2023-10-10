@@ -14,7 +14,7 @@ from pydna.amplicon import Amplicon
 import requests
 from bs4 import BeautifulSoup
 import regex
-from Bio.SeqFeature import FeatureLocation
+from Bio.SeqFeature import Location
 
 
 def sum_is_sticky(seq1: Dseq, seq2: Dseq) -> bool:
@@ -333,7 +333,7 @@ def correct_name(dseq: Dseqrecord):
         dseq.name = dseq.annotations['keywords'][0]
 
 
-def find_sequence_regex(pattern: str, seq: str, iscircular: bool) -> list[FeatureLocation]:
+def find_sequence_regex(pattern: str, seq: str, iscircular: bool) -> list[Location]:
 
     subject = seq if iscircular else seq + seq
     compiled_pattern = regex.compile(pattern, regex.IGNORECASE)
@@ -342,7 +342,7 @@ def find_sequence_regex(pattern: str, seq: str, iscircular: bool) -> list[Featur
     feature_locations = list()
     for m in matches:
         coords = [m.start() % len(seq), m.end() % len(seq)]
-        feature_locations.append(FeatureLocation(*coords, strand=1))
+        feature_locations.append(Location(*coords, strand=1))
 
     return feature_locations
 

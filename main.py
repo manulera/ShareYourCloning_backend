@@ -13,7 +13,6 @@ from pydantic_models import PCRSource, PrimerAnnealingSettings, PrimerModel, Seq
 from fastapi.middleware.cors import CORSMiddleware
 from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
-from queen_functions import queen_from_dseqrecord
 
 # Instance of the API object
 app = FastAPI()
