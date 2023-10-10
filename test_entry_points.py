@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
 from pydantic_models import RepositoryIdSource, PCRSource, PrimerAnnealingSettings, PrimerModel,\
-    RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource, UploadedFileSource
+    RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource, UploadedFileSource, HomologousRecombinationSource
 from pydna.dseqrecord import Dseqrecord
 import unittest
 from pydna.dseq import Dseq
@@ -736,6 +736,26 @@ class PCRTest(unittest.TestCase):
         payload = response.json()
         self.assertEqual(response.status_code, 400)
         self.assertEqual(payload['detail'], 'The annealing positions of the primers seem to be wrong.')
+
+
+class HomologousRecombinationTest(unittest.TestCase):
+
+    def test_enzyme_doesnt_exist(self):
+        template = Dseqrecord('GGGAAAACCC', circular=True)
+        json_template = format_sequence_genbank(template)
+        json_template.id = 1
+
+        insert = Dseqrecord('AATTCCAA', linear=True)
+        json_insert = format_sequence_genbank(insert)
+        json_insert.id = 2
+        # One enzyme
+        source = HomologousRecombinationSource(
+            input=[1, 2],
+        )
+        data = {'source': source.model_dump(), 'sequences': [json_template.model_dump(), json_insert.model_dump()]}
+        response = client.post('/homologous_recombination', params={'minimal_homology': 2}, json=data)
+        self.assertEqual(response.status_code, 200)
+        print(response.json())
 
 
 if __name__ == "__main__":

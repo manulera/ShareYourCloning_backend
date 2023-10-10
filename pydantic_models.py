@@ -132,7 +132,7 @@ class HomologousRecombinationSource(Source):
     # This can only take two inputs, the first one is the template, the second one is the insert
     type: SourceType = SourceType('homologous_recombination')
     input: conlist(int, min_length=2, max_length=2)
-    replaced_region: SeqFeatureModel
+    location: str = ''
 
 
 class RestrictionEnzymeDigestionSource(SequenceSubsetSource):

@@ -6,13 +6,14 @@ from Bio.SeqIO import read as seqio_read
 from pydna.genbank import Genbank
 from dna_functions import assembly_list_is_valid, get_assembly_list_from_sticky_ligation_source, get_invalid_enzyme_names, get_pcr_products_list, get_restriction_enzyme_products_list, \
     format_sequence_genbank, get_sticky_ligation_products_list, perform_assembly, \
-    read_dsrecord_from_json, read_primer_from_json, request_from_addgene
+    read_dsrecord_from_json, read_primer_from_json, request_from_addgene, get_homologous_recombination_locations, perform_homologous_recombination
 from pydantic_models import PCRSource, PrimerAnnealingSettings, PrimerModel, SequenceEntity, SequenceFileFormat, \
     RepositoryIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource, \
     UploadedFileSource, HomologousRecombinationSource
 from fastapi.middleware.cors import CORSMiddleware
 from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
+from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
 
 # Instance of the API object
 app = FastAPI()
@@ -291,10 +292,23 @@ async def pcr(source: PCRSource,
 async def homologous_recombination(source: HomologousRecombinationSource,
               sequences: conlist(SequenceEntity, min_length=1, max_length=1),
               minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.')):
-    
+
     template = read_dsrecord_from_json(sequences[0])
     insert = read_dsrecord_from_json(sequences[1])
 
-    
+    locs = get_homologous_recombination_locations(template, insert, minimal_homology)
+    products = [perform_homologous_recombination(template, insert, loc) for loc in locs]
 
-    
+    if len(products) == 0:
+        raise HTTPException(400, 'No homologous recombination was found.')
+
+    out_sequences = []
+    out_sources = []
+
+    for loc, seq in zip(locs, products):
+        out_sequences.append(format_sequence_genbank(seq))
+        new_source = source.model_copy()
+        new_source.location = format_feature_location(loc, None)
+        out_sources.append(new_source)
+
+    return {'sources': out_sources, 'sequences': out_sequences}
