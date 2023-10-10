@@ -1,0 +1,8 @@
+LOCUS       pj5_00001                 14 bp    DNA     circular SYN 10-OCT-2023
+COMMENT             teselagen_unique_id: 5adf735aa1811801e17d8aac
+FEATURES             Location/Qualifiers
+     misc_feature    14..2
+                     /label="hello"
+ORIGIN      
+        1 AAAAAAAAAA AAAA    
+//
