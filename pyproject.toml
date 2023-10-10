@@ -7,14 +7,13 @@ version = "0.1.0"
 
 [tool.poetry.dependencies]
 beautifulsoup4 = "^4.11.1"
-biopython = "1.79"
 fastapi = "*"
-pydna = {git = "https://github.com/manulera/pydna", develop = true}
 python = "^3.10"
 python-multipart = "*"
 uvicorn = "*"
 python-queen = "^1.1.0"
 httpx = "^0.25.0"
+pydna = "^5.2.0"
 
 [tool.poetry.dev-dependencies]
 autopep8 = "*"

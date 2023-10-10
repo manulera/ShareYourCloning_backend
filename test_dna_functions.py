@@ -3,8 +3,7 @@ from dna_functions import dseq_from_both_overhangs, both_overhangs_from_dseq, \
 import unittest
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from Bio.SeqFeature import FeatureLocation
-from pydna.seqfeature import SeqFeature
+from Bio.SeqFeature import FeatureLocation, SeqFeature
 from typing import OrderedDict
 
 
@@ -56,6 +55,8 @@ class DseqFromBothOverhangsTest(unittest.TestCase):
 
                     # Finally we test with pydantic models
                     seq_entity = format_sequence_genbank(dseq_original)
+                    # Default value when creating DseqRecord
+                    seq_entity.id = 'id'
                     dseq_3 = read_dsrecord_from_json(seq_entity)
 
                     self.assertEqual(dseq_original.seq.watson,
