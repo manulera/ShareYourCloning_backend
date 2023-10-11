@@ -397,5 +397,5 @@ def get_homologous_recombination_locations(template: Dseqrecord, insert: Dseqrec
 def perform_homologous_recombination(template: Dseqrecord, insert: Dseqrecord, location: Location):
     edges = location_edges(location)
     if template.circular:
-        return template[0:edges[0]] + insert + template[edges[1]:]
-    return (template[edges[1]:edges[0]] + insert).looped()
+        return (template[edges[1]:edges[0]] + insert).looped()
+    return template[0:edges[0]] + insert + template[edges[1]:]

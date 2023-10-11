@@ -311,4 +311,14 @@ async def homologous_recombination(source: HomologousRecombinationSource,
         new_source.location = format_feature_location(loc, None)
         out_sources.append(new_source)
 
+    output_is_known = len(source.location) > 0
+
+    if output_is_known:
+        for out_sequence, out_source in zip(out_sequences, out_sources):
+            if out_source == source:
+                return {'sequences': [out_sequence], 'sources': [out_source]}
+        # If we don't find it, there was a mistake
+        raise HTTPException(
+            400, 'The provided location does not seem valid for homologous recombination.')
+
     return {'sources': out_sources, 'sequences': out_sequences}
