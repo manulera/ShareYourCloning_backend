@@ -7,7 +7,7 @@ from pydna.genbank import Genbank
 from dna_functions import assembly_list_is_valid, get_assembly_list_from_sticky_ligation_source, get_invalid_enzyme_names, get_pcr_products_list, get_restriction_enzyme_products_list, \
     format_sequence_genbank, get_sticky_ligation_products_list, perform_assembly, \
     read_dsrecord_from_json, read_primer_from_json, request_from_addgene, get_homologous_recombination_locations, perform_homologous_recombination
-from pydantic_models import PCRSource, PrimerAnnealingSettings, PrimerModel, SequenceEntity, SequenceFileFormat, \
+from pydantic_models import PCRSource, PrimerModel, SequenceEntity, SequenceFileFormat, \
     RepositoryIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource, \
     UploadedFileSource, HomologousRecombinationSource
 from fastapi.middleware.cors import CORSMiddleware
@@ -139,7 +139,7 @@ async def get_from_repository_id(source: RepositoryIdSource):
             # Special addgene exception, they may have only partial sequences
             if len(dseqs) == 0:
                 raise HTTPException(
-                    404, f'The requested plasmid does not have full sequences, see https://www.addgene.org/{source.repository_id}/sequences/')
+                    404, f'The requested plasmid does not exist, or does not have full sequences, see https://www.addgene.org/{source.repository_id}/sequences/')
         else:
             raise HTTPException(400, 'wrong repository name')
 
@@ -245,25 +245,19 @@ async def sticky_ligation(source: StickyLigationSource,
 ))
 async def pcr(source: PCRSource,
               sequences: conlist(SequenceEntity, min_length=1, max_length=1),
-              primers: conlist(PrimerModel, min_length=1, max_length=2),):
+              primers: conlist(PrimerModel, min_length=1, max_length=2),
+              minimal_annealing: int = Query(20, description='The minimal annealing length for each primer.')):
     dseq = read_dsrecord_from_json(sequences[0])
     primers_pydna = [read_primer_from_json(p) for p in primers]
 
     # If the footprints are set, the output should be known
     output_is_known = len(source.primer_footprints) > 0 or len(source.primers) > 0 or len(source.fragment_boundaries) > 0
 
-    # Here we set the annealing settings to match the input. If we send the exact annealing,
-    # there is no point in sending these settings as well.
-    if output_is_known:
-        source.primer_annealing_settings = PrimerAnnealingSettings(
-            minimum_annealing=min(source.primer_footprints)
-        )
-
     # TODO: return error if the id of the sequence does not correspond.
     # TODO: return error if the ids not present in the list.
 
     # Error if no pair is generated.
-    products, out_sources = get_pcr_products_list(dseq, source, primers_pydna)
+    products, out_sources = get_pcr_products_list(dseq, source, primers_pydna, minimal_annealing)
     if len(products) == 0:
         raise HTTPException(
             400, 'No pair of annealing primers was found.' + ('' if output_is_known else ' Try changing the annealing settings.')
@@ -289,10 +283,12 @@ async def pcr(source: PCRSource,
     sources=(list[HomologousRecombinationSource], ...),
     sequences=(list[SequenceEntity], ...)
 ))
-async def homologous_recombination(source: HomologousRecombinationSource,
-              sequences: conlist(SequenceEntity, min_length=1, max_length=1),
-              minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.')):
-
+async def homologous_recombination(
+    source: HomologousRecombinationSource,
+    sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+    minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.')
+):
+    print(minimal_homology)
     template = read_dsrecord_from_json(sequences[0])
     insert = read_dsrecord_from_json(sequences[1])
 

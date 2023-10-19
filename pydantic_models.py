@@ -146,12 +146,6 @@ class RestrictionEnzymeDigestionSource(SequenceSubsetSource):
     restriction_enzymes: conlist(str, min_length=1)
 
 
-class PrimerAnnealingSettings(BaseModel):
-    """Settings to find annealing sites for the primer"""
-    minimum_annealing: int = Field(..., description='The minimum number of \
-    overlaping basepairs for an annealing to be considered.')
-
-
 class PCRSource(SequenceSubsetSource):
     """Documents a PCR, and the selection of one of the products."""
 
@@ -163,10 +157,6 @@ class PCRSource(SequenceSubsetSource):
 
     primer_footprints: conlist(int, max_length=2) = Field([], description='The number of basepairs that are anealed\
     in each primer (same order as in `primers`). Missmatch support should be added in the future.')
-
-    # TODO test this
-    primer_annealing_settings: PrimerAnnealingSettings = Field(None, description='This does not have\
-        to be specified if the primers and primer_footprints are provided.')
 
 
 class StickyLigationSource(Source):

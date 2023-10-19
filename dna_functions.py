@@ -191,8 +191,8 @@ def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnz
     return fragments, sources
 
 
-def get_pcr_products_list(template: Dseqrecord, source: PCRSource, primers: list[Primer]) -> tuple[list[Dseqrecord], list[PCRSource]]:
-    anneal = Anneal(primers, template, limit=source.primer_annealing_settings.minimum_annealing)
+def get_pcr_products_list(template: Dseqrecord, source: PCRSource, primers: list[Primer], minimal_annealing: int) -> tuple[list[Dseqrecord], list[PCRSource]]:
+    anneal = Anneal(primers, template, limit=minimal_annealing)
     amplicon: Amplicon
     sources = list()
 
@@ -304,7 +304,7 @@ def request_from_addgene(source: RepositoryIdSource) -> tuple[list[Dseqrecord], 
     if resp.status_code == 404:
         raise HTTPError(url, 404, 'wrong addgene id', 'wrong addgene id', None)
     soup = BeautifulSoup(resp.content, 'html.parser')
-
+    print(soup)
     sequence_file_url_dict = dict()
     for _type in ['depositor-full', 'depositor-partial', 'addgene-full', 'addgene-partial']:
         sequence_file_url_dict[_type] = []

@@ -85,10 +85,7 @@
             "primer_footprints": [
                 22,
                 20
-            ],
-            "primer_annealing_settings": {
-                "minimum_annealing": 13
-            }
+            ]
         },
         {
             "id": 7,

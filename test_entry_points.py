@@ -4,7 +4,7 @@ from main import app
 from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
-from pydantic_models import RepositoryIdSource, PCRSource, PrimerAnnealingSettings, PrimerModel,\
+from pydantic_models import RepositoryIdSource, PCRSource, PrimerModel,\
     RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource, UploadedFileSource, HomologousRecombinationSource
 from pydna.dseqrecord import Dseqrecord
 import unittest
@@ -135,7 +135,6 @@ class AddGeneTest(unittest.TestCase):
             )
 
             response = client.post("/repository_id", json=source.model_dump())
-
             self.assertEqual(response.status_code, 200)
             payload = response.json()
             resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
@@ -168,7 +167,7 @@ class AddGeneTest(unittest.TestCase):
         )
         response = client.post("/repository_id", json=source.model_dump())
         self.assertEqual(response.status_code, 404)
-        self.assertIn('does not have full sequences', response.json()['detail'])
+        self.assertIn('The requested plasmid does not exist, or does not have', response.json()['detail'])
 
         # url does not exist
         source = RepositoryIdSource(
@@ -605,8 +604,7 @@ class PCRTest(unittest.TestCase):
         json_seq.id = 1
 
         submitted_source = PCRSource(
-            input=[1],
-            primer_annealing_settings=PrimerAnnealingSettings(minimum_annealing=13)
+            input=[1]
         )
 
         primer_fwd = PrimerModel(
@@ -622,7 +620,7 @@ class PCRTest(unittest.TestCase):
         )
 
         data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data)
+        response = client.post("/pcr", json=data, params={'minimal_annealing': 13})
         payload = response.json()
 
         sources = [PCRSource.model_validate(s) for s in payload['sources']]
@@ -654,13 +652,6 @@ class PCRTest(unittest.TestCase):
         self.assertEqual(len(sequences), 1)
         dseq2 = sequences[0]
         source2 = sources[0]
-
-        # When we submit the information, the annealing_settings are changed
-        self.assertEqual(source2.primer_annealing_settings.minimum_annealing, min(source1.primer_footprints))
-
-        # To compare, we unset the annealing settings (see PCRSource)
-        source1.primer_annealing_settings = None
-        source2.primer_annealing_settings = None
         self.assertEqual(source1, source2)
         self.assertEqual(dseq2.seq, predicted_seq.seq)
 
@@ -670,10 +661,7 @@ class PCRTest(unittest.TestCase):
         json_seq = format_sequence_genbank(template)
         json_seq.id = 1
 
-        submitted_source = PCRSource(
-            input=[1],
-            primer_annealing_settings=PrimerAnnealingSettings(minimum_annealing=13)
-        )
+        submitted_source = PCRSource(input=[1])
 
         primer_fwd = PrimerModel(
             sequence='AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
@@ -690,7 +678,7 @@ class PCRTest(unittest.TestCase):
 
         # Without specifying the pair
         data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data)
+        response = client.post("/pcr", json=data, params={'minimal_annealing': 13})
         payload = response.json()
         self.assertEqual(response.status_code, 400)
         self.assertEqual(payload['detail'], 'No pair of annealing primers was found. Try changing the annealing settings.')
@@ -709,7 +697,7 @@ class PCRTest(unittest.TestCase):
         submitted_source.primer_footprints = [21, 20]
 
         data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data)
+        response = client.post("/pcr", json=data, params={'minimal_annealing': 13})
         payload = response.json()
         self.assertEqual(response.status_code, 200)
 
@@ -719,7 +707,7 @@ class PCRTest(unittest.TestCase):
         submitted_source.primer_footprints = [21, 20]
 
         data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data)
+        response = client.post("/pcr", json=data, params={'minimal_annealing': 13})
         payload = response.json()
         self.assertEqual(response.status_code, 400)
         self.assertEqual(payload['detail'], 'The annealing positions of the primers seem to be wrong.')
@@ -732,7 +720,7 @@ class PCRTest(unittest.TestCase):
         # e.g. it could not be [21,40] since it would not align with footprint 20)
         submitted_source.primer_footprints = [21, 12]
         data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data)
+        response = client.post("/pcr", json=data, params={'minimal_annealing': 13})
         payload = response.json()
         self.assertEqual(response.status_code, 400)
         self.assertEqual(payload['detail'], 'The annealing positions of the primers seem to be wrong.')
@@ -755,7 +743,6 @@ class HomologousRecombinationTest(unittest.TestCase):
         data = {'source': source.model_dump(), 'sequences': [json_template.model_dump(), json_insert.model_dump()]}
         response = client.post('/homologous_recombination', params={'minimal_homology': 2}, json=data)
         self.assertEqual(response.status_code, 200)
-        print(response.json())
 
 
 if __name__ == "__main__":
