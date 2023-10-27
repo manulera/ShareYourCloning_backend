@@ -54,13 +54,12 @@ primer_rvs = PrimerModel(
 
 input_source = PCRSource(
     input=[2],
-    primer_annealing_settings=PrimerAnnealingSettings(minimum_annealing=13)
 )
 
 primers = [primer_fwd.model_dump(), primer_rvs.model_dump()]
 
 data = {'source': input_source.model_dump(), 'sequences': sequences, 'primers': primers}
-payload = client.post("/pcr", json=data).json()
+payload = client.post("/pcr", json=data, params={'minimal_annealing': 13}).json()
 
 source = payload['sources'][0]
 source['id'] = 5

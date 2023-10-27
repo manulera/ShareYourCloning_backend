@@ -1,11 +1,9 @@
 from pydantic import BaseModel, Field
-from pydantic.types import constr
+from pydantic.types import constr, conlist
 from enum import Enum
 from typing import Optional
-from Bio.SeqFeature import SeqFeature, FeatureLocation
-
-from pydantic.types import conlist
-
+from Bio.SeqFeature import SeqFeature, Location
+from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
 
 # Enumerations:
 
@@ -15,6 +13,7 @@ class SourceType(str, Enum):
     restriction = 'restriction'
     sticky_ligation = 'sticky_ligation'
     PCR = 'PCR'
+    homologous_recombination = 'homologous_recombination'
 
 
 class SequenceFileFormat(str, Enum):
@@ -59,29 +58,25 @@ class PrimerModel(BaseModel):
     sequence: constr(pattern='^[acgtACGT]+$')
     # sequence: str
 
-# The next two models are unused for now
 
-
-class SequenceFeature(BaseModel):
-    id: str
+class SeqFeatureModel(BaseModel):
     type: str
-    start: int
-    end: int
-    strand: Optional[int] = None
+    qualifiers: dict[str, list[str]] = {}
+    location: str
 
-
-def seq_feature2pydantic(sf: SeqFeature) -> SequenceFeature:
-    if not isinstance(sf.location, FeatureLocation):
-        raise TypeError(
-            'Compound locations are not yet supported.'
+    def convert_to_seq_feature(self) -> SeqFeature:
+        return SeqFeature(
+            location=Location.fromstring(self.location),
+            type=self.type,
+            qualifiers=self.qualifiers
         )
-    return SequenceFeature(
-        id=sf.id,
-        type=sf.type,
-        strand=sf.location.strand,
-        start=sf.location.start,
-        end=sf.location.end
-    )
+
+    def read_from_seq_feature(sf: SeqFeature) -> 'SeqFeatureModel':
+        return SeqFeatureModel(
+            type=sf.type,
+            qualifiers=sf.qualifiers,
+            location=format_feature_location(sf.location, None)
+        )
 
 # Sources =========================================
 
@@ -132,6 +127,14 @@ class SequenceSubsetSource(Source):
     For both, 0-based indexing, [first,second)')
 
 
+class HomologousRecombinationSource(Source):
+
+    # This can only take two inputs, the first one is the template, the second one is the insert
+    type: SourceType = SourceType('homologous_recombination')
+    input: conlist(int, min_length=2, max_length=2)
+    location: str = ''
+
+
 class RestrictionEnzymeDigestionSource(SequenceSubsetSource):
     """Documents a restriction enzyme digestion, and the selection of one of the fragments."""
 
@@ -141,12 +144,6 @@ class RestrictionEnzymeDigestionSource(SequenceSubsetSource):
     # For instance, if a fragment 5' is cut with EcoRI and the 3' with BamHI,
     # restriction_enzymes = ['EcoRI', 'BamHI']
     restriction_enzymes: conlist(str, min_length=1)
-
-
-class PrimerAnnealingSettings(BaseModel):
-    """Settings to find annealing sites for the primer"""
-    minimum_annealing: int = Field(..., description='The minimum number of \
-    overlaping basepairs for an annealing to be considered.')
 
 
 class PCRSource(SequenceSubsetSource):
@@ -160,10 +157,6 @@ class PCRSource(SequenceSubsetSource):
 
     primer_footprints: conlist(int, max_length=2) = Field([], description='The number of basepairs that are anealed\
     in each primer (same order as in `primers`). Missmatch support should be added in the future.')
-
-    # TODO test this
-    primer_annealing_settings: PrimerAnnealingSettings = Field(None, description='This does not have\
-        to be specified if the primers and primer_footprints are provided.')
 
 
 class StickyLigationSource(Source):

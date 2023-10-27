@@ -1,5 +1,5 @@
-# TODO: stage the build to not have pipenv in production, which is not needed
-FROM python:3.9
+# TODO: use alpine in prod, but you need gcc for some of the deps
+FROM python:3.11
 
 WORKDIR /api
 
@@ -7,7 +7,6 @@ RUN pip install poetry
 
 COPY ./poetry.lock /api/poetry.lock
 COPY ./pyproject.toml /api/pyproject.toml
-COPY ./dna_functions /api/dna_functions
 RUN poetry config virtualenvs.create false
 RUN poetry install --no-dev
 
