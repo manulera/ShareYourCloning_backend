@@ -4,6 +4,7 @@ from Bio.SeqFeature import SimpleLocation, Location, CompoundLocation, ExactPosi
 from pydna.dseq import Dseq
 from pydna.dseqrecord import Dseqrecord
 import regex
+from Bio.restriction
 
 # compiled_pattern = regex.compile('AA.*AA', regex.IGNORECASE)
 # print(list(regex.finditer(compiled_pattern, 'GGGAAAACCC', overlapped=True)))
@@ -49,4 +50,3 @@ insert = Dseqrecord('AATTCCAA')
 locs = get_homologous_recombination_locations(template, insert, 2)
 
 print(perform_homologous_recombination(template, insert, locs[0]))
-

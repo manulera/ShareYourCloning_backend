@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
+from Bio.Restriction.Restriction_Dictionary import rest_dict
 
 # Instance of the API object
 app = FastAPI()
@@ -157,6 +158,13 @@ async def get_from_repository_id(source: RepositoryIdSource):
                      a wrong {source.repository} id')
     except URLError as exception:
         raise HTTPException(504, f'Unable to connect to {source.repository}: {exception}')
+
+
+@ app.get('/restriction_enzyme_list', response_model=dict[str, list[str]])
+async def get_restriction_enzyme_list():
+    """Return the dictionary of restriction enzymes
+    """
+    return {'enzyme_names': list(rest_dict.keys())}
 
 
 @ app.post('/restriction', response_model=create_model(
