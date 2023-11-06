@@ -1,10 +1,10 @@
-
+from functools import cmp_to_key
 from urllib.error import HTTPError
 from Bio.Restriction.Restriction import RestrictionBatch, RestrictionType
 from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from pydantic_models import PCRSource, PrimerModel, RepositoryIdSource, RestrictionEnzymeDigestionSource,\
+from pydantic_models import PCRSource, PrimerModel, RepositoryIdSource, RestrictionEnzymeDigestionSource, \
     GenbankSequence, SequenceEntity, StickyLigationSource
 from pydna.parsers import parse as pydna_parse
 from itertools import permutations, product
@@ -172,7 +172,7 @@ def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnz
     # NNNN  NN
     # NN  NNNN
     # This may cause problem for overlapping sites, for now I just remove
-    # the check 
+    # the check
     cutsites, cutsites_positions = get_cutsite_order(seq, enzymes)
 
     sources = list()
@@ -353,43 +353,60 @@ def create_location(start: int, end: int, strand: int, seq_len: int, is_circular
     if not is_circular:
         return SimpleLocation(start, end, strand)
 
-    coords = [start % seq_len, end % seq_len]
+    coords = [start, end]
     if coords[0] < coords[1]:
         return SimpleLocation(*coords, strand)
-    print('coords', coords[1])
-    return SimpleLocation(coords[0] + 1, seq_len, strand) + SimpleLocation(0, coords[1] + 1, strand)
+    return SimpleLocation(coords[0], seq_len, strand) + SimpleLocation(0, coords[1], strand)
+
+
+def location_sorter(x, y) -> int:
+    """
+    Sort by start, then length, then strand.
+
+    It's a bit weird for origin-spanning features in circular DNA,
+    as the start is always zero, ultimately the reason for this is
+    so that the features are always in the same order even if sets
+    are used in the function.
+    """
+    if x.start != y.start:
+        return x.start - y.start
+    elif x.end != y.end:
+        return x.end - y.end
+    return x.strand - y.strand
+
+
+def get_all_regex_feature_edges(pattern: str, seq: str, is_circular: bool) -> list[tuple[int, int]]:
+
+    subject = 2 * seq if is_circular else seq
+
+    compiled_pattern = regex.compile(pattern, regex.IGNORECASE)
+    compiled_pattern_rev = regex.compile('(?r)' + pattern, regex.IGNORECASE)
+
+    matches = list(regex.finditer(compiled_pattern, subject, overlapped=True))
+    matches += list(regex.finditer(compiled_pattern_rev, subject, overlapped=True))
+
+    # In circular objects we remove the matches that span the sequence more than once: m.end() - m.start() <= len(seq)
+    return list(set([(m.start(), m.end()) for m in matches if (m.end() - m.start() <= len(seq))]))
 
 
 def find_sequence_regex(pattern: str, seq: str, is_circular: bool) -> list[Location]:
 
-    compiled_pattern = regex.compile(pattern, regex.IGNORECASE)
     feature_locations = list()
 
-    # For strand 1
-    strand = 1
-    subject = 2 * seq if is_circular else seq
-    matches = list(regex.finditer(compiled_pattern, subject, overlapped=True))
-    # In circular objects, the matches can span the sequence more than once, so we
-    # remove all matches longer than the sequence
-    matches = [m for m in matches if m.end() - m.start() <= len(seq)]
-    feature_locations += [create_location(m.start() % len(seq), m.end() % len(seq), strand, len(seq), is_circular) for m in matches]
+    # Below, we use +1 in "% (len(seq) + 1)" because start / end is a range, for instance for a
+    # string of length 6 spanned entirely, start=0 end=6, so if you want to fold you need
+    # to add 1 to the end.
 
-    # For strand -1
+    strand = 1
+    feature_edges = get_all_regex_feature_edges(pattern, seq, is_circular)
+    feature_locations += [create_location(start % len(seq), (end - 1) % len(seq) + 1, strand, len(seq), is_circular) for start, end in feature_edges]
+
     strand = -1
-    rev_seq = reverse_complement(seq)
-    subject = 2 * rev_seq if is_circular else rev_seq
-    matches = list(regex.finditer(compiled_pattern, subject, overlapped=True))
-    matches = [m for m in matches if m.end() - m.start() <= len(seq)]
-    # The match object end and start are a range, so we need to substract 1 from the end
-    # For the example below:
-    # AAAATGAAT
-    # TTTTACTTA
-    # If we look for ATT, the match objects will be: 0-3, 4-7
-    # But the location should be: 6-9, 2-5
-    feature_locations += [create_location(len(seq) - (m.end() % len(seq)), len(seq) - (m.start() % len(seq)), strand, len(seq), is_circular) for m in matches][::-1]
+    feature_edges = get_all_regex_feature_edges(pattern, reverse_complement(seq), is_circular)
+    feature_locations += [create_location(len(seq) - ((end - 1) % len(seq) + 1), len(seq) - (start % len(seq)), strand, len(seq), is_circular) for start, end in feature_edges]
 
     # We return a unique list, cannot use a set because Location is not hashable
-    return sorted([x for i, x in enumerate(feature_locations) if x not in feature_locations[:i]], key=lambda x: (x.start - x.strand * 0.5))
+    return sorted([x for i, x in enumerate(feature_locations) if x not in feature_locations[:i]], key=cmp_to_key(location_sorter))
 
 
 def location_edges(location: Location):
