@@ -17,12 +17,27 @@ import regex
 from Bio.SeqFeature import SimpleLocation, Location, CompoundLocation
 
 
-def sum_is_sticky(seq1: Dseq, seq2: Dseq) -> bool:
+def sum_is_sticky(seq1: Dseq, seq2: Dseq, partial: bool=False) -> bool:
     """Return true if the 3' end of seq1 and 5' end of seq2 ends are sticky and compatible for ligation."""
-    # TODO: add support for restriction sites that partially overlap
     type_seq1, sticky_seq1 = seq1.three_prime_end()
     type_seq2, sticky_seq2 = seq2.five_prime_end()
-    return 'blunt' != type_seq2 and type_seq2 == type_seq1 and str(sticky_seq2) == str(reverse_complement(sticky_seq1))
+
+    if not partial:
+        return 'blunt' != type_seq2 and type_seq2 == type_seq1 and str(sticky_seq2) == str(reverse_complement(sticky_seq1))
+    else:
+        if type_seq1 != type_seq2 or type_seq2 == "blunt":
+            return False
+        elif type_seq2 == "5'":
+            sticky_seq1 = str(reverse_complement(sticky_seq1))
+        elif type_seq2 == "3'":
+            sticky_seq2 = str(reverse_complement(sticky_seq2))
+    
+        ovhg_len = min(len(sticky_seq1), len(sticky_seq2))
+        for i in range(ovhg_len):
+            if sticky_seq1[-(i+1):] == sticky_seq2[:i+1]:
+                return True
+        else:
+            return False
 
 
 def format_sequence_genbank(seq: Dseqrecord) -> SequenceEntity:
@@ -237,9 +252,9 @@ def perform_assembly(assembly: tuple[Dseqrecord], circularise) -> Dseqrecord:
     return out
 
 
-def assembly_list_is_valid(assembly: tuple[Dseqrecord], circularise=False) -> bool:
+def assembly_list_is_valid(assembly: tuple[Dseqrecord], circularise=False, partial=False) -> bool:
     for i in range(0, len(assembly) - 1):
-        if not sum_is_sticky(assembly[i].seq, assembly[i + 1].seq):
+        if not sum_is_sticky(assembly[i].seq, assembly[i + 1].seq, partial):
             return False
 
     if circularise:

@@ -227,8 +227,9 @@ async def sticky_ligation(source: StickyLigationSource,
     if len(source.fragments_inverted) > 0:
         # TODO Error if the list has different order or the ids are wrong.
         # TODO check input for unique ids
+        # TODO Modify frontend to allow for partially overlapping sticky ends (partial bool parameter)
         assembly_list = get_assembly_list_from_sticky_ligation_source(dseqs, source)
-        if not assembly_list_is_valid(assembly_list, source.circularised):
+        if not assembly_list_is_valid(assembly_list, source.circularised, partial=False):
             raise HTTPException(
                 400, 'Fragments are not compatible for sticky ligation')
         output_sequence = format_sequence_genbank(perform_assembly(assembly_list, source.circularised))
