@@ -134,3 +134,11 @@ class MultiTestPartialSticky(TestPartialSticky):
 
         self.expectTrue(seq3, seq4, True)
         self.expectFalse(seq3, seq4, False)
+
+    def test_sticky_ends_max_len(self):
+        # Ensures that all possible overlapping lengths are covered
+        seq1 = Dseq("ACGT", "GTACGT", ovhg=0)
+        seq2 = Dseq("ACAACGT", "ACGT", ovhg=-3)
+
+        self.expectTrue(seq1, seq2, True)
+        self.expectFalse(seq1, seq2, False)
