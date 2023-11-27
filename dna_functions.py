@@ -33,8 +33,8 @@ def sum_is_sticky(seq1: Dseq, seq2: Dseq, partial: bool=False) -> bool:
             sticky_seq2 = str(reverse_complement(sticky_seq2))
     
         ovhg_len = min(len(sticky_seq1), len(sticky_seq2))
-        for i in range(ovhg_len):
-            if sticky_seq1[-(i+1):] == sticky_seq2[:i+1]:
+        for i in range(1, ovhg_len):
+            if sticky_seq1[-i:] == sticky_seq2[:i]:
                 return True
         else:
             return False
