@@ -15,20 +15,20 @@ b = Dseqrecord("tgtgctgtgctctaTTTTTtattctggctgtatct", name="two35")
 c = Dseqrecord("tattctggctgtatctGGGGGTacgatgctatactgg", name="three37").reverse_complement()
 
 asm = Assembly((a, c, b), limit=14)
-print(asm.assemble_linear())
-contig : Contig = asm.assemble_linear()[0]
 
-print(contig.seq)
-print(contig.detailed_figure())
-print(asm.G.nodes)
+# contig : Contig = asm.assemble_linear()[0]
 
-
-asm = Assembly((a, b, c), limit=14)
-print(asm.assemble_linear())
-contig : Contig = asm.assemble_linear()[0]
+# print(contig.seq)
+# print(contig.detailed_figure())
+# print(asm.G.nodes)
 
 
-print(contig.seq)
-print(contig.detailed_figure())
-print(asm.G.nodes)
+# asm = Assembly((a, b, c), limit=14)
+# print(asm.assemble_linear())
+# contig : Contig = asm.assemble_linear()[0]
+
+
+# print(contig.seq)
+# print(contig.detailed_figure())
+# print(asm.G.nodes)
 
