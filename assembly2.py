@@ -1,54 +1,9 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-# Copyright 2013-2023 by Björn Johansson.  All rights reserved.
-# This code is part of the Python-dna distribution and governed by its
-# license.  Please see the LICENSE.txt file that should have been included
-# as part of this package.
+"""Slightly different assembly implementation"""
 
-"""Assembly of sequences by homologous recombination.
-
-Should also be useful for related techniques such as Gibson assembly and fusion
-PCR. Given a list of sequences (Dseqrecords), all sequences are analyzed for
-shared homology longer than the set limit.
-
-A graph is constructed where each overlapping region form a node and
-sequences separating the overlapping regions form edges.
-
-
-::
-
-
-                -- A --
-    catgatctacgtatcgtgt     -- B --
-                atcgtgtactgtcatattc
-                            catattcaaagttct
-
-
-
-    --x--> A --y--> B --z-->   (Graph)
-
-    Nodes:
-
-    A : atcgtgt
-    B : catattc
-
-    Edges:
-
-    x : catgatctacgt
-    y : actgt
-    z : aaagttct
-
-
-The NetworkX package is used to trace linear and circular paths through the
-graph.
-"""
-from Bio.SeqFeature import ExactPosition as _ExactPosition
 from Bio.SeqFeature import SimpleLocation as _SimpleLocation
-from Bio.SeqFeature import CompoundLocation as _CompoundLocation
 from pydna.utils import rc as _rc
 from pydna.utils import memorize as _memorize
 from pydna._pretty import pretty_str as _pretty_str
-from pydna.contig import Contig as _Contig
 from pydna.common_sub_strings import common_sub_strings
 from pydna.dseqrecord import Dseqrecord as _Dseqrecord
 import networkx as _nx
@@ -57,22 +12,35 @@ import itertools as _itertools
 import logging as _logging
 from Bio.Seq import reverse_complement
 
-_module_logger = _logging.getLogger("pydna." + __name__)
 
+def circular_permutation_min_abs(lst):
+    """Returns the circular permutation of lst with the smallest absolute value first."""
+    min_abs_index = min(range(len(lst)), key=lambda i: abs(lst[i]))
+    return lst[min_abs_index:] + lst[:min_abs_index]
 
-# TODO use quicker inits for contig
-# TODO remove maxnodes for init
-
-def match_to_location_pair(match, second_length=None) -> tuple[_SimpleLocation, _SimpleLocation]:
+def add_edges_from_match(match, index_first, index_secnd, len_first, len_scnd, graph: _nx.MultiDiGraph):
     x_start, y_start, length = match
-    x_loc = _SimpleLocation(x_start, x_start + length, 1)
-    if second_length is not None:
-        y_loc = _SimpleLocation(y_start, y_start + length, -1)._flip(second_length)
-    else:
-        y_loc = _SimpleLocation(y_start, y_start + length, 1)
+    # TODO: adapt to circular (maybe SimpleLocation would not work for origin-spanning locations)
+    locs = [_SimpleLocation(x_start, x_start + length, 1), _SimpleLocation(y_start, y_start + length, 1)]
+    rc_locs = [locs[0]._flip(len_first), locs[1]._flip(len_scnd)]
 
-    return x_loc, y_loc
+    combinations = (
+        (index_first, index_secnd, locs),
+        (index_secnd, index_first, locs[::-1]),
+        (-index_first, -index_secnd, rc_locs),
+        (-index_secnd, -index_first, rc_locs[::-1]),
+    )
+    for u, v, l in combinations:
+        graph.add_edge(u, v, f'{u}{l[0]}:{v}{l[1]}', locations=l)
 
+    return
+
+def fragments_in_assembly(assembly):
+    return [assembly[0][0]] + list(map(lambda x: x[1], assembly))
+
+# def assembly_is_sorted(assembly):
+#     fragment_order = list(map(abs, fragments_in_assembly(assembly)))
+#     return fragment_order == sorted(fragment_order)
 
 class _Memoize(type):
     @_memorize("pydna.assembly.Assembly")
@@ -125,45 +93,46 @@ class Assembly(object, metaclass=_Memoize):
 
     """
 
-    def __init__(self, frags=None, limit=25, algorithm=common_sub_strings, use_fragment_order=True):
+    def __init__(self, frags=None, limit=25, algorithm=common_sub_strings, use_fragment_order=True, use_all_fragments=False):
         # TODO: allow for the same fragment to be included more than once
         G = _nx.MultiDiGraph()
         G.add_nodes_from((i + 1, {'seq': f}) for (i, f) in enumerate(frags))
         G.add_nodes_from((-(i + 1), {'seq': f.reverse_complement()}) for (i, f) in enumerate(frags))
-        # all combinations of fragments are compared.
-        # see https://docs.python.org/3.10/library/itertools.html
-        # itertools.combinations('ABCD', 2)-->  AB AC AD BC BD CD
-        fragment_pairs = list(_itertools.combinations(enumerate(frags), 2))
-        if use_fragment_order:
-            temp = list(enumerate(frags))
-            fragment_pairs = list(zip(temp, temp[1:] + temp[:1]))
+        fragment_pairs = _itertools.combinations(enumerate(frags), 2)
+
+        # if use_fragment_order:
+        #     temp = list(enumerate(frags))
+        #     fragment_pairs = list(zip(temp, temp[1:] + temp[:1]))
 
         for (index_first, first), (index_secnd, secnd) in fragment_pairs:
             index_first += 1
             index_secnd += 1
             matches_fwd = algorithm(str(first.seq).upper(), str(secnd.seq).upper(), limit)
-            for pair in map(match_to_location_pair, matches_fwd):
-                G.add_edge(index_first, index_secnd, f'{index_first}{pair[0]}:{index_secnd}{pair[1]}', locations=pair)
-                G.add_edge(-index_first, -index_secnd, f'{index_first}_rc{pair[0]}:{index_secnd}_rc{pair[1]}', locations=[pair[1]._flip(len(secnd)), pair[0]._flip(len(first))])
+            for match in matches_fwd:
+                add_edges_from_match(match, index_first, index_secnd, len(first), len(secnd), G)
 
             matches_rvs = algorithm(str(first.seq).upper(), reverse_complement(str(secnd.seq).upper()), limit)
-            for pair in map(match_to_location_pair, matches_rvs):
-                G.add_edge(index_first, -index_secnd, f'{index_first}{pair[0]}:{index_secnd}_rc{pair[1]}', locations=pair)
-                G.add_edge(-index_first, index_secnd, f'{index_first}_rc{pair[0]}:{index_secnd}{pair[1]}', locations=[pair[1]._flip(len(secnd)), pair[0]._flip(len(first))])
+            for match in matches_rvs:
+                add_edges_from_match(match, index_first, -index_secnd, len(first), len(secnd), G)
+
 
         self.G = G
         self.fragments = frags
         self.limit = limit
         self.algorithm = algorithm
         self.use_fragment_order = use_fragment_order
+        self.use_all_fragments = use_all_fragments
 
         return
 
     def validate_assembly(self, assembly):
+
+        is_circular = assembly[0][0] == assembly[-1][1]
+
         # The assembly must include all fragments (this could be made optional)
-        if len(assembly) != len(self.fragments) - 1:
+        # TODO: handle circular assemblies
+        if self.use_all_fragments and (len(assembly) - (1 if is_circular else 0) != len(self.fragments) - 1):
             return False
-        return True
         # Here we check whether subsequent pairs of fragments are compatible, for instance:
         # Compatible (overlap of 1 and 2 occurs before overlap of 2 and 3):
         #    -- A --
@@ -192,57 +161,87 @@ class Assembly(object, metaclass=_Memoize):
         G = _nx.MultiDiGraph(self.G)
         G.add_nodes_from(['begin', 'end'])
         if self.use_fragment_order:
-            G.add_edge('begin', 1, locations=(None, None))
-        for node in G.nodes:
-            if not self.use_fragment_order:
-                if type(node) == int and node > 0:
-                    G.add_edge('begin', node, locations=(None, None))
-            G.add_edge(node, 'end', locations=(None, None))
+            G.add_edge('begin', 1)
+            G.add_edge('begin', -1)
+            G.add_edge(len(self.fragments), 'end')
+            G.add_edge(-len(self.fragments), 'end')
+        else:
+            for node in filter(lambda x: type(x) == int, G.nodes):
+                if not self.use_fragment_order and node > 0:
+                    G.add_edge('begin', node)
+                G.add_edge(node, 'end')
 
         return list(filter(self.validate_assembly, map(lambda x : x[1:-1], _nx.all_simple_edge_paths(G, 'begin', 'end'))))
 
-    def expand_circular_assembly(self, pairs):
+    def cycle2circular_assemblies(self, cycle):
         # Feels like this should be built-in to networkx, or that find_cycle would return all possible cycles
         combine = list()
-        for u, v, _, _ in pairs:
-            combine.append([key for key in self.G[u][v]])
+        for u, v in zip(cycle, cycle[1:] + cycle[:1]):
+            combine.append([(u, v, key) for key in self.G[u][v]])
         return list(_itertools.product(*combine))
 
     def get_circular_assemblies(self):
         # The constrain of circular sequence is that the first node is the first fragment in its initial orientation
-        return self.expand_circular_assembly(_nx.cycles.find_cycle(self.G, source=1, orientation='original'))
+        sorted_cycles = map(circular_permutation_min_abs, _nx.cycles.simple_cycles(self.G))
+        sorted_cycles = filter(lambda x: x[0] > 0, sorted_cycles)
+        assemblies = sum(map(self.cycle2circular_assemblies, sorted_cycles),[])
+        return filter(self.validate_assembly, assemblies)
 
     def execute_assembly(self, assembly):
-
         pos = 0
         first_fragment = assembly[0][0]
         out_dseq = self.G.nodes[first_fragment]['seq']
         for left, right, key in assembly:
-            if right == first_fragment:
-                out_dseq = out_dseq.looped()
-                break
+
             left_location, right_location = self.G[left][right][key]['locations']
             right_seq = self.G.nodes[right]['seq']
+            print(left_location, right_location)
+            print('a', pos)
+            # TODO: shouldn' this be start?
+            pos += left_location.parts[-1].end
+            print(pos)
+            if right == first_fragment:
+                # Go to circular joining
+                break
 
-            new_dseq = out_dseq.seq[:left_location.parts[-1].end + pos] + right_seq.seq[right_location.parts[-1].end:]
+            new_dseq = out_dseq.seq[:pos] + right_seq.seq[right_location.parts[-1].end:]
 
             overlap_length = len(left_location)
 
             # This could be a separate Dseqrecord method
             new_features = right_seq[right_location.parts[0].start:].features
-            for feature in new_features:
-                feature = feature._shift(left_location.parts[-1].end - overlap_length)
-            out_dseq = _Dseqrecord(new_dseq, features=out_dseq.features + new_features)
+            new_features = [f._shift(pos-overlap_length) for f in right_seq[right_location.parts[0].start:].features]
 
+            out_dseq = _Dseqrecord(new_dseq, features=out_dseq.features + new_features)
             pos += left_location.parts[-1].end
 
-        return out_dseq
+        else:
+            return out_dseq
 
+        # Close the circle in circular assemblies
+        # Cut the dseqrecord at the joining point, including the overlap at the beginning and end.
+        # E.g. GGGxxxxxxxxxxxxxxGGG
+        print(out_dseq.seq, len(out_dseq.seq), left_location)
+        print(pos)
+        print(right_location.parts[-1].start,left_location.parts[-1].end + pos)
+        out_dseq = out_dseq[right_location.parts[-1].start:left_location.parts[-1].end + pos]
+        overlap_length = len(left_location)
+        new_features = _deepcopy(out_dseq.features)
+        out_dseq = _Dseqrecord(out_dseq.seq[:-overlap_length], features=new_features)
+        # Wrap origin-spanning features
+        print('a', len(out_dseq))
+        for feature in new_features:
+            print(feature.location.start)
+            if feature.location.start >= len(out_dseq):
+                feature = feature._shift(len(out_dseq))
 
+    def assemble_linear(self):
+        assemblies = self.get_linear_assemblies()
+        return list(map(self.execute_assembly, assemblies))
 
-
-
-
+    def assemble_circular(self):
+        assemblies = self.get_circular_assemblies()
+        return list(map(self.execute_assembly, assemblies))
 
     def __repr__(self):
         # https://pyformat.info
@@ -269,6 +268,8 @@ example_fragments = (
 )
 
 
+'CattctgcGAGGacgatCAtgctcc'
+
 linear_results = (
     _Dseqrecord("AacgatCAtgctccTAAattctgcGAGGacgatG", name="abc"),
     _Dseqrecord("ggagcaTGatcgtCCTCgcagaatG", name="ac_rc"),
@@ -280,14 +281,3 @@ circular_results = (
     _Dseqrecord("acgatCAtgctccTAAattctgcGAGG", name="abc", circular=True),
     _Dseqrecord("ggagcaTGatcgtCCTCgcagaatTTA", name="abc_rc", circular=True),
 )
-
-
-if __name__ == "__main__":
-    import os as _os
-
-    cached = _os.getenv("pydna_cached_funcs", "")
-    _os.environ["pydna_cached_funcs"] = ""
-    import doctest
-
-    doctest.testmod(verbose=True, optionflags=doctest.ELLIPSIS)
-    _os.environ["pydna_cached_funcs"] = cached

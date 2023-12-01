@@ -1,61 +1,63 @@
 # %%
 from assembly2 import Assembly
+from pydna.assembly import Assembly as Assembly_pydna
+from assembly2 import example_fragments, linear_results
 from dna_functions import get_homologous_recombination_locations, perform_homologous_recombination
 from pydna.dseqrecord import Dseqrecord
 from pydna.common_sub_strings import common_sub_strings
 import networkx as _nx
+from Bio.SeqFeature import SeqFeature, SimpleLocation
 
+# for f in example_fragments:
+#     print(f.name, f.seq, '/', f.seq.reverse_complement())
+
+# print('++++++')
+
+# for i, rs in enumerate(linear_results):
+#     print(i, rs.seq, '/', rs.seq.reverse_complement())
+
+# print('======')
+# asm_pydna = Assembly_pydna(example_fragments, limit=5)
+# for f in asm_pydna.assemble_circular():
+#     print(f.seq, '/', f.seq.reverse_complement())
+
+# print('======')
 
 # acgatgctatactgg 15
-a = Dseqrecord("acgatgctatactggCCCCCtgtgctgtgctctaGG", name="one36")
-# tgtgctgtgctcta 14
-b = Dseqrecord("tgtgctgtgctctaTTTTTtattctggctgtatct", name="two35")
+a = Dseqrecord("GGacgatgctatactggCCCCCtgtgctgtgctctaGG", name="one36")
+# tgtgctgtgctcta 14                      xxxxxxxxx
+b = Dseqrecord("AAtgtgctgtgctctaTTTTTacgatgctatactggCC", name="two35")
 
-b2 = Dseqrecord("CCCCCtattctggctgtatctTTTTTtgtgctgtgctcta", name="two35")
-
-b3 = Dseqrecord("tgtgctgtgctctaTTTTTtgtgctgtgctctaCCCCtattctggctgtatct", name="two35")
-# tattctggctgtatct 16
-c = Dseqrecord("tattctggctgtatctGGGGGTacgatgctatactgg", name="three37").reverse_complement()
-c2 = Dseqrecord("tattctggctgtatctGGGGGTcccccccccccccccccc", name="three37").reverse_complement()
-
-asm = Assembly((a, b3, c), limit=14, use_fragment_order=True)
-
-for a in asm.get_linear_assemblies():
-    print(a)
-
-for a in asm.get_circular_assemblies():
-    print(a)
-    # print(asm.execute_assembly(a).seq)
+fa = SeqFeature(SimpleLocation(2, 6), type='misc_feature')
+fb = SeqFeature(SimpleLocation(25, 34), type='misc_feature')
+a.features.append(fa)
+b.features.append(fb)
 
 
-# print(asm.get_circular_assemblies())
+asm = Assembly(example_fragments, limit=5, use_fragment_order=True, use_all_fragments=True)
 
+asm.assemble_linear()
+# asm_exc = list(asm.get_circular_assemblies())[1]
 
-# Node to apply the constrain that circular seqs should start with 0
-# # asm.G.add_edge('circ', 0, pair=(None, None))
-
-# print(asm.G.nodes)
-# print(asm.G.edges)
-
-# print(list(filter(lambda x: len(x) == len(set(x)) and len(x) == 4, list(_nx.cycles.find_cycle(asm.G, orientation='original')))))
-
-# # asm.G.add_node('begin', seq=Dseqrecord(''))
-# # asm.G.add_node('end', seq=Dseqrecord(''))
-
-
-# asm.G.add_edge('begin', 1, pair=(None, None))
-# asm.G.add_edge('begin', 2, pair=(None, None))
-
-# asm.G.add_edge(0, 'end', pair=(None, None))
-# asm.G.add_edge(1, 'end', pair=(None, None))
-# asm.G.add_edge(2, 'end', pair=(None, None))
-# asm.G.add_edge(-0, 'end', pair=(None, None))
-# asm.G.add_edge(-1, 'end', pair=(None, None))
-# asm.G.add_edge(-2, 'end', pair=(None, None))
+# asm.execute_assembly(asm_exc)
 
 
 
-# print(list(filter(lambda x: len(x) == 5, list(_nx.all_simple_paths(asm.G, 'begin', 'end')))))
+
+# print(aa[0].features[0].extract(aa[0].seq))
+# print(aa[0].features[1].extract(aa[0].seq))
 
 
-# print(asm.G.edges())
+# for i, f in enumerate(asm.get_circular_assemblies()):
+#     print(i, f)
+# for i, f in enumerate(asm.assemble_circular()):
+#     print(i, f.seq, '/', f.seq.reverse_complement())
+
+# for e in _nx.cycles.find_cycle(asm.G, source=1, orientation='original'):
+#     print(e)
+
+
+
+# a AacgatCAtgctcc / ggagcaTGatcgtT
+# b TtgctccTAAattctgc / gcagaatTTAggagcaA
+# c CattctgcGAGGacgatG / CatcgtCCTCgcagaatG
