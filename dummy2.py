@@ -34,9 +34,20 @@ a.features.append(fa)
 b.features.append(fb)
 
 
-asm = Assembly(example_fragments, limit=5, use_fragment_order=True, use_all_fragments=True)
 
-asm.assemble_linear()
+
+a = Dseqrecord("GGacgatgctatactggCCCCCtgtgctgtgctctaGG", name="one36")
+# tgtgctgtgctcta 14
+b = Dseqrecord("GGtgtgctgtgctctaTTTTTtattctggctgtatctGG", name="two35")
+
+# tattctggctgtatct 16
+c = Dseqrecord("tattctggctgtatctGGGGGTacgatgctatactgg", name="three37")
+
+
+asm = Assembly((a,b,c), limit=14, use_fragment_order=True, use_all_fragments=True)
+
+for f in asm.assemble_linear():
+    print(f.seq)
 # asm_exc = list(asm.get_circular_assemblies())[1]
 
 # asm.execute_assembly(asm_exc)
