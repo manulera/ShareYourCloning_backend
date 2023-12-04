@@ -1,5 +1,6 @@
 * Same molecule returned multiple times
-* Same fragment used several times (different edges?)
+* Same fragment used several times (different edges?), does this make sense? In the end same fragment multiple times
+would give infinite sequences for those that can assemble circularly.
 
 ```python
 primer = parse("test_files/primers.fas", ds=False)
