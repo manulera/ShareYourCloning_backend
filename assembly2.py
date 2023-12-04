@@ -256,7 +256,7 @@ class Assembly(object, metaclass=_Memoize):
             "G.nodes....: {nodes}\n"
             "algorithm..: {al}".format(
                 sequences=" ".join(
-                    "{}bp".format(len(x["mixed"])) for x in self.fragments
+                    "{}bp".format(len(x)) for x in self.fragments
                 ),
                 limit=self.limit,
                 nodes=self.G.order(),
