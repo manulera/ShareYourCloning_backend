@@ -1,7 +1,6 @@
 """Slightly different assembly implementation"""
 
 from pydna.utils import shift_location as _shift_location
-from pydna.utils import memorize as _memorize
 from pydna._pretty import pretty_str as _pretty_str
 from pydna.common_sub_strings import common_sub_strings
 from pydna.dseqrecord import Dseqrecord as _Dseqrecord
