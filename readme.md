@@ -25,6 +25,8 @@ In the project directory:
 # This should install the dependencies and create a virtual environment
 poetry install
 
+# If you want to develop: poetry install --with dev --with test
+
 # Activate the virtual environment
 poetry shell
 
