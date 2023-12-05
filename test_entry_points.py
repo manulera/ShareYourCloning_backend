@@ -4,7 +4,7 @@ from main import app
 from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
-from pydantic_models import RepositoryIdSource, PCRSource, PrimerModel,\
+from pydantic_models import RepositoryIdSource, PCRSource, PrimerModel, \
     RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource, UploadedFileSource, HomologousRecombinationSource
 from pydna.dseqrecord import Dseqrecord
 import unittest
@@ -729,7 +729,7 @@ class PCRTest(unittest.TestCase):
 class HomologousRecombinationTest(unittest.TestCase):
 
     def test_enzyme_doesnt_exist(self):
-        template = Dseqrecord('GGGAAAACCC', circular=True)
+        template = Dseqrecord('GGGAAAACCC', linear=True)
         json_template = format_sequence_genbank(template)
         json_template.id = 1
 

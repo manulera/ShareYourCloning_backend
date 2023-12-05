@@ -1,0 +1,76 @@
+LOCUS       1404bp_PCR_prod         1404 bp    DNA     linear   UNK 01-JAN-1980
+DEFINITION  pcr_product_592_GAL10_fwd_467_pCAPs_release_re (31-mer).
+ACCESSION   1404bp_zdIU4vjdfOxLkTTnKzIxhphnewg
+VERSION     1404bp_zdIU4vjdfOxLkTTnKzIxhphnewg
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+     promoter        1..507
+                     /note="Promotor des GAL10-Gens aus Saccharomyces
+                     cerevisiae; ringf rmig geschlossene DNA aus Saccharomyces
+                     cerevisiae/E. coli auf der Basis des 2 -Plasmid yEP51.
+                     Plasmid yEP5117a"
+     primer_bind     1..21
+                     /label="592_GAL10_fwd"
+                     /ApEinfo_fwdcolor="#baffa3"
+                     /ApEinfo_revcolor="#ffbaba"
+     primer_bind     1..21
+                     /label="592_GAL10_fwd"
+                     /ApEinfo_fwdcolor="#baffa3"
+                     /ApEinfo_revcolor="#ffbaba"
+     source          508..1367
+                     /organism="Saccharomyces cerevisiae"
+                     /mol_type="genomic DNA"
+                     /strain="X2180-1A"
+                     /db_xref="taxon:4932"
+                     /clone="pGA108"
+                     /clone_lib="YEp51B library of R.Akada"
+     gene            508..1367
+                     /gene="GIN11"
+     misc_feature    508..1367
+                     /gene="GIN11"
+                     /experiment="experimental evidence, no additional details
+                     recorded"
+                     /note="GIN11 gene; complete sequence, homology to X element
+                     of telomere ARS"
+                     /citation=[1]
+                     /phenotype="growth inhibitory effect when overexpressed"
+     misc_feature    940..951
+                     /gene="GIN11"
+                     /note="ARS consensus sequence (ACS)"
+     primer_bind     complement(1344..1367)
+                     /label="593_GIN11_rev"
+                     /ApEinfo_fwdcolor="#baffa3"
+                     /ApEinfo_revcolor="#ffbaba"
+     primer_bind     complement(1374..1398)
+                     /label="467_pCAPs_release_re"
+                     /ApEinfo_fwdcolor="#baffa3"
+                     /ApEinfo_revcolor="#ffbaba"
+ORIGIN
+        1 tcaaaaatca tcgcttcgct gattaattac cccagaaata aggctaaaaa actaatcgca
+       61 ttatcatcct atggttgtta atttgattcg ttcatttgaa ggtttgtggg gccaggttac
+      121 tgccaatttt tcctcttcat aaccataaaa gctagtattg tagaatcttt attgttcgga
+      181 gcagtgcggc gcgaggcaca tctgcgtttc aggaacgcga ccggtgaaga cgaggacgca
+      241 cggaggagag tcttccttcg gagggctgtc acccgctcgg cggcttctaa tccgtacttc
+      301 aatatagcaa tgagcagtta agcgtattac tgaaagttcc aaagagaagg tttttttagg
+      361 ctaagataat ggggctcttt acatttccac aacatataag taagattaga tatggatagt
+      421 tatatggata tgtatatggt ggtaatgcca tgtaatatga ttattaaact tctttgcgtc
+      481 catccaaaaa aaaagtaaga atttttggat caataacagt gtttgtggag cattttctga
+      541 atacaataaa cccaaaacag aaacttccct tttgtatcac tgttctggaa aaggggtggg
+      601 cggtaataaa gctaataggg tgtgtccata agtaatactg aacttggaaa tgtgcggctt
+      661 tgcagcattt tgtctttcta taaaaatgtg tcgttccttt ttttcatttt ttggcgcgtc
+      721 gcctcggggt cgtatagaat atgcgtcact tttaaaaata agattgcaga tcagggcaaa
+      781 acaagtagca aatcatagca agagaccctg atttttgtga cataaatatt tttacttctg
+      841 tgttaggtta actttttatg taactgtaaa tggaatagag ttgaggggat agtgcccaca
+      901 agtcaatatg tttattttgt aaagttgaaa gataattatt tttatgctca ggtgattttg
+      961 gtgttgaatt ttctgtaata ttaacataag agtaatacat tgagtggtta gtatatggtg
+     1021 taaaagtggt ataacgcatg tattaagagc agttatacaa tatttggggc cgctgaatga
+     1081 gatatagata ttaaaatgtg gataatcatg ggctttatgg gtaaatggaa cagggtatag
+     1141 accactgagg caagtgccgt gcataatgat atgagtgcat ctagtactga tttagtgaga
+     1201 gatgggccgt ggagtggaat gtgagagtag ggtaagttga gagtggtata tacttgtagc
+     1261 atccgtgtgc gtatgccata tcagtataca agtgaaggtg agtatggcaa gtggtggtgg
+     1321 gattggtata aagtggtagg gtaagtatgt gtgtattatt tacgatcgtg ccatctgtgc
+     1381 agacaaacgc atcaggattt aaat
+//
