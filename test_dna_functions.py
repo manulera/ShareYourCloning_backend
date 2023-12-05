@@ -38,10 +38,10 @@ class DseqFromBothOverhangsTest(unittest.TestCase):
                     for a, start, end in [('a', 0, 2), ('b', 1, 2), ('c', 4, 7)]:
                         dseq_original.features.append(
                             SeqFeature(
-                                location=SimpleLocation(start, end),
+                                location=SimpleLocation(start, end, 1),
                                 type="misc_feature",
-                                qualifiers=OrderedDict({"label": [a]}),
-                                strand=1)
+                                qualifiers=OrderedDict({"label": [a]})
+                                )
                         )
                     dseq_2.features = dseq_original.features
 
@@ -199,17 +199,18 @@ class SequenceRegexTest(unittest.TestCase):
         # TTCCTTAAGG
         # <<<<<<--<<
         f1, f2 = features[0].parts
-        self.assertEqual([f1.start, f1.end], [8, 10])
-        self.assertEqual([f2.start, f2.end], [0, 6])
-        print(features[0])
+        self.assertEqual([f2.start, f2.end], [8, 10])
+        self.assertEqual([f1.start, f1.end], [0, 6])
+        features[0].strand = -1
         self.assertEqual(features[0].extract(template_seq), 'AAGGAACC')
 
         # match: AACC
         # TTCCTTAAGG
         # <<------<<
         f1, f2 = features[1].parts
-        self.assertEqual([f1.start, f1.end], [8, 10])
-        self.assertEqual([f2.start, f2.end], [0, 2])
+        self.assertEqual([f1.start, f1.end], [0, 2])
+        self.assertEqual([f2.start, f2.end], [8, 10])
+        self.assertEqual(features[1].extract(template_seq), 'AACC')
 
         # match: AAGGTTCC
         # TTCCTTAAGG
@@ -217,3 +218,4 @@ class SequenceRegexTest(unittest.TestCase):
         f1, f2 = features[2].parts
         self.assertEqual([f1.start, f1.end], [6, 10])
         self.assertEqual([f2.start, f2.end], [0, 4])
+        self.assertEqual(features[2].extract(template_seq), 'AAGGTTCC')

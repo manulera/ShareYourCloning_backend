@@ -297,7 +297,6 @@ async def homologous_recombination(
     sequences: conlist(SequenceEntity, min_length=1, max_length=1),
     minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.')
 ):
-    print(minimal_homology)
     template = read_dsrecord_from_json(sequences[0])
     insert = read_dsrecord_from_json(sequences[1])
 

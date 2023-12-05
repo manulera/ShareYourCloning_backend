@@ -4,8 +4,7 @@
 import pytest
 
 
-def test_built(monkeypatch):
-    monkeypatch.setenv("pydna_cached_funcs", "")
+def test_built():
     from importlib import reload
     import assembly2 as assembly
 
@@ -18,8 +17,7 @@ def test_built(monkeypatch):
     assert [c.seq.cseguid() for c in crc] == [c.seq.cseguid() for c in assembly.circular_results]
 
 
-def test_new_assembly(monkeypatch):
-    monkeypatch.setenv("pydna_cached_funcs", "")
+def test_new_assembly():
     from pydna.dseqrecord import Dseqrecord
     import assembly2 as assembly
     from pydna.parsers import parse
@@ -248,8 +246,7 @@ def test_new_assembly(monkeypatch):
     # [821] [713] [132] [51] [38]
 
 
-def test_assembly(monkeypatch):
-    monkeypatch.setenv("pydna_cached_funcs", "")
+def test_assembly():
     import assembly2 as assembly
     from pydna.parsers import parse
     from pydna.utils import eq
@@ -485,8 +482,7 @@ algorithm..: common_sub_strings"""
     assert candidate.cseguid() == "wM7nM6oJer3bB6RV81IH78e02j4"
 
 
-def test_MXblaster1(monkeypatch):
-    monkeypatch.setenv("pydna_cached_funcs", "")
+def test_MXblaster1():
     import assembly2 as assembly
     from pydna.parsers import parse
     from pydna.amplify import pcr
@@ -643,8 +639,7 @@ def test_MXblaster1(monkeypatch):
     assert pCAPs_MX4blaster2.useguid() == "7B4KKAeM2x8npjkp5U942rtMbB8"
 
 
-def test_assemble_pGUP1(monkeypatch):
-    monkeypatch.setenv("pydna_cached_funcs", "")
+def test_assemble_pGUP1():
 
     from pydna.readers import read
     import assembly2 as assembly
@@ -680,7 +675,7 @@ def test_assemble_pGUP1(monkeypatch):
     assert pGUP1.useguid() == "42wIByERn2kSe_Exn405RYwhffU"
 
 
-# def test_35_36(monkeypatch):
+# def test_35_36():
 #    import sys
 #    from pydna.assembly import _od
 #    if sys.version_info < (3, 6):
@@ -690,7 +685,7 @@ def test_assemble_pGUP1(monkeypatch):
 #        assert _od==dict
 
 
-def test_pYPK7_TDH3_GAL2_PGI1(monkeypatch):
+def test_pYPK7_TDH3_GAL2_PGI1():
     from pydna.readers import read
     from pydna.assembly import Assembly
 
@@ -707,7 +702,7 @@ def test_pYPK7_TDH3_GAL2_PGI1(monkeypatch):
     assert z.assemble_circular()[1].cseguid() == "eDYovOVEKFIbc7REPlTsnScycQY"
 
 
-def test_marker_replacement_on_plasmid(monkeypatch):
+def test_marker_replacement_on_plasmid():
     from pydna.assembly import Assembly
     from pydna.parsers import parse
 
@@ -745,7 +740,7 @@ def test_marker_replacement_on_plasmid(monkeypatch):
     assert pMEC1135.features[-1].extract(pMEC1135).seq == candidate.features[-1].extract(candidate).seq
 
 @pytest.mark.xfail(reason="contig not implemented")
-def test_linear_with_annotations2(monkeypatch):
+def test_linear_with_annotations2():
     # Thanks to James Bagley for finding this bug
     # https://github.com/JamesBagley
     from pydna._pretty import pretty_str

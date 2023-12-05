@@ -15,7 +15,7 @@ import requests
 from bs4 import BeautifulSoup
 import regex
 from Bio.SeqFeature import SimpleLocation, Location, CompoundLocation
-
+from pydna.utils import shift_location
 
 def sum_is_sticky(seq1: Dseq, seq2: Dseq, partial: bool=False) -> bool:
     """Return true if the 3' end of seq1 and 5' end of seq2 ends are sticky and compatible for ligation."""
@@ -319,7 +319,6 @@ def request_from_addgene(source: RepositoryIdSource) -> tuple[list[Dseqrecord], 
     if resp.status_code == 404:
         raise HTTPError(url, 404, 'wrong addgene id', 'wrong addgene id', None)
     soup = BeautifulSoup(resp.content, 'html.parser')
-    print(soup)
     sequence_file_url_dict = dict()
     for _type in ['depositor-full', 'depositor-partial', 'addgene-full', 'addgene-partial']:
         sequence_file_url_dict[_type] = []
@@ -346,17 +345,6 @@ def correct_name(dseq: Dseqrecord):
     # Can set the name from keyword if locus is set to Exported
     if dseq.name.lower() == 'exported' and dseq.locus.lower() == 'exported' and 'keywords' in dseq.annotations:
         dseq.name = dseq.annotations['keywords'][0]
-
-
-def create_location(start: int, end: int, strand: int, seq_len: int, is_circular: bool) -> Location:
-
-    if not is_circular:
-        return SimpleLocation(start, end, strand)
-
-    coords = [start, end]
-    if coords[0] < coords[1]:
-        return SimpleLocation(*coords, strand)
-    return SimpleLocation(coords[0], seq_len, strand) + SimpleLocation(0, coords[1], strand)
 
 
 def location_sorter(x, y) -> int:
@@ -397,13 +385,14 @@ def find_sequence_regex(pattern: str, seq: str, is_circular: bool) -> list[Locat
     # string of length 6 spanned entirely, start=0 end=6, so if you want to fold you need
     # to add 1 to the end.
 
-    strand = 1
+    # Strand 1
     feature_edges = get_all_regex_feature_edges(pattern, seq, is_circular)
-    feature_locations += [create_location(start % len(seq), (end - 1) % len(seq) + 1, strand, len(seq), is_circular) for start, end in feature_edges]
+    # We use shift_location to format origin-spanning features in circular DNA
+    feature_locations += [ shift_location(SimpleLocation(start, end, 1), 0, len(seq)) for start, end in feature_edges]
 
-    strand = -1
+    # Strand -1
     feature_edges = get_all_regex_feature_edges(pattern, reverse_complement(seq), is_circular)
-    feature_locations += [create_location(len(seq) - ((end - 1) % len(seq) + 1), len(seq) - (start % len(seq)), strand, len(seq), is_circular) for start, end in feature_edges]
+    feature_locations += [ shift_location(SimpleLocation(start, end, 1)._flip(len(seq)), 0, len(seq)) for start, end in feature_edges]
 
     # We return a unique list, cannot use a set because Location is not hashable
     return sorted([x for i, x in enumerate(feature_locations) if x not in feature_locations[:i]], key=cmp_to_key(location_sorter))

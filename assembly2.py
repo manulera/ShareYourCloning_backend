@@ -1,17 +1,15 @@
 """Slightly different assembly implementation"""
 
-from Bio.SeqFeature import SimpleLocation as _SimpleLocation
 from pydna.utils import shift_location as _shift_location
 from pydna.utils import memorize as _memorize
 from pydna._pretty import pretty_str as _pretty_str
 from pydna.common_sub_strings import common_sub_strings
 from pydna.dseqrecord import Dseqrecord as _Dseqrecord
 import networkx as _nx
-from copy import deepcopy as _deepcopy
 import itertools as _itertools
-import logging as _logging
 from Bio.Seq import reverse_complement
-from dna_functions import create_location
+from Bio.SeqFeature import SimpleLocation
+from pydna.utils import shift_location
 
 def circular_permutation_min_abs(lst):
     """Returns the circular permutation of lst with the smallest absolute value first."""
@@ -20,9 +18,9 @@ def circular_permutation_min_abs(lst):
 
 def add_edges_from_match(match, index_first, index_secnd, first, secnd, graph: _nx.MultiDiGraph):
     x_start, y_start, length = match
-    # We use this function in case there are origin-spanning features. Circular case should be handled properly.
-    locs = [create_location(x_start, x_start + length, 1, len(first), first.circular),
-            create_location(y_start, y_start + length, 1, len(secnd), secnd.circular)]
+    # We use shift_location with 0 to wrap origin-spanning features
+    locs = [shift_location(SimpleLocation(x_start, x_start + length, 1), 0, len(first)),
+            shift_location(SimpleLocation(y_start, y_start + length, 1), 0, len(secnd))]
     rc_locs = [locs[0]._flip(len(first)), locs[1]._flip(len(secnd))]
 
     combinations = (
