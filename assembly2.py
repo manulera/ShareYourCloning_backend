@@ -10,6 +10,50 @@ from Bio.Seq import reverse_complement
 from Bio.SeqFeature import SimpleLocation
 from pydna.utils import shift_location
 
+def assembly2str(assembly):
+    return str(tuple(f'{u}{lu}:{v}{lv}' for u, v, lu, lv in assembly))
+
+def edge_representation2subfragment_representation(assembly, is_circular):
+    """
+    Turn this kind of edge representation fragment 1, fragment 2, right edge on 1, left edge on 2
+    a = [(1, 2, 'loc1a', 'loc2a'), (2, 3, 'loc2b', 'loc3b'), (3, 1, 'loc3c', 'loc1c')]
+    Into this: fragment 1, left edge on 1, right edge on 1
+    b = [(1, 'loc1c', 'loc1a'), (2, 'loc2a', 'loc2b'), (3, 'loc3b', 'loc3c')]
+    """
+
+    if is_circular:
+        temp = list(assembly[-1:]) + list(assembly)
+    else:
+        temp = [(None, assembly[0][0], None, None)] + list(assembly) + [(assembly[-1][1], None, None, None)]
+    edge_pairs = zip(temp, temp[1:])
+    subfragment_representation = list()
+    for (u1, v1, _, start_location), (u2, v2, end_location, _) in edge_pairs:
+        subfragment_representation.append((v1, start_location, end_location))
+
+    return subfragment_representation
+
+def get_assembly_subfragments(fragment, subfragment_representation):
+    """From the fragment representation returned by edge_representation2subfragment_representation, get the subfragments that are joined together.
+
+        Subfragments are the slices of the fragments that are joined together
+
+        For example:
+        ```
+            -- A --
+        cccccgtatcgtgtcccccc
+            -- B --
+            acatcgtgtactgtcatattc
+        ```
+        Subfragments: `cccccgtatcgtgt`, `atcgtgtactgtcatattc`
+    """
+    subfragments = list()
+    for node, start_location, end_location in subfragment_representation:
+        seq = fragment[node-1] if node > 0 else fragment[-node-1].reverse_complement()
+        start = 0 if start_location is None else start_location.parts[0].start
+        end = None if end_location is None else end_location.parts[-1].end
+        subfragments.append(seq[start:end])
+    return subfragments
+
 def is_sublist(sublist, my_list):
     """Returns True if sublist is a sublist of my_list, False otherwise.
 
@@ -275,16 +319,10 @@ class Assembly:
         else:
             edge_pairs = zip(assembly, assembly[1:])
 
-        for (u1, v1, key1), (u2, v2, key2) in edge_pairs:
-            left_edge = self.G[u1][v1][key1]['locations']
-            right_edge = self.G[u2][v2][key2]['locations']
-
+        for (u1, v1, _, start_location), (u2, v2, end_location, _) in edge_pairs:
             # Incompatible as described in figure above
-            if left_edge[1].parts[-1].end >= right_edge[0].parts[0].end:
+            if start_location.parts[-1].end >= end_location.parts[0].end:
                 return False
-
-        # TODO: validation of circular assemblies with constrain from
-        # https://github.com/manulera/ShareYourCloning_backend/issues/51#issuecomment-1845344894
 
         return True
 
@@ -308,6 +346,13 @@ class Assembly:
 
         return filtered_assemblies
 
+    def format_assembly_edge(self, assembly_edge):
+        """Go from the (u, v, key) to the (u, v, locu, locv) format."""
+        u, v, key = assembly_edge
+        locu, locv = self.G.get_edge_data(u, v, key)['locations']
+        return u, v, locu, locv
+
+
     def get_linear_assemblies(self):
         """Get linear assemblies, applying the constrains described in __init__, ensuring that paths represent
         real assemblies (see validate_assembly). Subassemblies are removed (see remove_subassemblies)."""
@@ -329,12 +374,11 @@ class Assembly:
                     G.add_edge('begin', node)
                 G.add_edge(node, 'end')
 
-        assemblies = map(lambda x : tuple(x[1:-1]), _nx.all_simple_edge_paths(G, 'begin', 'end'))
+        assemblies = [tuple(map(self.format_assembly_edge, x[1:-1])) for x in _nx.all_simple_edge_paths(G, 'begin', 'end')]
         return self.remove_subassemblies([a for a in assemblies if self.validate_assembly(a, False)])
 
     def cycle2circular_assemblies(self, cycle):
-        """Convert a cycle in the format [1, 2, 3] (as returned by _nx.cycles.simple_cycles) to a list of all possible circular assemblies
-        in the format of an assembly (like the output of _nx.all_simple_edge_paths).
+        """Convert a cycle in the format [1, 2, 3] (as returned by _nx.cycles.simple_cycles) to a list of all possible circular assemblies.
 
         There may be multiple assemblies for a given cycle,
         if there are several edges connecting two nodes, for example two overlaps between 1 and 2, and single overlap between 2 and 3 should
@@ -344,7 +388,7 @@ class Assembly:
         combine = list()
         for u, v in zip(cycle, cycle[1:] + cycle[:1]):
             combine.append([(u, v, key) for key in self.G[u][v]])
-        return list(_itertools.product(*combine))
+        return [tuple(map(self.format_assembly_edge, x)) for x in _itertools.product(*combine)]
 
     def get_circular_assemblies(self):
         """Get circular assemblies, applying the constrains described in __init__, ensuring that paths represent
@@ -357,59 +401,16 @@ class Assembly:
         assemblies = sum(map(self.cycle2circular_assemblies, sorted_cycles),[])
         return [a for a in assemblies if self.validate_assembly(a, True)]
 
-    def edge_representation2subfragment_representation(self, assembly, is_circular):
-        """
-        Turn this kind of edge representation fragment 1, fragment 2, right edge on 1, left edge on 2
-        a = [(1, 2, 'loc1a', 'loc2a'), (2, 3, 'loc2b', 'loc3b'), (3, 1, 'loc3c', 'loc1c')]
-        Into this: fragment 1, left edge on 1, right edge on 1
-        b = [(1, 'loc1c', 'loc1a'), (2, 'loc2a', 'loc2b'), (3, 'loc3b', 'loc3c')]
-        """
 
-        if is_circular:
-            temp = list(assembly[-1:]) + list(assembly)
-        else:
-            temp = [(None, assembly[0][0], None)] + list(assembly) + [(assembly[-1][1], None, None)]
-        edge_pairs = zip(temp, temp[1:])
-        alternative_representation = list()
-        for (u1, v1, key1), (u2, v2, key2) in edge_pairs:
-            start_location = None if u1 is None else self.G[u1][v1][key1]['locations'][1]
-            end_location = None if v2 is None else self.G[u2][v2][key2]['locations'][0]
-            alternative_representation.append((v1, start_location, end_location))
+    def assemble(self, assembly, is_circular):
+        """Execute an assembly, from the representation returned by get_linear_assemblies or get_circular_assemblies."""
 
-        return alternative_representation
-
-
-    def get_assembly_subfragments(self, assembly_repr_fragments):
-        """From the fragment representation returned by edge_representation2subfragment_representation, get the subfragments that are joined together.
-
-            Subfragments are the slices of the fragments that are joined together
-
-            For example:
-            ```
-                -- A --
-            cccccgtatcgtgtcccccc
-                -- B --
-                acatcgtgtactgtcatattc
-            ```
-            Subfragments: `cccccgtatcgtgt`, `atcgtgtactgtcatattc`
-        """
-        subfragments = list()
-        for node, start_location, end_location in assembly_repr_fragments:
-            seq = self.G.nodes[node]['seq']
-            start = 0 if start_location is None else start_location.parts[0].start
-            end = None if end_location is None else end_location.parts[-1].end
-            subfragments.append(seq[start:end])
-        return subfragments
-
-    def assemble(self, assembly_repr_edges, is_circular):
-        """Execute an assembly, from the edge representation returned by get_linear_assemblies or get_circular_assemblies."""
-
-        assembly_repr_fragments = self.edge_representation2subfragment_representation(assembly_repr_edges, is_circular)
+        subfragment_representation = edge_representation2subfragment_representation(assembly, is_circular)
 
         # Length of the overlaps between consecutive assembly fragments
-        fragment_overlaps = [len(self.G[u][v][key]['locations'][1]) for u, v, key in assembly_repr_edges]
+        fragment_overlaps = [len(e[-1]) for e in assembly]
 
-        subfragments = self.get_assembly_subfragments(assembly_repr_fragments)
+        subfragments = get_assembly_subfragments(self.fragments, subfragment_representation)
 
         out_dseqrecord = _Dseqrecord(subfragments[0])
 

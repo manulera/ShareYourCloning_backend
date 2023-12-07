@@ -15,6 +15,7 @@ from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
 from Bio.Restriction.Restriction_Dictionary import rest_dict
+from assembly2 import Assembly
 
 # Instance of the API object
 app = FastAPI()
@@ -294,14 +295,16 @@ async def pcr(source: PCRSource,
 ))
 async def homologous_recombination(
     source: HomologousRecombinationSource,
-    sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+    sequences: conlist(SequenceEntity, min_length=2, max_length=2),
     minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.')
 ):
     template = read_dsrecord_from_json(sequences[0])
     insert = read_dsrecord_from_json(sequences[1])
 
-    locs = get_homologous_recombination_locations(template, insert, minimal_homology)
-    products = [perform_homologous_recombination(template, insert, loc) for loc in locs]
+    asm = Assembly((template, insert, template), limit=minimal_homology, use_all_fragments=True)
+    # The condition is that the first and last fragments are the template
+    possible_assemblies = [a for a in asm.get_linear_assemblies() if a[0][0] == 1 and a[-1][1] == 3]
+    products = [asm.assemble(a) for a in possible_assemblies]
 
     if len(products) == 0:
         raise HTTPException(400, 'No homologous recombination was found.')
@@ -309,13 +312,12 @@ async def homologous_recombination(
     out_sequences = []
     out_sources = []
 
-    for loc, seq in zip(locs, products):
-        out_sequences.append(format_sequence_genbank(seq))
+    for assembly in possible_assemblies:
+        out_sequences.append(format_sequence_genbank(asm.assemble(assembly, False)))
         new_source = source.model_copy()
-        new_source.location = format_feature_location(loc, None)
+        new_source.assembly = (assembly[0], assembly[1], format_feature_location(assembly[2]), format_feature_location(assembly[3]))
         out_sources.append(new_source)
 
-    output_is_known = len(source.location) > 0
 
     if output_is_known:
         for out_sequence, out_source in zip(out_sequences, out_sources):

@@ -127,14 +127,6 @@ class SequenceSubsetSource(Source):
     For both, 0-based indexing, [first,second)')
 
 
-class HomologousRecombinationSource(Source):
-
-    # This can only take two inputs, the first one is the template, the second one is the insert
-    type: SourceType = SourceType('homologous_recombination')
-    input: conlist(int, min_length=2, max_length=2)
-    location: str = ''
-
-
 class RestrictionEnzymeDigestionSource(SequenceSubsetSource):
     """Documents a restriction enzyme digestion, and the selection of one of the fragments."""
 
@@ -180,3 +172,8 @@ class StickyLigationSource(Source):
     #     assert len(v) == len(values['input']) or len(v) == 0, '`fragments_inverted` must\
     #         be either empty, or have the same length as `input`'
 
+class HomologousRecombinationSource(Assembly):
+
+    # This can only take two inputs, the first one is the template, the second one is the insert
+    type: SourceType = SourceType('homologous_recombination')
+    input: conlist(int, min_length=2, max_length=2)
