@@ -184,9 +184,8 @@ async def restriction(source: RestrictionEnzymeDigestionSource,
     dseq = read_dsrecord_from_json(sequences[0])
     # TODO: return error if the id of the sequence does not correspond
 
-    # If the request provides the fragment_boundaries, the program should return only one output.
-    output_is_known = False
-    if len(source.fragment_boundaries) > 0:
+    # If the output is known
+    if len(source.left_edge) > 0:
         if len(source.fragment_boundaries) != 2 or len(source.restriction_enzymes) != 2:
             raise HTTPException(
                 400, 'If `fragment_boundaries` are provided, the length of `fragment_boundaries` and `restriction_enzymes` must be 2.')
