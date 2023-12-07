@@ -159,6 +159,10 @@ class PCRSource(SequenceSubsetSource):
     in each primer (same order as in `primers`). Missmatch support should be added in the future.')
 
 
+class Assembly(Source):
+    assembly:  conlist(tuple[int, int, str, str], min_length=1)
+    is_circular: bool = None
+
 class StickyLigationSource(Source):
     """Documents a ligation with sticky ends. This might consist of \
     a single fragment's circularisation"""
@@ -175,3 +179,4 @@ class StickyLigationSource(Source):
     # def lists_have_equal_length(cls, v, values):
     #     assert len(v) == len(values['input']) or len(v) == 0, '`fragments_inverted` must\
     #         be either empty, or have the same length as `input`'
+

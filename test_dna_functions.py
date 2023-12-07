@@ -173,6 +173,7 @@ class SequenceRegexTest(unittest.TestCase):
         for circular in [False, True]:
             features = find_sequence_regex(regex_pattern, template_seq, circular)
             self.assertEqual(len(features), 4)
+            print(features)
             # First AATTAA
             self.assertEqual([features[0].start, features[0].end], [0, 6])
             self.assertEqual(features[0].extract(template_seq), 'AATTAA')

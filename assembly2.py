@@ -237,36 +237,40 @@ class Assembly:
 
         return
 
-    def validate_assembly(self, assembly):
+    def validate_assembly(self, assembly, is_circular):
         """Function used to filter paths returned from the graph, see conditions tested below.
         """
         # Linear assemblies may get begin-1-end, begin-2-end, these are removed here.
         if len(assembly) == 0:
             return False
 
-        is_circular = assembly[0][0] == assembly[-1][1]
-
-        if self.use_all_fragments and (len(assembly) - (1 if is_circular else 0) != len(self.fragments) - 1):
+        if self.use_all_fragments and len(self.fragments) == len(set(sum( (map(abs, list(e[:2])) for e in assembly) , []))):
             return False
 
         # Here we check whether subsequent pairs of fragments are compatible, for instance:
         # Compatible (overlap of 1 and 2 occurs before overlap of 2 and 3):
+        # (1,2,[2:9],[0:7]), (2,3,[12:19],[0:7])
         #    -- A --
-        #  gtatcgtgt     -- B --
-        #    atcgtgtactgtcatattc
-        #                catattcaa
+        # 1 gtatcgtgt     -- B --
+        # 2   atcgtgtactgtcatattc
+        # 3               catattcaa
         # Incompatible (overlap of 1 and 2 occurs after overlap of 2 and 3):
-        #               -- A --
-        #  -- B --    gtatcgtgt
-        #  catattcccccccatcgtgtactgt
-        #
-        # Redundant: overlap of 1 and 2 is at the same spot as overlap of 2 and 3
+        # (1,2,[2:9],[13:20]), (2,3,[0:7],[0:7])
+        #                 -- A --
+        #  1 -- B --    gtatcgtgt
+        #  2 catattcccccccatcgtgtactgt
+        #  3 catattcaa
+        # Redundant: overlap of 1 and 2 ends at the same spot as overlap of 2 and 3
+        # (1,2,[2:9],[1:8]), (2,3,[0:8],[0:8])
         #    -- A --
         #  gtatcgtgt
         #   catcgtgtactgtcatattc
         #   catcgtgtactgtcatattc
         #   -- B ---
         if is_circular:
+            # In a circular assembly, first and last fragment must be the same
+            if assembly[0][0] != assembly[-1][1]:
+                return False
             edge_pairs = zip(assembly, assembly[1:] + assembly[:1])
         else:
             edge_pairs = zip(assembly, assembly[1:])
@@ -278,6 +282,9 @@ class Assembly:
             # Incompatible as described in figure above
             if left_edge[1].parts[-1].end >= right_edge[0].parts[0].end:
                 return False
+
+        # TODO: validation of circular assemblies with constrain from
+        # https://github.com/manulera/ShareYourCloning_backend/issues/51#issuecomment-1845344894
 
         return True
 
@@ -322,7 +329,8 @@ class Assembly:
                     G.add_edge('begin', node)
                 G.add_edge(node, 'end')
 
-        return self.remove_subassemblies(filter(self.validate_assembly, map(lambda x : tuple(x[1:-1]), _nx.all_simple_edge_paths(G, 'begin', 'end'))))
+        assemblies = map(lambda x : tuple(x[1:-1]), _nx.all_simple_edge_paths(G, 'begin', 'end'))
+        return self.remove_subassemblies([a for a in assemblies if self.validate_assembly(a, False)])
 
     def cycle2circular_assemblies(self, cycle):
         """Convert a cycle in the format [1, 2, 3] (as returned by _nx.cycles.simple_cycles) to a list of all possible circular assemblies
@@ -347,10 +355,9 @@ class Assembly:
         sorted_cycles = filter(lambda x: x[0] > 0, sorted_cycles)
         # cycles.simple_cycles returns lists [1,2,3] not assemblies, see self.cycle2circular_assemblies
         assemblies = sum(map(self.cycle2circular_assemblies, sorted_cycles),[])
+        return [a for a in assemblies if self.validate_assembly(a, True)]
 
-        return list(filter(self.validate_assembly, assemblies))
-
-    def edge_representation2subfragment_representation(self, assembly):
+    def edge_representation2subfragment_representation(self, assembly, is_circular):
         """
         Turn this kind of edge representation fragment 1, fragment 2, right edge on 1, left edge on 2
         a = [(1, 2, 'loc1a', 'loc2a'), (2, 3, 'loc2b', 'loc3b'), (3, 1, 'loc3c', 'loc1c')]
@@ -358,7 +365,6 @@ class Assembly:
         b = [(1, 'loc1c', 'loc1a'), (2, 'loc2a', 'loc2b'), (3, 'loc3b', 'loc3c')]
         """
 
-        is_circular = assembly[0][0] == assembly[-1][1]
         if is_circular:
             temp = list(assembly[-1:]) + list(assembly)
         else:
@@ -395,10 +401,10 @@ class Assembly:
             subfragments.append(seq[start:end])
         return subfragments
 
-    def assemble(self, assembly_repr_edges):
+    def assemble(self, assembly_repr_edges, is_circular):
         """Execute an assembly, from the edge representation returned by get_linear_assemblies or get_circular_assemblies."""
 
-        assembly_repr_fragments = self.edge_representation2subfragment_representation(assembly_repr_edges)
+        assembly_repr_fragments = self.edge_representation2subfragment_representation(assembly_repr_edges, is_circular)
 
         # Length of the overlaps between consecutive assembly fragments
         fragment_overlaps = [len(self.G[u][v][key]['locations'][1]) for u, v, key in assembly_repr_edges]
@@ -414,7 +420,7 @@ class Assembly:
             out_dseqrecord = _Dseqrecord(out_dseqrecord.seq + fragment.seq[overlap:], features=out_dseqrecord.features + new_features)
 
         # For circular assemblies, close the loop and wrap origin-spanning features
-        if assembly_repr_fragments[0][1] != None:
+        if is_circular:
             overlap = fragment_overlaps[-1]
             # Remove trailing overlap
             out_dseqrecord = _Dseqrecord(out_dseqrecord.seq[:-overlap], features=out_dseqrecord.features, circular=True)
@@ -428,12 +434,12 @@ class Assembly:
     def assemble_linear(self):
         """Assemble linear constructs, from assemblies returned by self.get_linear_assemblies."""
         assemblies = self.get_linear_assemblies()
-        return list(map(self.assemble, assemblies))
+        return [self.assemble(a, False) for a in assemblies]
 
     def assemble_circular(self):
         """Assemble circular constructs, from assemblies returned by self.get_circular_assemblies."""
         assemblies = self.get_circular_assemblies()
-        return list(map(self.assemble, assemblies))
+        return [self.assemble(a, True) for a in assemblies]
 
     def __repr__(self):
         # https://pyformat.info
