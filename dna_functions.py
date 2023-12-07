@@ -108,7 +108,7 @@ def sort_by(list2sort, reference_list):
 
 def get_cutsite_order(dseqrecord: Dseqrecord, enzymes: RestrictionBatch) -> tuple[list[RestrictionType], list[int]]:
     """Return the cutsites in order."""
-    cuts = enzymes.search(dseqrecord.seq, linear=dseqrecord.linear)
+    cuts = enzymes.search(dseqrecord.seq, linear=not dseqrecord.circular)
     positions = list()
     cutsites = list()
     for enzyme in cuts:
@@ -125,14 +125,14 @@ def get_cutsite_order(dseqrecord: Dseqrecord, enzymes: RestrictionBatch) -> tupl
     positions = sorted(positions)
 
     # For digestion of linear sequences, the first one and last one are the molecule ends
-    if dseqrecord.linear:
+    if not dseqrecord.circular:
         cutsites.insert(0, '')
         cutsites.append('')
         positions.insert(0, 0)
         positions.append(len(dseqrecord))
 
     # For digestion of circular sequences, the first one and last one are the same
-    if not dseqrecord.linear:
+    if dseqrecord.circular:
         cutsites.append(cutsites[0])
         positions.append(positions[0])
 
@@ -350,16 +350,11 @@ def correct_name(dseq: Dseqrecord):
 def location_sorter(x, y) -> int:
     """
     Sort by start, then length, then strand.
-
-    It's a bit weird for origin-spanning features in circular DNA,
-    as the start is always zero, ultimately the reason for this is
-    so that the features are always in the same order even if sets
-    are used in the function.
     """
-    if x.start != y.start:
-        return x.start - y.start
-    elif x.end != y.end:
-        return x.end - y.end
+    if x.parts[0].start != y.parts[0].start:
+        return x.parts[0].start - y.parts[0].start
+    elif x.parts[-1].end != y.parts[-1].end:
+        return x.parts[-1].end - y.parts[-1].end
     return x.strand - y.strand
 
 
@@ -380,10 +375,6 @@ def get_all_regex_feature_edges(pattern: str, seq: str, is_circular: bool) -> li
 def find_sequence_regex(pattern: str, seq: str, is_circular: bool) -> list[Location]:
 
     feature_locations = list()
-
-    # Below, we use +1 in "% (len(seq) + 1)" because start / end is a range, for instance for a
-    # string of length 6 spanned entirely, start=0 end=6, so if you want to fold you need
-    # to add 1 to the end.
 
     # Strand 1
     feature_edges = get_all_regex_feature_edges(pattern, seq, is_circular)
@@ -420,3 +411,4 @@ def perform_homologous_recombination(template: Dseqrecord, insert: Dseqrecord, l
     if template.circular:
         return (template[edges[1]:edges[0]] + insert).looped()
     return template[0:edges[0]] + insert + template[edges[1]:]
+

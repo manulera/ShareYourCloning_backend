@@ -15,7 +15,8 @@ from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
 from Bio.Restriction.Restriction_Dictionary import rest_dict
-
+from assembly2 import Assembly, assemble, assembly_is_valid, assembly2str
+from Bio.SeqFeature import Location
 # Instance of the API object
 app = FastAPI()
 
@@ -294,35 +295,35 @@ async def pcr(source: PCRSource,
 ))
 async def homologous_recombination(
     source: HomologousRecombinationSource,
-    sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+    sequences: conlist(SequenceEntity, min_length=2, max_length=2),
     minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.')
 ):
     template = read_dsrecord_from_json(sequences[0])
     insert = read_dsrecord_from_json(sequences[1])
+    if source.assembly is not None:
+        # Format the locations
+        assembly = [(part[0], part[1], Location.fromstring(part[2], None), Location.fromstring(part[3], None)) for part in source.assembly]
+        if source.assembly[0][:2] != (1,2) or source.assembly[1][:2] != (2, 1) or not assembly_is_valid([template, source], assembly, False, True):
+            raise HTTPException(400, 'The provided assembly is not valid.')
+        return {'sequences': [format_sequence_genbank(assemble([template, insert], assembly, False))], 'sources': [source]}
 
-    locs = get_homologous_recombination_locations(template, insert, minimal_homology)
-    products = [perform_homologous_recombination(template, insert, loc) for loc in locs]
+    asm = Assembly((template, insert, template), limit=minimal_homology, use_all_fragments=True)
 
-    if len(products) == 0:
+    # The condition is that the first and last fragments are the template
+    possible_assemblies = [a for a in asm.get_linear_assemblies() if a[0][0] == 1 and a[-1][1] == 3]
+
+    # Replace the index of last fragment (3) by 1, since it is repeated
+    possible_assemblies = [(a[0], (2, 1, a[1][2], a[1][3]), ) for a in possible_assemblies]
+    if len(possible_assemblies) == 0:
         raise HTTPException(400, 'No homologous recombination was found.')
 
     out_sequences = []
     out_sources = []
 
-    for loc, seq in zip(locs, products):
-        out_sequences.append(format_sequence_genbank(seq))
+    for assembly in possible_assemblies:
+        out_sequences.append(format_sequence_genbank(assemble([template, insert], assembly, False)))
         new_source = source.model_copy()
-        new_source.location = format_feature_location(loc, None)
+        new_source.assembly = [(part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None)) for part in assembly]
         out_sources.append(new_source)
-
-    output_is_known = len(source.location) > 0
-
-    if output_is_known:
-        for out_sequence, out_source in zip(out_sequences, out_sources):
-            if out_source == source:
-                return {'sequences': [out_sequence], 'sources': [out_source]}
-        # If we don't find it, there was a mistake
-        raise HTTPException(
-            400, 'The provided location does not seem valid for homologous recombination.')
 
     return {'sources': out_sources, 'sequences': out_sequences}

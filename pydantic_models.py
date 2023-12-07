@@ -127,14 +127,6 @@ class SequenceSubsetSource(Source):
     For both, 0-based indexing, [first,second)')
 
 
-class HomologousRecombinationSource(Source):
-
-    # This can only take two inputs, the first one is the template, the second one is the insert
-    type: SourceType = SourceType('homologous_recombination')
-    input: conlist(int, min_length=2, max_length=2)
-    location: str = ''
-
-
 class RestrictionEnzymeDigestionSource(SequenceSubsetSource):
     """Documents a restriction enzyme digestion, and the selection of one of the fragments."""
 
@@ -159,6 +151,10 @@ class PCRSource(SequenceSubsetSource):
     in each primer (same order as in `primers`). Missmatch support should be added in the future.')
 
 
+class Assembly(Source):
+    assembly:  Optional[conlist(tuple[int, int, str, str], min_length=1)] = None
+    is_circular: Optional[bool] = None
+
 class StickyLigationSource(Source):
     """Documents a ligation with sticky ends. This might consist of \
     a single fragment's circularisation"""
@@ -175,3 +171,9 @@ class StickyLigationSource(Source):
     # def lists_have_equal_length(cls, v, values):
     #     assert len(v) == len(values['input']) or len(v) == 0, '`fragments_inverted` must\
     #         be either empty, or have the same length as `input`'
+
+class HomologousRecombinationSource(Assembly):
+
+    # This can only take two inputs, the first one is the template, the second one is the insert
+    type: SourceType = SourceType('homologous_recombination')
+    input: conlist(int, min_length=2, max_length=2)

@@ -14,21 +14,21 @@ class PydnaTest(unittest.TestCase):
         first_product_sequence = list()
         # With an unpacked list of enzymes ===================
 
-        # seq_object = Dseq('AAAGGATCCAAAAGATATCAAAAA', linear=False)
+        # seq_object = Dseq('AAAGGATCCAAAAGATATCAAAAA', circular=True)
         # first_product_sequence.append(str(seq_object.cut(*enzymes)[0]))
         # first_product_sequence.append(str(seq_object.cut(*enzymes[::-1])[0]))
 
-        # seq_object = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', linear=False)
+        # seq_object = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', circular=True)
         # first_product_sequence.append(str(seq_object.cut(*enzymes)[0].seq))
         # first_product_sequence.append(str(seq_object.cut(*enzymes[::-1])[0].seq))
 
         # With a RestrictionBatch ==============================
 
-        seq_object = Dseq('AAAGGATCCAAAAGATATCAAAAA', linear=False)
+        seq_object = Dseq('AAAGGATCCAAAAGATATCAAAAA', circular=True)
         first_product_sequence.append(str(seq_object.cut(RestrictionBatch(enzymes))[0]))
         first_product_sequence.append(str(seq_object.cut(RestrictionBatch(enzymes[::-1]))[0]))
 
-        seq_object = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', linear=False)
+        seq_object = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', circular=True)
         first_product_sequence.append(str(seq_object.cut(RestrictionBatch(enzymes))[0].seq))
         first_product_sequence.append(str(seq_object.cut(RestrictionBatch(enzymes[::-1]))[0].seq))
 

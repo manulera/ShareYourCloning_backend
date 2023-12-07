@@ -311,7 +311,7 @@ class StickyLigationTest(unittest.TestCase):
 class RestrictionTest(unittest.TestCase):
 
     def test_enzyme_doesnt_exist(self):
-        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', linear=True)
+        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', circular=False)
         json_seq = format_sequence_genbank(dseq)
         json_seq.id = 1
 
@@ -337,7 +337,7 @@ class RestrictionTest(unittest.TestCase):
         self.assertIn('helloworld', response.json()['detail'])
 
     def test_enzymes_dont_cut(self):
-        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', linear=True)
+        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', circular=False)
         json_seq = format_sequence_genbank(dseq)
         json_seq.id = 1
 
@@ -374,7 +374,7 @@ class RestrictionTest(unittest.TestCase):
 
     def test_linear_single_restriction(self):
 
-        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', linear=True)
+        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', circular=False)
         json_seq = format_sequence_genbank(dseq)
         json_seq.id = 1
 
@@ -422,7 +422,7 @@ class RestrictionTest(unittest.TestCase):
 
     def test_circular_single_restriction(self):
 
-        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', linear=False)
+        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', circular=True)
         json_seq = format_sequence_genbank(dseq)
         json_seq.id = 1
 
@@ -455,7 +455,7 @@ class RestrictionTest(unittest.TestCase):
         cut_positions = [0, 11]
 
         for s, pos in zip(sequences, cut_positions):
-            dseq = Dseqrecord(s, linear=False)
+            dseq = Dseqrecord(s, circular=True)
             json_seq = format_sequence_genbank(dseq)
             json_seq.id = 1
 
@@ -485,7 +485,7 @@ class RestrictionTest(unittest.TestCase):
 
     def test_linear_multiple_restriction(self):
 
-        dseq = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', linear=True)
+        dseq = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', circular=False)
         json_seq = format_sequence_genbank(dseq)
         json_seq.id = 1
 
@@ -541,7 +541,7 @@ class RestrictionTest(unittest.TestCase):
 
     def test_circular_multiple_restriction(self):
 
-        dseq = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', linear=False)
+        dseq = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', circular=True)
         json_seq = format_sequence_genbank(dseq)
         json_seq.id = 1
 
@@ -729,11 +729,11 @@ class PCRTest(unittest.TestCase):
 class HomologousRecombinationTest(unittest.TestCase):
 
     def test_enzyme_doesnt_exist(self):
-        template = Dseqrecord('GGGAAAACCC', linear=True)
+        template = Dseqrecord('TTTTacgatAAtgctccCCCC', circular=False)
         json_template = format_sequence_genbank(template)
         json_template.id = 1
 
-        insert = Dseqrecord('AATTCCAA', linear=True)
+        insert = Dseqrecord('acgatCCCtgctcc', circular=False)
         json_insert = format_sequence_genbank(insert)
         json_insert.id = 2
         # One enzyme
@@ -741,8 +741,20 @@ class HomologousRecombinationTest(unittest.TestCase):
             input=[1, 2],
         )
         data = {'source': source.model_dump(), 'sequences': [json_template.model_dump(), json_insert.model_dump()]}
-        response = client.post('/homologous_recombination', params={'minimal_homology': 2}, json=data)
+        response = client.post('/homologous_recombination', params={'minimal_homology': 5}, json=data)
         self.assertEqual(response.status_code, 200)
+
+        payload = response.json()
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        self.assertEqual(len(sequences), 1)
+        self.assertEqual(str(sequences[0].seq), 'TTTTacgatCCCtgctccCCCC'.upper())
+
+        response = client.post('/homologous_recombination', json={'source': payload['sources'][0], 'sequences': [json_template.model_dump(), json_insert.model_dump()]})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        self.assertEqual(len(sequences), 1)
+        self.assertEqual(str(sequences[0].seq), 'TTTTacgatCCCtgctccCCCC'.upper())
 
 
 if __name__ == "__main__":
