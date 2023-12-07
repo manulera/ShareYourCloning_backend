@@ -1,6 +1,6 @@
 """Slightly different assembly implementation"""
 
-from pydna.utils import shift_location as _shift_location
+from pydna.utils import shift_location as _shift_location, flatten
 from pydna._pretty import pretty_str as _pretty_str
 from pydna.common_sub_strings import common_sub_strings
 from pydna.dseqrecord import Dseqrecord as _Dseqrecord
@@ -12,6 +12,81 @@ from pydna.utils import shift_location
 
 def assembly2str(assembly):
     return str(tuple(f'{u}{lu}:{v}{lv}' for u, v, lu, lv in assembly))
+
+def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments):
+    """Function used to filter paths returned from the graph, see conditions tested below.
+    """
+    # Linear assemblies may get begin-1-end, begin-2-end, these are removed here.
+    if len(assembly) == 0:
+        return False
+
+    if use_all_fragments and len(fragments) != len(set(flatten(map(abs, e[:2]) for e in assembly))):
+        return False
+
+    # Here we check whether subsequent pairs of fragments are compatible, for instance:
+    # Compatible (overlap of 1 and 2 occurs before overlap of 2 and 3):
+    # (1,2,[2:9],[0:7]), (2,3,[12:19],[0:7])
+    #    -- A --
+    # 1 gtatcgtgt     -- B --
+    # 2   atcgtgtactgtcatattc
+    # 3               catattcaa
+    # Incompatible (overlap of 1 and 2 occurs after overlap of 2 and 3):
+    # (1,2,[2:9],[13:20]), (2,3,[0:7],[0:7])
+    #                 -- A --
+    #  1 -- B --    gtatcgtgt
+    #  2 catattcccccccatcgtgtactgt
+    #  3 catattcaa
+    # Redundant: overlap of 1 and 2 ends at the same spot as overlap of 2 and 3
+    # (1,2,[2:9],[1:8]), (2,3,[0:8],[0:8])
+    #    -- A --
+    #  gtatcgtgt
+    #   catcgtgtactgtcatattc
+    #   catcgtgtactgtcatattc
+    #   -- B ---
+    if is_circular:
+        # In a circular assembly, first and last fragment must be the same
+        if assembly[0][0] != assembly[-1][1]:
+            return False
+        edge_pairs = zip(assembly, assembly[1:] + assembly[:1])
+    else:
+        edge_pairs = zip(assembly, assembly[1:])
+
+    for (u1, v1, _, start_location), (u2, v2, end_location, _) in edge_pairs:
+        # Incompatible as described in figure above
+        if start_location.parts[-1].end >= end_location.parts[0].end:
+            return False
+
+    return True
+
+def assemble(fragments, assembly, is_circular):
+    """Execute an assembly, from the representation returned by get_linear_assemblies or get_circular_assemblies."""
+
+    subfragment_representation = edge_representation2subfragment_representation(assembly, is_circular)
+
+    # Length of the overlaps between consecutive assembly fragments
+    fragment_overlaps = [len(e[-1]) for e in assembly]
+
+    subfragments = get_assembly_subfragments(fragments, subfragment_representation)
+
+    out_dseqrecord = _Dseqrecord(subfragments[0])
+
+    for fragment, overlap in zip(subfragments[1:], fragment_overlaps):
+        # Shift the features of the right fragment to the left by `overlap`
+        new_features = [f._shift(len(out_dseqrecord)-overlap) for f in fragment.features]
+        # Join the left sequence including the overlap with the right sequence without the overlap
+        out_dseqrecord = _Dseqrecord(out_dseqrecord.seq + fragment.seq[overlap:], features=out_dseqrecord.features + new_features)
+
+    # For circular assemblies, close the loop and wrap origin-spanning features
+    if is_circular:
+        overlap = fragment_overlaps[-1]
+        # Remove trailing overlap
+        out_dseqrecord = _Dseqrecord(out_dseqrecord.seq[:-overlap], features=out_dseqrecord.features, circular=True)
+        for feature in out_dseqrecord.features:
+            if feature.location.parts[0].start >= len(out_dseqrecord) or feature.location.parts[-1].end > len(out_dseqrecord):
+                # Wrap around the origin
+                feature.location = _shift_location(feature.location, 0, len(out_dseqrecord))
+
+    return out_dseqrecord
 
 def edge_representation2subfragment_representation(assembly, is_circular):
     """
@@ -281,50 +356,6 @@ class Assembly:
 
         return
 
-    def validate_assembly(self, assembly, is_circular):
-        """Function used to filter paths returned from the graph, see conditions tested below.
-        """
-        # Linear assemblies may get begin-1-end, begin-2-end, these are removed here.
-        if len(assembly) == 0:
-            return False
-
-        if self.use_all_fragments and len(self.fragments) == len(set(sum( (map(abs, list(e[:2])) for e in assembly) , []))):
-            return False
-
-        # Here we check whether subsequent pairs of fragments are compatible, for instance:
-        # Compatible (overlap of 1 and 2 occurs before overlap of 2 and 3):
-        # (1,2,[2:9],[0:7]), (2,3,[12:19],[0:7])
-        #    -- A --
-        # 1 gtatcgtgt     -- B --
-        # 2   atcgtgtactgtcatattc
-        # 3               catattcaa
-        # Incompatible (overlap of 1 and 2 occurs after overlap of 2 and 3):
-        # (1,2,[2:9],[13:20]), (2,3,[0:7],[0:7])
-        #                 -- A --
-        #  1 -- B --    gtatcgtgt
-        #  2 catattcccccccatcgtgtactgt
-        #  3 catattcaa
-        # Redundant: overlap of 1 and 2 ends at the same spot as overlap of 2 and 3
-        # (1,2,[2:9],[1:8]), (2,3,[0:8],[0:8])
-        #    -- A --
-        #  gtatcgtgt
-        #   catcgtgtactgtcatattc
-        #   catcgtgtactgtcatattc
-        #   -- B ---
-        if is_circular:
-            # In a circular assembly, first and last fragment must be the same
-            if assembly[0][0] != assembly[-1][1]:
-                return False
-            edge_pairs = zip(assembly, assembly[1:] + assembly[:1])
-        else:
-            edge_pairs = zip(assembly, assembly[1:])
-
-        for (u1, v1, _, start_location), (u2, v2, end_location, _) in edge_pairs:
-            # Incompatible as described in figure above
-            if start_location.parts[-1].end >= end_location.parts[0].end:
-                return False
-
-        return True
 
     def remove_subassemblies(self, assemblies):
         """Filter out subassemblies, i.e. assemblies that are contained within another assembly.
@@ -375,7 +406,7 @@ class Assembly:
                 G.add_edge(node, 'end')
 
         assemblies = [tuple(map(self.format_assembly_edge, x[1:-1])) for x in _nx.all_simple_edge_paths(G, 'begin', 'end')]
-        return self.remove_subassemblies([a for a in assemblies if self.validate_assembly(a, False)])
+        return self.remove_subassemblies([a for a in assemblies if assembly_is_valid(self.fragments, a, False, self.use_all_fragments)])
 
     def cycle2circular_assemblies(self, cycle):
         """Convert a cycle in the format [1, 2, 3] (as returned by _nx.cycles.simple_cycles) to a list of all possible circular assemblies.
@@ -399,48 +430,17 @@ class Assembly:
         sorted_cycles = filter(lambda x: x[0] > 0, sorted_cycles)
         # cycles.simple_cycles returns lists [1,2,3] not assemblies, see self.cycle2circular_assemblies
         assemblies = sum(map(self.cycle2circular_assemblies, sorted_cycles),[])
-        return [a for a in assemblies if self.validate_assembly(a, True)]
-
-
-    def assemble(self, assembly, is_circular):
-        """Execute an assembly, from the representation returned by get_linear_assemblies or get_circular_assemblies."""
-
-        subfragment_representation = edge_representation2subfragment_representation(assembly, is_circular)
-
-        # Length of the overlaps between consecutive assembly fragments
-        fragment_overlaps = [len(e[-1]) for e in assembly]
-
-        subfragments = get_assembly_subfragments(self.fragments, subfragment_representation)
-
-        out_dseqrecord = _Dseqrecord(subfragments[0])
-
-        for fragment, overlap in zip(subfragments[1:], fragment_overlaps):
-            # Shift the features of the right fragment to the left by `overlap`
-            new_features = [f._shift(len(out_dseqrecord)-overlap) for f in fragment.features]
-            # Join the left sequence including the overlap with the right sequence without the overlap
-            out_dseqrecord = _Dseqrecord(out_dseqrecord.seq + fragment.seq[overlap:], features=out_dseqrecord.features + new_features)
-
-        # For circular assemblies, close the loop and wrap origin-spanning features
-        if is_circular:
-            overlap = fragment_overlaps[-1]
-            # Remove trailing overlap
-            out_dseqrecord = _Dseqrecord(out_dseqrecord.seq[:-overlap], features=out_dseqrecord.features, circular=True)
-            for feature in out_dseqrecord.features:
-                if feature.location.parts[0].start >= len(out_dseqrecord) or feature.location.parts[-1].end > len(out_dseqrecord):
-                    # Wrap around the origin
-                    feature.location = _shift_location(feature.location, 0, len(out_dseqrecord))
-
-        return out_dseqrecord
+        return [a for a in assemblies if assembly_is_valid(self.fragments, a, True, self.use_all_fragments)]
 
     def assemble_linear(self):
         """Assemble linear constructs, from assemblies returned by self.get_linear_assemblies."""
         assemblies = self.get_linear_assemblies()
-        return [self.assemble(a, False) for a in assemblies]
+        return [assemble(self.fragments, a, False) for a in assemblies]
 
     def assemble_circular(self):
         """Assemble circular constructs, from assemblies returned by self.get_circular_assemblies."""
         assemblies = self.get_circular_assemblies()
-        return [self.assemble(a, True) for a in assemblies]
+        return [assemble(self.fragments, a, True) for a in assemblies]
 
     def __repr__(self):
         # https://pyformat.info

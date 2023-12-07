@@ -729,11 +729,11 @@ class PCRTest(unittest.TestCase):
 class HomologousRecombinationTest(unittest.TestCase):
 
     def test_enzyme_doesnt_exist(self):
-        template = Dseqrecord('GGGAAAACCC', circular=False)
+        template = Dseqrecord('TTTTacgatAAtgctccCCCC', circular=False)
         json_template = format_sequence_genbank(template)
         json_template.id = 1
 
-        insert = Dseqrecord('AATTCCAA', circular=False)
+        insert = Dseqrecord('acgatCCCtgctcc', circular=False)
         json_insert = format_sequence_genbank(insert)
         json_insert.id = 2
         # One enzyme
@@ -741,8 +741,20 @@ class HomologousRecombinationTest(unittest.TestCase):
             input=[1, 2],
         )
         data = {'source': source.model_dump(), 'sequences': [json_template.model_dump(), json_insert.model_dump()]}
-        response = client.post('/homologous_recombination', params={'minimal_homology': 2}, json=data)
+        response = client.post('/homologous_recombination', params={'minimal_homology': 5}, json=data)
         self.assertEqual(response.status_code, 200)
+
+        payload = response.json()
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        self.assertEqual(len(sequences), 1)
+        self.assertEqual(str(sequences[0].seq), 'TTTTacgatCCCtgctccCCCC'.upper())
+
+        response = client.post('/homologous_recombination', json={'source': payload['sources'][0], 'sequences': [json_template.model_dump(), json_insert.model_dump()]})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        self.assertEqual(len(sequences), 1)
+        self.assertEqual(str(sequences[0].seq), 'TTTTacgatCCCtgctccCCCC'.upper())
 
 
 if __name__ == "__main__":

@@ -152,8 +152,8 @@ class PCRSource(SequenceSubsetSource):
 
 
 class Assembly(Source):
-    assembly:  conlist(tuple[int, int, str, str], min_length=1)
-    is_circular: bool = None
+    assembly:  Optional[conlist(tuple[int, int, str, str], min_length=1)] = None
+    is_circular: Optional[bool] = None
 
 class StickyLigationSource(Source):
     """Documents a ligation with sticky ends. This might consist of \
