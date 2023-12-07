@@ -690,21 +690,21 @@ files = [
 
 [[package]]
 name = "networkx"
-version = "3.1"
+version = "3.2.1"
 description = "Python package for creating and manipulating graphs and networks"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 files = [
-    {file = "networkx-3.1-py3-none-any.whl", hash = "sha256:4f33f68cb2afcf86f28a45f43efc27a9386b535d567d2127f8f61d51dec58d36"},
-    {file = "networkx-3.1.tar.gz", hash = "sha256:de346335408f84de0eada6ff9fafafff9bcda11f0a0dfaa931133debb146ab61"},
+    {file = "networkx-3.2.1-py3-none-any.whl", hash = "sha256:f18c69adc97877c42332c170849c96cefa91881c99a7cb3e95b7c659ebdc1ec2"},
+    {file = "networkx-3.2.1.tar.gz", hash = "sha256:9f1bb5cf3409bf324e0a722c20bdb4c20ee39bf1c30ce8ae499c8502b0b5e0c6"},
 ]
 
 [package.extras]
-default = ["matplotlib (>=3.4)", "numpy (>=1.20)", "pandas (>=1.3)", "scipy (>=1.8)"]
-developer = ["mypy (>=1.1)", "pre-commit (>=3.2)"]
-doc = ["nb2plots (>=0.6)", "numpydoc (>=1.5)", "pillow (>=9.4)", "pydata-sphinx-theme (>=0.13)", "sphinx (>=6.1)", "sphinx-gallery (>=0.12)", "texext (>=0.6.7)"]
-extra = ["lxml (>=4.6)", "pydot (>=1.4.2)", "pygraphviz (>=1.10)", "sympy (>=1.10)"]
-test = ["codecov (>=2.1)", "pytest (>=7.2)", "pytest-cov (>=4.0)"]
+default = ["matplotlib (>=3.5)", "numpy (>=1.22)", "pandas (>=1.4)", "scipy (>=1.9,!=1.11.0,!=1.11.1)"]
+developer = ["changelist (==0.4)", "mypy (>=1.1)", "pre-commit (>=3.2)", "rtoml"]
+doc = ["nb2plots (>=0.7)", "nbconvert (<7.9)", "numpydoc (>=1.6)", "pillow (>=9.4)", "pydata-sphinx-theme (>=0.14)", "sphinx (>=7)", "sphinx-gallery (>=0.14)", "texext (>=0.6.7)"]
+extra = ["lxml (>=4.6)", "pydot (>=1.4.2)", "pygraphviz (>=1.11)", "sympy (>=1.10)"]
+test = ["pytest (>=7.2)", "pytest-cov (>=4.0)"]
 
 [[package]]
 name = "numpy"
@@ -999,39 +999,90 @@ files = [
 typing-extensions = ">=4.6.0,<4.7.0 || >4.7.0"
 
 [[package]]
+name = "pydivsufsort"
+version = "0.0.12"
+description = "String algorithms"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "pydivsufsort-0.0.12-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:59b5864d5e25943339cf55058459b2b0ba5bcb190ab055601add9dc70c1c7418"},
+    {file = "pydivsufsort-0.0.12-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:0b47004a16581c511ede92e7dc05997f3dc89b6dcf579c24ca67abfa1feac485"},
+    {file = "pydivsufsort-0.0.12-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2642089d278018fd5eb9768522dcf951822425dac6accce79df0b6b56c815b82"},
+    {file = "pydivsufsort-0.0.12-cp310-cp310-win32.whl", hash = "sha256:94a800ba28aaf52c4f703357ef5cd75a509148e7e15c21168252c81508798b4e"},
+    {file = "pydivsufsort-0.0.12-cp310-cp310-win_amd64.whl", hash = "sha256:d95057b4e79e93f5b983d3a1e76a3cf8d1f5a2f9c0ba36bb44beeeecfd7137d9"},
+    {file = "pydivsufsort-0.0.12-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:2310294f0f5a99b4bcc8a8d0aec488f9f0ae138c2b96bb6f09b4ff26e98dd01c"},
+    {file = "pydivsufsort-0.0.12-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:e5fb15b3ad135438c3820dc762310a39ca8ab3754d6f8b6d6e17727918c9fe3a"},
+    {file = "pydivsufsort-0.0.12-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:1b370c05c5f764c28eb4ed092a22f6547606ef5b0e5dec599309fcaa5e0b4b9f"},
+    {file = "pydivsufsort-0.0.12-cp311-cp311-win32.whl", hash = "sha256:c239c2decbbfb9215c76a1aee56b591ee7e3f6d04a7a444b38d6428b37e7bb7e"},
+    {file = "pydivsufsort-0.0.12-cp311-cp311-win_amd64.whl", hash = "sha256:6be5fadd2c8bdbc44955e55a21304e71a131fcb8182da706b24233c6497b1952"},
+    {file = "pydivsufsort-0.0.12-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:2190103bdd8e6b0a5c5f757844d25ef4dc61a695d95c484a3d6fdb84501e06ba"},
+    {file = "pydivsufsort-0.0.12-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:f2c6e622bf41c5d660f8c8e84db2940a85ab10fa3ea4f66a60d39cc2a7a3611f"},
+    {file = "pydivsufsort-0.0.12-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d4abbfbec1804ddee902c3e52327e19e4d874f46e12b67d084853765f8b6509b"},
+    {file = "pydivsufsort-0.0.12-cp312-cp312-win32.whl", hash = "sha256:16814d28194561baccd606b4ddbe2d3fd79cf880f9bc9203f4a349fd429d4056"},
+    {file = "pydivsufsort-0.0.12-cp312-cp312-win_amd64.whl", hash = "sha256:8c0eecf744e6f6b5a8f765d4ce042540178bb0607c3ecad84181c2243528be66"},
+    {file = "pydivsufsort-0.0.12-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:b587b09394882ce37b78e4056ed757c146d6e2a01856533248e098734bab4e93"},
+    {file = "pydivsufsort-0.0.12-cp36-cp36m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:76fcf4c411ae9de1e93f0dc2881fedf4f3950e8570dd8085bca262d85ab16aa4"},
+    {file = "pydivsufsort-0.0.12-cp36-cp36m-win32.whl", hash = "sha256:bdfa237223e066325cd9f243b4232787fa93594a01a62b4b46583110a914bf2d"},
+    {file = "pydivsufsort-0.0.12-cp36-cp36m-win_amd64.whl", hash = "sha256:2205ac2749e7463767cfc024c36a69a117bb53f35f5095d64efe15710ead4a40"},
+    {file = "pydivsufsort-0.0.12-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:ed436f9a79f9b1b4809fa1114e9bc8d84a04eb6284b4f71bc2ed58266e94036c"},
+    {file = "pydivsufsort-0.0.12-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c9c68cf99b15ceb1da2c913dd2b6e05a1f613d0716ff9f9d58a3624408b5d3ff"},
+    {file = "pydivsufsort-0.0.12-cp37-cp37m-win32.whl", hash = "sha256:a021ed3e1ae6edfcafbd1a3e66228e36c12d3347db27da5130c92c5a06475444"},
+    {file = "pydivsufsort-0.0.12-cp37-cp37m-win_amd64.whl", hash = "sha256:1291d5c137d8f7506b5c9f602640689c02f9ed8492e83f60cd9d7b335e290790"},
+    {file = "pydivsufsort-0.0.12-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:663d871cd881e3b9b24a9bff6d5d4a59cb686b2b2cecbf8d2a3b088c5e6ca0bb"},
+    {file = "pydivsufsort-0.0.12-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:2418daab881b5d9d1995976dd395ddb0c6516f35bae48eab8e1a636bc67445cc"},
+    {file = "pydivsufsort-0.0.12-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bba6c75f80599225a5e5421770c91ef3f921e078d6fa63b817007af883fa6059"},
+    {file = "pydivsufsort-0.0.12-cp38-cp38-win32.whl", hash = "sha256:71548f32ed0ad40c49344a0e3b5928265840f76d7e6df788d7c53a6b29c34087"},
+    {file = "pydivsufsort-0.0.12-cp38-cp38-win_amd64.whl", hash = "sha256:d459905e055515071dcffc3d860e3a564c5eb7cb7e2ac2c8efd79ad94a37fa62"},
+    {file = "pydivsufsort-0.0.12-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:233353dca35df0f923a109173fb2506991f08ef026bf5255ca579ebfed3024a7"},
+    {file = "pydivsufsort-0.0.12-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:cb4e971c636b8fae63c3d55ebb39f40e4126face9b4351b8b9f1fb477633d735"},
+    {file = "pydivsufsort-0.0.12-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b025baeaff8128ea708c3285c83c77b93a0336d375cf29cf4767fb9e12c8f58d"},
+    {file = "pydivsufsort-0.0.12-cp39-cp39-win32.whl", hash = "sha256:a4766cc2312da1a601e5044acabe586171e0b759a5f8ee91f64ee2d2b1f88f08"},
+    {file = "pydivsufsort-0.0.12-cp39-cp39-win_amd64.whl", hash = "sha256:d90a0f67c107ab1bf68f024eda4e116680dd27f63a081ec6b1dc8048d6ebb4b4"},
+    {file = "pydivsufsort-0.0.12.tar.gz", hash = "sha256:22097d5be82e3a0be8c0e7608ee855b16746d7e6c2921d44680728a2c019a7da"},
+]
+
+[package.dependencies]
+numpy = "*"
+wheel = "*"
+
+[[package]]
 name = "pydna"
-version = "5.2.0"
+version = "5.2.0-a.15"
 description = "Representing double stranded DNA and functions for simulating cloning and homologous recombination between DNA molecules."
 optional = false
 python-versions = ">=3.8"
-files = [
-    {file = "pydna-5.2.0-py3-none-any.whl", hash = "sha256:b715c8753065f16339dc105781c0836233b8f8789ba3ea983db252aab70857ee"},
-    {file = "pydna-5.2.0.tar.gz", hash = "sha256:211ccc1329758657b925ab806931060a96c6eca711e278ae2f19fd0e186971bd"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 appdirs = ">=1.4.4"
 biopython = ">=1.80"
 networkx = ">=2.8.8"
 prettytable = ">=3.5.0"
-pyfiglet = ">=0.8.post1"
-pyperclip = ">=1.8.2"
+pydivsufsort = ">=0.0.11"
+pyfiglet = "0.8.post1"
 
 [package.extras]
+clipboard = ["pyperclip (>=1.8.2)"]
 download = ["pyparsing (>=2.4.7)", "requests (>=2.26.0)"]
 express = ["cai2 (>=1.0.5)"]
-gel = ["matplotlib (>=3.4.3)", "pillow (>=8.4.0)", "scipy (>=1.8.0)"]
-gui = ["pyqt5 (>=5.15.0)"]
+gel = ["matplotlib (>=3.4.3)", "pillow (>=8.4.0)", "scipy (>=1.9.3)"]
+
+[package.source]
+type = "git"
+url = "https://github.com/BjornFJohansson/pydna"
+reference = "issue_157"
+resolved_reference = "bf8aee2c1bf15ea674750cf9d9020e7d94cb04f7"
 
 [[package]]
 name = "pyfiglet"
-version = "1.0.2"
+version = "0.8.post1"
 description = "Pure-python FIGlet implementation"
 optional = false
-python-versions = ">=3.9"
+python-versions = "*"
 files = [
-    {file = "pyfiglet-1.0.2-py3-none-any.whl", hash = "sha256:889b351d79c99e50a3f619c8f8e6ffdb27fd8c939fc43ecbd7559bd57d5f93ea"},
-    {file = "pyfiglet-1.0.2.tar.gz", hash = "sha256:758788018ab8faaddc0984e1ea05ff330d3c64be663c513cc1f105f6a3066dab"},
+    {file = "pyfiglet-0.8.post1-py2.py3-none-any.whl", hash = "sha256:d555bcea17fbeaf70eaefa48bb119352487e629c9b56f30f383e2c62dd67a01c"},
+    {file = "pyfiglet-0.8.post1.tar.gz", hash = "sha256:c6c2321755d09267b438ec7b936825a4910fec696292139e664ca8670e103639"},
 ]
 
 [[package]]
@@ -1058,16 +1109,6 @@ files = [
 
 [package.extras]
 diagrams = ["jinja2", "railroad-diagrams"]
-
-[[package]]
-name = "pyperclip"
-version = "1.8.2"
-description = "A cross-platform clipboard module for Python. (Only handles plain text for now.)"
-optional = false
-python-versions = "*"
-files = [
-    {file = "pyperclip-1.8.2.tar.gz", hash = "sha256:105254a8b04934f0bc84e9c24eb360a591aaf6535c9def5f29d92af107a9bf57"},
-]
 
 [[package]]
 name = "pytest"
@@ -1403,16 +1444,30 @@ standard = ["colorama (>=0.4)", "httptools (>=0.5.0)", "python-dotenv (>=0.13)",
 
 [[package]]
 name = "wcwidth"
-version = "0.2.8"
+version = "0.2.12"
 description = "Measures the displayed width of unicode strings in a terminal"
 optional = false
 python-versions = "*"
 files = [
-    {file = "wcwidth-0.2.8-py2.py3-none-any.whl", hash = "sha256:77f719e01648ed600dfa5402c347481c0992263b81a027344f3e1ba25493a704"},
-    {file = "wcwidth-0.2.8.tar.gz", hash = "sha256:8705c569999ffbb4f6a87c6d1b80f324bd6db952f5eb0b95bc07517f4c1813d4"},
+    {file = "wcwidth-0.2.12-py2.py3-none-any.whl", hash = "sha256:f26ec43d96c8cbfed76a5075dac87680124fa84e0855195a6184da9c187f133c"},
+    {file = "wcwidth-0.2.12.tar.gz", hash = "sha256:f01c104efdf57971bcb756f054dd58ddec5204dd15fa31d6503ea57947d97c02"},
 ]
+
+[[package]]
+name = "wheel"
+version = "0.42.0"
+description = "A built-package format for Python"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "wheel-0.42.0-py3-none-any.whl", hash = "sha256:177f9c9b0d45c47873b619f5b650346d632cdc35fb5e4d25058e09c9e581433d"},
+    {file = "wheel-0.42.0.tar.gz", hash = "sha256:c45be39f7882c9d34243236f2d63cbd58039e360f85d0913425fbd7ceea617a8"},
+]
+
+[package.extras]
+test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "453a6b19d665c1d248ae32980e626b041725ef64ce1f8bed4c1c10c9cfe384d7"
+content-hash = "986466d6ad47b53d8f81c87cad47be727751e95bfcaa14d96aaa88d3525495b2"

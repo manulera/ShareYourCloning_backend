@@ -9,11 +9,11 @@ version = "0.1.0"
 beautifulsoup4 = "^4.11.1"
 fastapi = "*"
 httpx = "^0.25.0"
-pydna = "^5.2.0"
 python = "^3.10"
 python-multipart = "*"
 python-queen = "^1.1.0"
 uvicorn = "*"
+pydna = {git = "https://github.com/BjornFJohansson/pydna", rev = "issue_157"}
 
 [tool.poetry.group.dev.dependencies]
 autopep8 = "^2.0.4"

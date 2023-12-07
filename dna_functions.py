@@ -108,7 +108,7 @@ def sort_by(list2sort, reference_list):
 
 def get_cutsite_order(dseqrecord: Dseqrecord, enzymes: RestrictionBatch) -> tuple[list[RestrictionType], list[int]]:
     """Return the cutsites in order."""
-    cuts = enzymes.search(dseqrecord.seq, linear=dseqrecord.linear)
+    cuts = enzymes.search(dseqrecord.seq, linear=not dseqrecord.circular)
     positions = list()
     cutsites = list()
     for enzyme in cuts:
@@ -125,14 +125,14 @@ def get_cutsite_order(dseqrecord: Dseqrecord, enzymes: RestrictionBatch) -> tupl
     positions = sorted(positions)
 
     # For digestion of linear sequences, the first one and last one are the molecule ends
-    if dseqrecord.linear:
+    if not dseqrecord.circular:
         cutsites.insert(0, '')
         cutsites.append('')
         positions.insert(0, 0)
         positions.append(len(dseqrecord))
 
     # For digestion of circular sequences, the first one and last one are the same
-    if not dseqrecord.linear:
+    if dseqrecord.circular:
         cutsites.append(cutsites[0])
         positions.append(positions[0])
 

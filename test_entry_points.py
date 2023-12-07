@@ -311,7 +311,7 @@ class StickyLigationTest(unittest.TestCase):
 class RestrictionTest(unittest.TestCase):
 
     def test_enzyme_doesnt_exist(self):
-        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', linear=True)
+        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', circular=False)
         json_seq = format_sequence_genbank(dseq)
         json_seq.id = 1
 
@@ -337,7 +337,7 @@ class RestrictionTest(unittest.TestCase):
         self.assertIn('helloworld', response.json()['detail'])
 
     def test_enzymes_dont_cut(self):
-        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', linear=True)
+        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', circular=False)
         json_seq = format_sequence_genbank(dseq)
         json_seq.id = 1
 
@@ -374,7 +374,7 @@ class RestrictionTest(unittest.TestCase):
 
     def test_linear_single_restriction(self):
 
-        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', linear=True)
+        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', circular=False)
         json_seq = format_sequence_genbank(dseq)
         json_seq.id = 1
 
@@ -422,7 +422,7 @@ class RestrictionTest(unittest.TestCase):
 
     def test_circular_single_restriction(self):
 
-        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', linear=False)
+        dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', circular=True)
         json_seq = format_sequence_genbank(dseq)
         json_seq.id = 1
 
@@ -455,7 +455,7 @@ class RestrictionTest(unittest.TestCase):
         cut_positions = [0, 11]
 
         for s, pos in zip(sequences, cut_positions):
-            dseq = Dseqrecord(s, linear=False)
+            dseq = Dseqrecord(s, circular=True)
             json_seq = format_sequence_genbank(dseq)
             json_seq.id = 1
 
@@ -485,7 +485,7 @@ class RestrictionTest(unittest.TestCase):
 
     def test_linear_multiple_restriction(self):
 
-        dseq = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', linear=True)
+        dseq = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', circular=False)
         json_seq = format_sequence_genbank(dseq)
         json_seq.id = 1
 
@@ -541,7 +541,7 @@ class RestrictionTest(unittest.TestCase):
 
     def test_circular_multiple_restriction(self):
 
-        dseq = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', linear=False)
+        dseq = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', circular=True)
         json_seq = format_sequence_genbank(dseq)
         json_seq.id = 1
 
@@ -729,11 +729,11 @@ class PCRTest(unittest.TestCase):
 class HomologousRecombinationTest(unittest.TestCase):
 
     def test_enzyme_doesnt_exist(self):
-        template = Dseqrecord('GGGAAAACCC', linear=True)
+        template = Dseqrecord('GGGAAAACCC', circular=False)
         json_template = format_sequence_genbank(template)
         json_template.id = 1
 
-        insert = Dseqrecord('AATTCCAA', linear=True)
+        insert = Dseqrecord('AATTCCAA', circular=False)
         json_insert = format_sequence_genbank(insert)
         json_insert.id = 2
         # One enzyme
