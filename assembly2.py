@@ -8,9 +8,17 @@ import networkx as _nx
 import itertools as _itertools
 from Bio.SeqFeature import SimpleLocation
 from pydna.utils import shift_location
+from dna_functions import sum_is_sticky
 
 def common_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
     return common_sub_strings_str(str(seqx.seq).upper(), str(seqy.seq).upper(), limit)
+
+def sticky_end_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=0):
+    """For now, if limit 0 only full overlaps are considered."""
+    overlap = sum_is_sticky(seqx, seqy, limit != 0)
+    if overlap:
+        return [(len(seqx)-overlap, 0, overlap)]
+    return []
 
 def assembly2str(assembly):
     return str(tuple(f'{u}{lu}:{v}{lv}' for u, v, lu, lv in assembly))

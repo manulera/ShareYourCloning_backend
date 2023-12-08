@@ -17,16 +17,19 @@ import regex
 from Bio.SeqFeature import SimpleLocation, Location, CompoundLocation
 from pydna.utils import shift_location
 
+
 def sum_is_sticky(seq1: Dseq, seq2: Dseq, partial: bool=False) -> bool:
     """Return true if the 3' end of seq1 and 5' end of seq2 ends are sticky and compatible for ligation."""
     type_seq1, sticky_seq1 = seq1.three_prime_end()
     type_seq2, sticky_seq2 = seq2.five_prime_end()
 
     if not partial:
-        return 'blunt' != type_seq2 and type_seq2 == type_seq1 and str(sticky_seq2) == str(reverse_complement(sticky_seq1))
+        if 'blunt' != type_seq2 and type_seq2 == type_seq1 and str(sticky_seq2) == str(reverse_complement(sticky_seq1)):
+            return len(sticky_seq1)
+        return 0
     else:
         if type_seq1 != type_seq2 or type_seq2 == "blunt":
-            return False
+            return 0
         elif type_seq2 == "5'":
             sticky_seq1 = str(reverse_complement(sticky_seq1))
         elif type_seq2 == "3'":
@@ -35,9 +38,9 @@ def sum_is_sticky(seq1: Dseq, seq2: Dseq, partial: bool=False) -> bool:
         ovhg_len = min(len(sticky_seq1), len(sticky_seq2))
         for i in range(1, ovhg_len+1):
             if sticky_seq1[-i:] == sticky_seq2[:i]:
-                return True
+                return i
         else:
-            return False
+            return 0
 
 
 def format_sequence_genbank(seq: Dseqrecord) -> SequenceEntity:

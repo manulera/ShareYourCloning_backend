@@ -163,24 +163,11 @@ class PCRSource(Source):
 
 class Assembly(Source):
     assembly:  Optional[conlist(tuple[int, int, str, str], min_length=1)] = None
-    is_circular: Optional[bool] = None
+    circular: Optional[bool] = None
 
-class StickyLigationSource(Source):
-    """Documents a ligation with sticky ends. This might consist of \
-    a single fragment's circularisation"""
+class StickyLigationSource(Assembly):
 
-    # TODO: this should support at some point specifying the order of the fragments
-    # of the assembly + whether there is circularization.
-    input: conlist(int, min_length=1)
     type: SourceType = SourceType('sticky_ligation')
-    fragments_inverted: list[bool] = []
-    circularised: Optional[bool] = None
-
-    # TODO include this
-    # @validator('fragments_inverted')
-    # def lists_have_equal_length(cls, v, values):
-    #     assert len(v) == len(values['input']) or len(v) == 0, '`fragments_inverted` must\
-    #         be either empty, or have the same length as `input`'
 
 class HomologousRecombinationSource(Assembly):
 
