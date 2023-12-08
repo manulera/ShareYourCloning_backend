@@ -2,13 +2,15 @@
 
 from pydna.utils import shift_location as _shift_location, flatten
 from pydna._pretty import pretty_str as _pretty_str
-from pydna.common_sub_strings import common_sub_strings
+from pydna.common_sub_strings import common_sub_strings as common_sub_strings_str
 from pydna.dseqrecord import Dseqrecord as _Dseqrecord
 import networkx as _nx
 import itertools as _itertools
-from Bio.Seq import reverse_complement
 from Bio.SeqFeature import SimpleLocation
 from pydna.utils import shift_location
+
+def common_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
+    return common_sub_strings_str(str(seqx.seq).upper(), str(seqy.seq).upper(), limit)
 
 def assembly2str(assembly):
     return str(tuple(f'{u}{lu}:{v}{lv}' for u, v, lu, lv in assembly))
@@ -338,12 +340,12 @@ class Assembly:
             secnd = G.nodes[index_secnd]['seq']
 
             # Overlaps where both fragments are in the forward orientation
-            matches_fwd = algorithm(str(first.seq).upper(), str(secnd.seq).upper(), limit)
+            matches_fwd = algorithm(first, secnd, limit)
             for match in matches_fwd:
                 add_edges_from_match(match, index_first, index_secnd, first, secnd, G)
 
             # Overlaps where the first fragment is in the forward orientation and the second in the reverse orientation
-            matches_rvs = algorithm(str(first.seq).upper(), reverse_complement(str(secnd.seq).upper()), limit)
+            matches_rvs = algorithm(first, secnd.reverse_complement(), limit)
             for match in matches_rvs:
                 add_edges_from_match(match, index_first, -index_secnd, first, secnd, G)
 
