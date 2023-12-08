@@ -20,9 +20,7 @@ jobs:
           poetry config virtualenvs.create false
           poetry install --with test
       - name: Run tests
-        run: |
-          python -m unittest
-          pytest -s test_assembly.py
+        run: pytest -v
       # - name: Run linter
       #   run: flake8
 

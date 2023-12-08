@@ -4,19 +4,19 @@ from pydantic import conlist, create_model
 from pydna.parsers import parse as pydna_parse
 from Bio.SeqIO import read as seqio_read
 from pydna.genbank import Genbank
-from dna_functions import assembly_list_is_valid, get_assembly_list_from_sticky_ligation_source, get_invalid_enzyme_names, get_pcr_products_list, get_restriction_enzyme_products_list, \
+from dna_functions import assembly_list_is_valid, get_assembly_list_from_sticky_ligation_source, get_invalid_enzyme_names, get_pcr_products_list, \
     format_sequence_genbank, get_sticky_ligation_products_list, perform_assembly, \
-    read_dsrecord_from_json, read_primer_from_json, request_from_addgene, get_homologous_recombination_locations, perform_homologous_recombination
+    read_dsrecord_from_json, read_primer_from_json, request_from_addgene
 from pydantic_models import PCRSource, PrimerModel, SequenceEntity, SequenceFileFormat, \
     RepositoryIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource, \
     UploadedFileSource, HomologousRecombinationSource
 from fastapi.middleware.cors import CORSMiddleware
-from Bio.Restriction.Restriction import RestrictionBatch, RestrictionType
+from Bio.Restriction.Restriction import RestrictionBatch
 from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
 from Bio.Restriction.Restriction_Dictionary import rest_dict
-from assembly2 import Assembly, assemble, assembly_is_valid, assembly2str
+from assembly2 import Assembly, assemble, assembly_is_valid
 from Bio.SeqFeature import Location
 # Instance of the API object
 app = FastAPI()

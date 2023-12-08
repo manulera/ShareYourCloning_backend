@@ -1,10 +1,10 @@
 from functools import cmp_to_key
 from urllib.error import HTTPError
-from Bio.Restriction.Restriction import RestrictionBatch, RestrictionType
+from Bio.Restriction.Restriction import RestrictionBatch
 from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from pydantic_models import PCRSource, PrimerModel, RepositoryIdSource, RestrictionEnzymeDigestionSource, \
+from pydantic_models import PCRSource, PrimerModel, RepositoryIdSource, \
     GenbankSequence, SequenceEntity, StickyLigationSource
 from pydna.parsers import parse as pydna_parse
 from itertools import permutations, product
@@ -31,7 +31,7 @@ def sum_is_sticky(seq1: Dseq, seq2: Dseq, partial: bool=False) -> bool:
             sticky_seq1 = str(reverse_complement(sticky_seq1))
         elif type_seq2 == "3'":
             sticky_seq2 = str(reverse_complement(sticky_seq2))
-    
+
         ovhg_len = min(len(sticky_seq1), len(sticky_seq2))
         for i in range(1, ovhg_len+1):
             if sticky_seq1[-i:] == sticky_seq2[:i]:
@@ -45,11 +45,9 @@ def format_sequence_genbank(seq: Dseqrecord) -> SequenceEntity:
     if seq.name.lower() == 'exported':
         correct_name(seq)
     # In principle here we do not set the id from the id of the Dseqrecord
-    overhang_crick_3prime, overhang_watson_3prime = both_overhangs_from_dseq(
-        seq.seq)
     gb_seq = GenbankSequence(file_content=seq.format('genbank'),
-                             overhang_crick_3prime=overhang_crick_3prime,
-                             overhang_watson_3prime=overhang_watson_3prime)
+                             overhang_crick_3prime=seq.seq.ovhg,
+                             overhang_watson_3prime=seq.seq.watson_ovhg())
     return SequenceEntity(sequence=gb_seq)
 
 
@@ -66,39 +64,16 @@ def read_dsrecord_from_json(seq: SequenceEntity) -> Dseqrecord:
     if seq.sequence.overhang_watson_3prime == 0 and seq.sequence.overhang_crick_3prime == 0:
         out_dseq_record = initial_dseqrecord
     else:
-        out_dseq_record = Dseqrecord(dseq_from_both_overhangs(
+        out_dseq_record = Dseqrecord(Dseq.from_full_sequence_and_overhangs(
             str(initial_dseqrecord.seq),
             seq.sequence.overhang_crick_3prime,
-            seq.sequence.overhang_watson_3prime))
-        out_dseq_record.features = initial_dseqrecord.features
+            seq.sequence.overhang_watson_3prime
+        ), features=initial_dseqrecord.features )
     # We set the id to the integer converted to integer (this is only
     # useful for assemblies)
     out_dseq_record.id = str(seq.id)
     return out_dseq_record
 
-
-def dseq_from_both_overhangs(full_sequence: str, overhang_crick_3prime: int, overhang_watson_3prime: int) -> Dseq:
-    full_sequence_rev = str(Dseq(full_sequence).reverse_complement())
-    watson = full_sequence
-    crick = full_sequence_rev
-
-    # If necessary, we trim the left side
-    if overhang_crick_3prime < 0:
-        crick = crick[:overhang_crick_3prime]
-    elif overhang_crick_3prime > 0:
-        watson = watson[overhang_crick_3prime:]
-
-    # If necessary, we trim the right side
-    if overhang_watson_3prime < 0:
-        watson = watson[:overhang_watson_3prime]
-    elif overhang_watson_3prime > 0:
-        crick = crick[overhang_watson_3prime:]
-
-    return Dseq(watson, crick=crick, ovhg=overhang_crick_3prime)
-
-
-def both_overhangs_from_dseq(dseq: Dseq):
-    return dseq.ovhg, len(dseq.watson) - len(dseq.crick) + dseq.ovhg
 
 
 def get_invalid_enzyme_names(enzyme_names_list: list[str|None]) -> list[str]:
@@ -303,7 +278,6 @@ def location_edges(location: Location):
     if isinstance(location, SimpleLocation):
         return location.start, location.end
     if isinstance(location, CompoundLocation):
-        print(location.parts)
         return location.parts[0].start, location.parts[-1].end
 
 
