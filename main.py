@@ -11,6 +11,7 @@ from pydantic_models import PCRSource, PrimerModel, SequenceEntity, SequenceFile
     RepositoryIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource, \
     UploadedFileSource, HomologousRecombinationSource
 from fastapi.middleware.cors import CORSMiddleware
+from Bio.Restriction.Restriction import RestrictionBatch, RestrictionType
 from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
@@ -181,39 +182,35 @@ async def restriction(source: RestrictionEnzymeDigestionSource,
     if len(invalid_enzymes):
         raise HTTPException(404, 'These enzymes do not exist: ' + ', '.join(invalid_enzymes))
 
-    dseq = read_dsrecord_from_json(sequences[0])
+    seqr = read_dsrecord_from_json(sequences[0])
     # TODO: return error if the id of the sequence does not correspond
 
-    # If the output is known
-    if len(source.left_edge) > 0:
-        if len(source.fragment_boundaries) != 2 or len(source.restriction_enzymes) != 2:
-            raise HTTPException(
-                400, 'If `fragment_boundaries` are provided, the length of `fragment_boundaries` and `restriction_enzymes` must be 2.')
-        output_is_known = True
+    enzymes = RestrictionBatch(first=[e for e in source.restriction_enzymes if e is not None])
+    cutsites = seqr.seq.get_cutsites(*enzymes)
+    cutsite_pairs = seqr.seq.get_cutsite_pairs(cutsites)
+    sources = [RestrictionEnzymeDigestionSource.from_cutsites(*p, source.input) for p in cutsite_pairs]
 
-    fragments, out_sources = get_restriction_enzyme_products_list(dseq, source)
-
-    out_sequences = [format_sequence_genbank(seq) for seq in fragments]
-
-    # Return an error if some of the enzymes do not cut
-    if len(out_sequences) == 0:
-        raise HTTPException(400, 'The enzymes do not cut.')
-
-    all_enzymes = set(enzyme for s in out_sources for enzyme in s.restriction_enzymes)
+    all_enzymes = set(enzyme for s in sources for enzyme in s.restriction_enzymes)
     enzymes_not_cutting = set(source.restriction_enzymes) - set(all_enzymes)
     if len(enzymes_not_cutting):
         raise HTTPException(400, 'These enzymes do not cut: ' + ', '.join(enzymes_not_cutting))
 
-    # If the user has provided boundaries, we verify that they are correct, and return only those as the output
-    if output_is_known:
-        for i, out_source in enumerate(out_sources):
-            if out_source == source:
-                return {'sequences': [out_sequences[i]], 'sources': [out_source]}
-        # If we don't find it, there was a mistake
-        raise HTTPException(
-            400, 'The fragment boundaries / enzymes provided do not correspond to the ones predicted.')
+    # If the output is known
+    if source.left_edge is not None or source.right_edge is not None:
+        # TODO: this could be moved to the class
+        if len(source.restriction_enzymes) != 2:
+            raise HTTPException(400, 'If either `left_edge` or `right_edge` is provided, the length of `restriction_enzymes` must be 2.')
 
-    return {'sources': out_sources, 'sequences': out_sequences}
+        for i, s in enumerate(sources):
+            if s == source:
+                return {'sequences': [format_sequence_genbank(seqr.apply_cut(*cutsite_pairs[i]))], 'sources': [s]}
+
+        raise HTTPException(400, 'Invalid restriction enzyme pair.')
+
+    products = [format_sequence_genbank(seqr.apply_cut(*p)) for p in cutsite_pairs]
+
+    return {'sequences': products, 'sources': sources}
+
 
 
 @ app.post('/sticky_ligation', response_model=create_model(

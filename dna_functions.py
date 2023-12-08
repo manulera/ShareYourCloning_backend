@@ -101,44 +101,6 @@ def both_overhangs_from_dseq(dseq: Dseq):
     return dseq.ovhg, len(dseq.watson) - len(dseq.crick) + dseq.ovhg
 
 
-def sort_by(list2sort, reference_list):
-    argsort = sorted(range(len(reference_list)), key=reference_list.__getitem__)
-    return [list2sort[i] for i in argsort]
-
-
-def get_cutsite_order(dseqrecord: Dseqrecord, enzymes: RestrictionBatch) -> tuple[list[RestrictionType], list[int]]:
-    """Return the cutsites in order."""
-    cuts = enzymes.search(dseqrecord.seq, linear=not dseqrecord.circular)
-    positions = list()
-    cutsites = list()
-    for enzyme in cuts:
-        for position in cuts[enzyme]:
-            # batch.search returns 1-based indexes
-            positions.append(position - 1)
-            cutsites.append(str(enzyme))
-
-    if len(positions) == 0:
-        return cutsites, positions
-
-    # Sort both lists by position
-    cutsites = sort_by(cutsites, positions)
-    positions = sorted(positions)
-
-    # For digestion of linear sequences, the first one and last one are the molecule ends
-    if not dseqrecord.circular:
-        cutsites.insert(0, '')
-        cutsites.append('')
-        positions.insert(0, 0)
-        positions.append(len(dseqrecord))
-
-    # For digestion of circular sequences, the first one and last one are the same
-    if dseqrecord.circular:
-        cutsites.append(cutsites[0])
-        positions.append(positions[0])
-
-    return cutsites, positions
-
-
 def get_invalid_enzyme_names(enzyme_names_list: list[str|None]) -> list[str]:
     rest_batch = RestrictionBatch()
     invalid_names = list()
@@ -152,16 +114,6 @@ def get_invalid_enzyme_names(enzyme_names_list: list[str|None]) -> list[str]:
     return invalid_names
 
 
-def get_restriction_enzyme_products_list(seqr: Dseqrecord, source: RestrictionEnzymeDigestionSource) -> tuple[list[Dseqrecord], list[RestrictionEnzymeDigestionSource]]:
-
-    enzymes = RestrictionBatch(first=source.restriction_enzymes)
-    seqr.seq.get_cutsites(enzymes)
-    cutsites = seqr.seq.get_cutsites(*enzymes)
-    cutsite_pairs = seqr.seq.get_cutsite_pairs(cutsites)
-    sources = [RestrictionEnzymeDigestionSource.from_cutsites(p) for p in cutsite_pairs]
-    fragments = [seqr.apply_cut(*p) for p in cutsite_pairs]
-
-    return fragments, sources
 
 
 def get_pcr_products_list(template: Dseqrecord, source: PCRSource, primers: list[Primer], minimal_annealing: int) -> tuple[list[Dseqrecord], list[PCRSource]]:

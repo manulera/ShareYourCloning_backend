@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Optional
 from Bio.SeqFeature import SeqFeature, Location
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
-from Bio.Restriction import RestrictionType
+from Bio.Restriction.Restriction import RestrictionType
 # Enumerations:
 
 class SourceType(str, Enum):
@@ -113,11 +113,11 @@ class RepositoryIdSource(Source):
 # TODO There is some abstract common thing between restriction and PCR, since
 # they select a subset of the molecule, perhaps they can be merged in some way.
 
-class SequenceCut(BaseModel):
+class SequenceCut(Source):
     """A class to represent a cut in a sequence"""
 
-    left_edge = Optional[tuple[int, int]] = None
-    right_edge = Optional[tuple[int, int]] = None
+    left_edge : Optional[tuple[int, int]] = None
+    right_edge : Optional[tuple[int, int]] = None
 
 class RestrictionEnzymeDigestionSource(SequenceCut):
     """Documents a restriction enzyme digestion, and the selection of one of the fragments."""
@@ -129,11 +129,12 @@ class RestrictionEnzymeDigestionSource(SequenceCut):
     # restriction_enzymes = ['EcoRI', 'BamHI']
     restriction_enzymes: conlist(str|None, min_length=1)
 
-    def from_cutsites(left: tuple[tuple[int,int], RestrictionType], right: tuple[tuple[int,int], RestrictionType]) -> 'RestrictionEnzymeDigestionSource':
+    def from_cutsites(left: tuple[tuple[int,int], RestrictionType], right: tuple[tuple[int,int], RestrictionType], input_ids: list[int]) -> 'RestrictionEnzymeDigestionSource':
         return RestrictionEnzymeDigestionSource(
-            restriction_enzymes=[str(left[1]), str(right[1])],
-            left_edge=left[0],
-            right_edge=right[0]
+            restriction_enzymes=[None if left is None else str(left[1]), None if right is None else str(right[1])],
+            left_edge=None if left is None else left[0],
+            right_edge=None if right is None else right[0],
+            input=input_ids
         )
 
 class PCRSource(Source):
