@@ -15,7 +15,7 @@ def common_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
 
 def sticky_end_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=0):
     """For now, if limit 0 only full overlaps are considered."""
-    overlap = sum_is_sticky(seqx, seqy, limit != 0)
+    overlap = sum_is_sticky(seqx.seq, seqy.seq, limit != 0)
     if overlap:
         return [(len(seqx)-overlap, 0, overlap)]
     return []

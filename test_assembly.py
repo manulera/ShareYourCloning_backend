@@ -783,6 +783,27 @@ def test_linear_with_annotations2():
             print(feature_sequences[feat.qualifiers['label']].seq, 'original feat')
             assert feat.extract(x).seq == feature_sequences[feat.qualifiers['label']].seq
 
+def test_sticky_ligation_algorithm():
+    from assembly2 import sticky_end_sub_strings
+    from pydna.dseqrecord import Dseqrecord
+    from pydna.dseq import Dseq
+
+    # Test full overlap
+    seqrA = Dseqrecord(Dseq.from_full_sequence_and_overhangs('AAAGAT', 0, 3))
+    seqrB = Dseqrecord(Dseq.from_full_sequence_and_overhangs('GATAAA', 3, 0))
+
+    common = sticky_end_sub_strings(seqrA, seqrB, 0)
+    assert common == [(3, 0, 3)]
+
+    # Test partial overlap
+    seqrB = Dseqrecord(Dseq.from_full_sequence_and_overhangs('ATAAA', 2, 0))
+    common = sticky_end_sub_strings(seqrA, seqrB, 1)
+    assert common == [(4, 0, 2)]
+
+    # Test no overlap
+    seqrB = Dseqrecord(Dseq.from_full_sequence_and_overhangs('CCCCC', 2, 0))
+    common = sticky_end_sub_strings(seqrA, seqrB, 1)
+    assert common == []
 
 # acgatgctatactgtgCCNCCtgtgctgtgctcta
 #                      TGTGCTGTGCTCTA
