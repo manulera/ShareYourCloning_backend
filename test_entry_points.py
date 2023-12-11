@@ -281,6 +281,8 @@ class StickyLigationTest(unittest.TestCase):
 
         # Restriction cut
         output_list: list[Dseqrecord] = initial_sequence.cut([CommOnly.format('AscI'), CommOnly.format('SacI')])
+        for seq in output_list:
+            print(seq.seq.__repr__())
 
         # Convert to json to use as input
         json_seqs = [format_sequence_genbank(seq) for seq in output_list]
@@ -739,7 +741,7 @@ class PCRTest(unittest.TestCase):
 
 class HomologousRecombinationTest(unittest.TestCase):
 
-    def test_enzyme_doesnt_exist(self):
+    def test_homologous_recombination(self):
         template = Dseqrecord('TTTTacgatAAtgctccCCCC', circular=False)
         json_template = format_sequence_genbank(template)
         json_template.id = 1

@@ -230,17 +230,14 @@ async def sticky_ligation(source: StickyLigationSource,
         else:
             raise HTTPException(400, f'Invalid fragment id in input: {i}')
 
-    asm = Assembly(fragments, algorithm=sticky_end_sub_strings, limit=allow_partial_overlap, use_all_fragments=True, use_fragment_order=False, holliday_junction=False)
+    asm = Assembly(fragments, algorithm=sticky_end_sub_strings, limit=allow_partial_overlap, use_all_fragments=True, use_fragment_order=False)
     circular_assemblies = asm.get_circular_assemblies()
-    print(asm.G.edges)
-    print(circular_assemblies)
+
     linear_assemblies = asm.get_linear_assemblies()
     # Remove linear assemblies which are sub-assemblies of circular assemblies
     linear_assemblies = [a for a in linear_assemblies if not any(is_sublist(a, c, True) for c in circular_assemblies)]
     possible_assemblies = circular_assemblies + linear_assemblies
 
-    for a in possible_assemblies:
-        print(assembly2str(a))
     out_sources = [StickyLigationSource.from_assembly(input=source.input, assembly=a, circular=(a[0][0] == a[-1][1])) for a in possible_assemblies]
 
     # If a specific assembly is requested
@@ -254,7 +251,7 @@ async def sticky_ligation(source: StickyLigationSource,
     if len(possible_assemblies) == 0:
         raise HTTPException(400, 'No ligations were found.')
 
-    out_sequences = [format_sequence_genbank(assemble(fragments, a, False)) for a in possible_assemblies]
+    out_sequences = [format_sequence_genbank(assemble(fragments, a, s.circular)) for s, a in zip(out_sources, possible_assemblies)]
 
     return {'sources': out_sources, 'sequences': out_sequences}
 
@@ -312,6 +309,17 @@ async def homologous_recombination(
     template = read_dsrecord_from_json(sequences[0])
     insert = read_dsrecord_from_json(sequences[1])
 
+    # If an assembly is provided, we ignore minimal_homology
+    # TODO: is this the way to go? -> move to a separate function
+    if source.assembly is not None:
+        all_overlaps = list()
+        for f in source.assembly:
+            if f[2] is not None:
+                all_overlaps.append(len(Location.fromstring(f[2])))
+            if f[3] is not None:
+                all_overlaps.append(len(Location.fromstring(f[3])))
+        minimal_homology = min(all_overlaps)
+
     asm = Assembly((template, insert, template), limit=minimal_homology, use_all_fragments=True)
 
     # The condition is that the first and last fragments are the template
@@ -320,6 +328,9 @@ async def homologous_recombination(
     # Replace the index of last fragment (3) by 1, since it is repeated
     possible_assemblies = [(a[0], (2, 1, a[1][2], a[1][3]), ) for a in possible_assemblies]
     out_sources = [HomologousRecombinationSource.from_assembly(input=source.input, assembly=a, circular=False) for a in possible_assemblies]
+
+    # print('//', *out_sources, sep='\n')
+    # print('>>', source)
 
     # If a specific assembly is requested
     if source.assembly is not None:

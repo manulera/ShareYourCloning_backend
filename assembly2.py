@@ -225,8 +225,10 @@ def circular_permutation_min_abs(lst):
     min_abs_index = min(range(len(lst)), key=lambda i: abs(lst[i]))
     return lst[min_abs_index:] + lst[:min_abs_index]
 
-def add_edges_from_match(match, index_first, index_secnd, first, secnd, graph: _nx.MultiDiGraph, holliday_junction: bool):
+def add_edges_from_match(match, index_first, index_secnd, first, secnd, graph: _nx.MultiDiGraph):
     """Add edges to the graph from a match returned by an `algorithm` function (see pydna.common_substrings).
+
+    TODO: this is now outdated, and combinations are handled differently.
 
     The edges added to the graph have the following format: (index_first, index_secnd, key, locations), where:
     - index_first and index_secnd are the indices of the fragments in the input list of fragments.
@@ -302,18 +304,19 @@ def add_edges_from_match(match, index_first, index_secnd, first, secnd, graph: _
             shift_location(SimpleLocation(y_start, y_start + length, 1), 0, len(secnd))]
     rc_locs = [locs[0]._flip(len(first)), locs[1]._flip(len(secnd))]
 
-    if holliday_junction:
-        combinations = (
-            (index_first, index_secnd, locs),
-            (index_secnd, index_first, locs[::-1]),
-            (-index_first, -index_secnd, rc_locs),
-            (-index_secnd, -index_first, rc_locs[::-1]),
-        )
-    else:
-        combinations = (
-            (index_first, index_secnd, locs),
-            (-index_secnd, -index_first, rc_locs[::-1]),
-        )
+    # For an homology-like assembly, we could do as below, and not do the other combinations,
+    # but for a non-symmetrical assembly, such as a sticky end assembly, 1 -> 2 is not the same as 2 -> 1.
+    # combinations = (
+    #         (index_first, index_secnd, locs),
+    #         (index_secnd, index_first, locs[::-1]),
+    #         (-index_first, -index_secnd, rc_locs),
+    #         (-index_secnd, -index_first, rc_locs[::-1]),
+    #     )
+
+    combinations = (
+        (index_first, index_secnd, locs),
+        (-index_secnd, -index_first, rc_locs[::-1]),
+    )
     for u, v, l in combinations:
         graph.add_edge(u, v, f'{u}{l[0]}:{v}{l[1]}', locations=l)
 
@@ -397,7 +400,7 @@ class Assembly:
 
     """
 
-    def __init__(self, frags: list[_Dseqrecord], limit=25, algorithm=common_sub_strings, use_fragment_order=True, use_all_fragments=False, holliday_junction=True):
+    def __init__(self, frags: list[_Dseqrecord], limit=25, algorithm=common_sub_strings, use_fragment_order=True, use_all_fragments=False):
         # TODO: allow for the same fragment to be included more than once?
         G = _nx.MultiDiGraph()
         # Add positive and negative nodes for forward and reverse fragments
@@ -407,18 +410,18 @@ class Assembly:
         # Iterate over all possible combinations of fragments
         edge_pairs = _itertools.combinations(filter(lambda x : x>0, G.nodes), 2)
         for index_first, index_secnd in edge_pairs:
-            first = G.nodes[index_first]['seq']
-            secnd = G.nodes[index_secnd]['seq']
-
-            # Overlaps where both fragments are in the forward orientation
-            matches_fwd = algorithm(first, secnd, limit)
-            for match in matches_fwd:
-                add_edges_from_match(match, index_first, index_secnd, first, secnd, G, holliday_junction)
-
-            # Overlaps where the first fragment is in the forward orientation and the second in the reverse orientation
-            matches_rvs = algorithm(first, secnd.reverse_complement(), limit)
-            for match in matches_rvs:
-                add_edges_from_match(match, index_first, -index_secnd, first, secnd, G, holliday_junction)
+            combinations = (
+                (index_first, index_secnd),
+                (index_secnd, index_first),
+                (index_first, -index_secnd),
+                (-index_secnd, index_first)
+            )
+            for u, v in combinations:
+                u_seq = G.nodes[u]['seq']
+                v_seq = G.nodes[v]['seq']
+                matches = algorithm(u_seq, v_seq, limit)
+                for match in matches:
+                    add_edges_from_match(match, u, v, u_seq, v_seq, G)
 
         self.G = G
         self.fragments = frags
