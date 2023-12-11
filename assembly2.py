@@ -4,21 +4,65 @@ from pydna.utils import shift_location as _shift_location, flatten
 from pydna._pretty import pretty_str as _pretty_str
 from pydna.common_sub_strings import common_sub_strings as common_sub_strings_str
 from pydna.dseqrecord import Dseqrecord as _Dseqrecord
+from pydna.dseq import Dseq as _Dseq
 import networkx as _nx
 import itertools as _itertools
 from Bio.SeqFeature import SimpleLocation
 from pydna.utils import shift_location
 from dna_functions import sum_is_sticky
+from Bio.Seq import reverse_complement
 
 def common_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
     return common_sub_strings_str(str(seqx.seq).upper(), str(seqy.seq).upper(), limit)
 
 def sticky_end_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=0):
-    """For now, if limit 0 only full overlaps are considered."""
-    overlap = sum_is_sticky(seqx.seq, seqy.seq, limit != 0)
+    """For now, if limit 0 / False only full overlaps are considered."""
+    overlap = sum_is_sticky(seqx.seq, seqy.seq, limit )
     if overlap:
         return [(len(seqx)-overlap, 0, overlap)]
     return []
+
+def fill_dseq(seq: _Dseq):
+    """Fill the overhangs of a dseq with the complementary sequence."""
+    new_watson = seq.watson
+    new_crick = seq.crick
+    # Watson 5' overhang
+    if seq.ovhg < 0:
+        new_crick = new_crick + reverse_complement(seq.watson[:-seq.ovhg])
+    # Crick 5' overhang
+    elif seq.ovhg > 0:
+        new_watson = reverse_complement(seq.crick[-seq.ovhg:]) + new_watson
+
+    # Watson 3' overhang
+    watson_ovhg = seq.watson_ovhg()
+    if watson_ovhg < 0:
+        new_watson = new_watson + reverse_complement(seq.crick[:-watson_ovhg])
+
+    # Crick 3' overhang
+    elif watson_ovhg > 0:
+        new_crick = reverse_complement(seq.watson[-watson_ovhg:]) + new_crick
+
+    return _Dseq(new_watson, new_crick, 0)
+
+def remove_subassemblies(assemblies):
+    """Filter out subassemblies, i.e. assemblies that are contained within another assembly.
+
+    For example:
+        [(1, 2, '1[8:14](+):2[1:7](+)'), (2, 3, '2[10:17](+):3[1:8](+)')]
+        [(1, 2, '1[8:14](+):2[1:7](+)')]
+    The second one is a subassembly of the first one.
+    """
+
+    # Sort by length, longest first
+    assemblies = sorted(assemblies, key=len, reverse=True)
+
+    filtered_assemblies = list()
+    for assembly in assemblies:
+        # Check if this assembly is a subassembly of any of the assemblies we have already found
+        if not any(is_sublist(assembly, a) for a in filtered_assemblies):
+            filtered_assemblies.append(assembly)
+
+    return filtered_assemblies
 
 def assembly2str(assembly):
     return str(tuple(f'{u}{lu}:{v}{lv}' for u, v, lu, lv in assembly))
@@ -26,6 +70,10 @@ def assembly2str(assembly):
 def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments):
     """Function used to filter paths returned from the graph, see conditions tested below.
     """
+
+    if is_circular is None:
+        return False
+
     # Linear assemblies may get begin-1-end, begin-2-end, these are removed here.
     if len(assembly) == 0:
         return False
@@ -84,13 +132,14 @@ def assemble(fragments, assembly, is_circular):
         # Shift the features of the right fragment to the left by `overlap`
         new_features = [f._shift(len(out_dseqrecord)-overlap) for f in fragment.features]
         # Join the left sequence including the overlap with the right sequence without the overlap
-        out_dseqrecord = _Dseqrecord(out_dseqrecord.seq + fragment.seq[overlap:], features=out_dseqrecord.features + new_features)
+        # we use fill_dseq so that it works for ligation of sticky ends
+        out_dseqrecord = _Dseqrecord(fill_dseq(out_dseqrecord.seq) + fill_dseq(fragment.seq)[overlap:], features=out_dseqrecord.features + new_features)
 
     # For circular assemblies, close the loop and wrap origin-spanning features
     if is_circular:
         overlap = fragment_overlaps[-1]
         # Remove trailing overlap
-        out_dseqrecord = _Dseqrecord(out_dseqrecord.seq[:-overlap], features=out_dseqrecord.features, circular=True)
+        out_dseqrecord = _Dseqrecord(fill_dseq(out_dseqrecord.seq)[:-overlap], features=out_dseqrecord.features, circular=True)
         for feature in out_dseqrecord.features:
             if feature.location.parts[0].start >= len(out_dseqrecord) or feature.location.parts[-1].end > len(out_dseqrecord):
                 # Wrap around the origin
@@ -139,17 +188,25 @@ def get_assembly_subfragments(fragment, subfragment_representation):
         subfragments.append(seq[start:end])
     return subfragments
 
-def is_sublist(sublist, my_list):
-    """Returns True if sublist is a sublist of my_list, False otherwise.
+def is_sublist(sublist, my_list, my_list_is_cyclic=False):
+    """Returns True if sublist is a sublist of my_list (can be treated as cyclic), False otherwise.
 
     Examples
     --------
-    >>> is_sublist([1, 2], [1, 2, 3])
+    >>> is_sublist([1, 2], [1, 2, 3], False)
     True
-    >>> is_sublist([1, 2], [1, 3, 2])
+    >>> is_sublist([1, 2], [1, 3, 2], False)
     False
+
+    # See the case here for cyclic lists
+    >>> is_sublist([3, 1], [1, 2, 3], False)
+    False
+    >>> is_sublist([3, 1], [1, 2, 3], True)
+    True
     """
     n = len(sublist)
+    if my_list_is_cyclic:
+        my_list = my_list + my_list
     for i in range(len(my_list) - n + 1):
         if my_list[i:i+n] == sublist:
             return True
@@ -168,7 +225,7 @@ def circular_permutation_min_abs(lst):
     min_abs_index = min(range(len(lst)), key=lambda i: abs(lst[i]))
     return lst[min_abs_index:] + lst[:min_abs_index]
 
-def add_edges_from_match(match, index_first, index_secnd, first, secnd, graph: _nx.MultiDiGraph):
+def add_edges_from_match(match, index_first, index_secnd, first, secnd, graph: _nx.MultiDiGraph, holliday_junction: bool):
     """Add edges to the graph from a match returned by an `algorithm` function (see pydna.common_substrings).
 
     The edges added to the graph have the following format: (index_first, index_secnd, key, locations), where:
@@ -245,12 +302,18 @@ def add_edges_from_match(match, index_first, index_secnd, first, secnd, graph: _
             shift_location(SimpleLocation(y_start, y_start + length, 1), 0, len(secnd))]
     rc_locs = [locs[0]._flip(len(first)), locs[1]._flip(len(secnd))]
 
-    combinations = (
-        (index_first, index_secnd, locs),
-        (index_secnd, index_first, locs[::-1]),
-        (-index_first, -index_secnd, rc_locs),
-        (-index_secnd, -index_first, rc_locs[::-1]),
-    )
+    if holliday_junction:
+        combinations = (
+            (index_first, index_secnd, locs),
+            (index_secnd, index_first, locs[::-1]),
+            (-index_first, -index_secnd, rc_locs),
+            (-index_secnd, -index_first, rc_locs[::-1]),
+        )
+    else:
+        combinations = (
+            (index_first, index_secnd, locs),
+            (-index_secnd, -index_first, rc_locs[::-1]),
+        )
     for u, v, l in combinations:
         graph.add_edge(u, v, f'{u}{l[0]}:{v}{l[1]}', locations=l)
 
@@ -334,7 +397,7 @@ class Assembly:
 
     """
 
-    def __init__(self, frags: list[_Dseqrecord], limit=25, algorithm=common_sub_strings, use_fragment_order=True, use_all_fragments=False):
+    def __init__(self, frags: list[_Dseqrecord], limit=25, algorithm=common_sub_strings, use_fragment_order=True, use_all_fragments=False, holliday_junction=True):
         # TODO: allow for the same fragment to be included more than once?
         G = _nx.MultiDiGraph()
         # Add positive and negative nodes for forward and reverse fragments
@@ -350,12 +413,12 @@ class Assembly:
             # Overlaps where both fragments are in the forward orientation
             matches_fwd = algorithm(first, secnd, limit)
             for match in matches_fwd:
-                add_edges_from_match(match, index_first, index_secnd, first, secnd, G)
+                add_edges_from_match(match, index_first, index_secnd, first, secnd, G, holliday_junction)
 
             # Overlaps where the first fragment is in the forward orientation and the second in the reverse orientation
             matches_rvs = algorithm(first, secnd.reverse_complement(), limit)
             for match in matches_rvs:
-                add_edges_from_match(match, index_first, -index_secnd, first, secnd, G)
+                add_edges_from_match(match, index_first, -index_secnd, first, secnd, G, holliday_junction)
 
         self.G = G
         self.fragments = frags
@@ -367,26 +430,6 @@ class Assembly:
         return
 
 
-    def remove_subassemblies(self, assemblies):
-        """Filter out subassemblies, i.e. assemblies that are contained within another assembly.
-
-        For example:
-            [(1, 2, '1[8:14](+):2[1:7](+)'), (2, 3, '2[10:17](+):3[1:8](+)')]
-            [(1, 2, '1[8:14](+):2[1:7](+)')]
-        The second one is a subassembly of the first one.
-        """
-
-        # Sort by length, longest first
-        assemblies = sorted(assemblies, key=len, reverse=True)
-
-        filtered_assemblies = list()
-        for assembly in assemblies:
-            # Check if this assembly is a subassembly of any of the assemblies we have already found
-            if not any(is_sublist(assembly, a) for a in filtered_assemblies):
-                filtered_assemblies.append(assembly)
-
-        return filtered_assemblies
-
     def format_assembly_edge(self, assembly_edge):
         """Go from the (u, v, key) to the (u, v, locu, locv) format."""
         u, v, key = assembly_edge
@@ -396,7 +439,7 @@ class Assembly:
 
     def get_linear_assemblies(self):
         """Get linear assemblies, applying the constrains described in __init__, ensuring that paths represent
-        real assemblies (see validate_assembly). Subassemblies are removed (see remove_subassemblies)."""
+        real assemblies (see assembly_is_valid). Subassemblies are removed (see remove_subassemblies)."""
 
         # Copy the graph since we will add the begin and end mock nodes
         G = _nx.MultiDiGraph(self.G)
@@ -416,7 +459,7 @@ class Assembly:
                 G.add_edge(node, 'end')
 
         assemblies = [tuple(map(self.format_assembly_edge, x[1:-1])) for x in _nx.all_simple_edge_paths(G, 'begin', 'end')]
-        return self.remove_subassemblies([a for a in assemblies if assembly_is_valid(self.fragments, a, False, self.use_all_fragments)])
+        return remove_subassemblies([a for a in assemblies if assembly_is_valid(self.fragments, a, False, self.use_all_fragments)])
 
     def cycle2circular_assemblies(self, cycle):
         """Convert a cycle in the format [1, 2, 3] (as returned by _nx.cycles.simple_cycles) to a list of all possible circular assemblies.
@@ -433,7 +476,7 @@ class Assembly:
 
     def get_circular_assemblies(self):
         """Get circular assemblies, applying the constrains described in __init__, ensuring that paths represent
-        real assemblies (see validate_assembly)."""
+        real assemblies (see assembly_is_valid)."""
         # The constrain of circular sequence is that the first node is the fragment with the smallest index in its initial orientation,
         # this is ensured by the circular_permutation_min_abs function + the filter below
         sorted_cycles = map(circular_permutation_min_abs, _nx.cycles.simple_cycles(self.G))

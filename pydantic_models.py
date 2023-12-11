@@ -92,6 +92,9 @@ class Source(BaseModel):
     type: Optional[SourceType]
     info: dict = {}
 
+    class Config:
+        extra = "forbid"
+
 
 class UploadedFileSource(Source):
     """Describes a sequence from a file uploaded by the user
@@ -129,12 +132,12 @@ class RestrictionEnzymeDigestionSource(SequenceCut):
     # restriction_enzymes = ['EcoRI', 'BamHI']
     restriction_enzymes: conlist(str|None, min_length=1)
 
-    def from_cutsites(left: tuple[tuple[int,int], RestrictionType], right: tuple[tuple[int,int], RestrictionType], input_ids: list[int]) -> 'RestrictionEnzymeDigestionSource':
+    def from_cutsites(left: tuple[tuple[int,int], RestrictionType], right: tuple[tuple[int,int], RestrictionType], input: list[int]) -> 'RestrictionEnzymeDigestionSource':
         return RestrictionEnzymeDigestionSource(
             restriction_enzymes=[None if left is None else str(left[1]), None if right is None else str(right[1])],
             left_edge=None if left is None else left[0],
             right_edge=None if right is None else right[0],
-            input=input_ids
+            input=input
         )
 
 class PCRSource(Source):
@@ -165,12 +168,28 @@ class Assembly(Source):
     assembly:  Optional[conlist(tuple[int, int, str, str], min_length=1)] = None
     circular: Optional[bool] = None
 
+
 class StickyLigationSource(Assembly):
 
     type: SourceType = SourceType('sticky_ligation')
+
+    def from_assembly(assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool) -> 'StickyLigationSource':
+        return StickyLigationSource(
+            assembly=[(part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None)) for part in assembly],
+            input=input,
+            circular=circular
+        )
+
 
 class HomologousRecombinationSource(Assembly):
 
     # This can only take two inputs, the first one is the template, the second one is the insert
     type: SourceType = SourceType('homologous_recombination')
     input: conlist(int, min_length=2, max_length=2)
+
+    def from_assembly(assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool) -> 'HomologousRecombinationSource':
+        return HomologousRecombinationSource(
+            assembly=[(part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None)) for part in assembly],
+            input=input,
+            circular=circular
+        )

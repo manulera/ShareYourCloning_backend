@@ -811,6 +811,19 @@ def test_sticky_ligation_algorithm():
 #                                           TATTCTGGCTGTATC
 #                                          GtattctggctgtatcGGGGGtacgatgctatactgtg
 
+def test_fill_dseq():
+    from pydna.dseq import Dseq as _Dseq
+    from assembly2 import fill_dseq
+
+    solution = _Dseq('ACGT')
+    for query in [
+        _Dseq('ACGT', 'T', 0),
+        _Dseq('ACGT', 'G', -1),
+        _Dseq('ACGT', 'C', -2),
+        _Dseq('ACGT', 'A', -3),
+    ]:
+        assert fill_dseq(query) == solution
+
 
 if __name__ == "__main__":
     # pytest.main([__file__, "-x", "-vv", "-s"])

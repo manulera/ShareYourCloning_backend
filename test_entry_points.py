@@ -202,8 +202,8 @@ class StickyLigationTest(unittest.TestCase):
         # Assign ids to define deterministic assembly
         source = StickyLigationSource(
             input=[1, 2],
-            fragments_inverted=[False, False],
-            circularised=False
+            assembly=[(1, 2, '8..11', '1..4')],
+            circular=False
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post("/sticky_ligation", json=data)
@@ -222,26 +222,26 @@ class StickyLigationTest(unittest.TestCase):
         # Check that the inverse assembly will not pass
         source = StickyLigationSource(
             input=[2, 1],
-            fragments_inverted=[False, False],
-            circularised=False
+            assembly=[(1, 2, '8..11', '1..4')],
+            circular=False
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post("/sticky_ligation", json=data)
         self.assertEqual(response.status_code, 400)
         data = response.json()
-        self.assertEqual(data['detail'], 'Fragments are not compatible for sticky ligation')
+        self.assertEqual(data['detail'], 'The provided assembly is not valid.')
 
         # Check that the circular assembly does not pass either
         source = StickyLigationSource(
             input=[1, 2],
-            fragments_inverted=[False, False],
-            circularised=True
+            assembly=[(1, 2, '8..11', '1..4')],
+            circular=True
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post("/sticky_ligation", json=data)
         self.assertEqual(response.status_code, 400)
         data = response.json()
-        self.assertEqual(data['detail'], 'Fragments are not compatible for sticky ligation')
+        self.assertEqual(data['detail'], 'The provided assembly is not valid.')
 
     def test_linear_assembly_no_order(self):
         """Test that when order is not provided, no duplicate sequences are returned as options."""
