@@ -288,14 +288,13 @@ class StickyLigationTest(unittest.TestCase):
         json_seqs[1].id = 2
         json_seqs = [seq.model_dump() for seq in json_seqs]
 
-        # We don't set the fragments_inverted, so we will get all possibilities (in this case only one)
         source = StickyLigationSource(
             input=[1, 2],
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post("/sticky_ligation", json=data)
         payload = response.json()
-
+        print(payload)
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
         sources = [StickyLigationSource.model_validate(s) for s in payload['sources']]
 
