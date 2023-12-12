@@ -186,8 +186,8 @@ async def restriction(source: RestrictionEnzymeDigestionSource,
     enzymes = RestrictionBatch(first=[e for e in source.restriction_enzymes if e is not None])
     cutsites = seqr.seq.get_cutsites(*enzymes)
     cutsite_pairs = seqr.seq.get_cutsite_pairs(cutsites)
-    sources = [RestrictionEnzymeDigestionSource.from_cutsites(*p, source.input) for p in cutsite_pairs]
-
+    sources = [RestrictionEnzymeDigestionSource.from_cutsites(*p, source.input, source.id) for p in cutsite_pairs]
+    print(sources)
     all_enzymes = set(enzyme for s in sources for enzyme in s.restriction_enzymes)
     enzymes_not_cutting = set(source.restriction_enzymes) - set(all_enzymes)
     if len(enzymes_not_cutting):
@@ -238,7 +238,7 @@ async def sticky_ligation(source: StickyLigationSource,
     linear_assemblies = [a for a in linear_assemblies if not any(is_sublist(a, c, True) for c in circular_assemblies)]
     possible_assemblies = circular_assemblies + linear_assemblies
 
-    out_sources = [StickyLigationSource.from_assembly(input=source.input, assembly=a, circular=(a[0][0] == a[-1][1])) for a in possible_assemblies]
+    out_sources = [StickyLigationSource.from_assembly(id= source.id, input=source.input, assembly=a, circular=(a[0][0] == a[-1][1])) for a in possible_assemblies]
 
     # If a specific assembly is requested
     if source.assembly is not None:
@@ -320,7 +320,7 @@ async def homologous_recombination(
 
     # Replace the index of last fragment (3) by 1, since it is repeated
     possible_assemblies = [(a[0], (2, 1, a[1][2], a[1][3]), ) for a in possible_assemblies]
-    out_sources = [HomologousRecombinationSource.from_assembly(input=source.input, assembly=a, circular=False) for a in possible_assemblies]
+    out_sources = [HomologousRecombinationSource.from_assembly(id= source.id, input=source.input, assembly=a, circular=False) for a in possible_assemblies]
 
 
     # If a specific assembly is requested
