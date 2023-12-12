@@ -310,15 +310,8 @@ async def homologous_recombination(
     insert = read_dsrecord_from_json(sequences[1])
 
     # If an assembly is provided, we ignore minimal_homology
-    # TODO: is this the way to go? -> move to a separate function
     if source.assembly is not None:
-        all_overlaps = list()
-        for f in source.assembly:
-            if f[2] is not None:
-                all_overlaps.append(len(Location.fromstring(f[2])))
-            if f[3] is not None:
-                all_overlaps.append(len(Location.fromstring(f[3])))
-        minimal_homology = min(all_overlaps)
+        minimal_homology = source.minimal_overlap()
 
     asm = Assembly((template, insert, template), limit=minimal_homology, use_all_fragments=True)
 
@@ -329,8 +322,6 @@ async def homologous_recombination(
     possible_assemblies = [(a[0], (2, 1, a[1][2], a[1][3]), ) for a in possible_assemblies]
     out_sources = [HomologousRecombinationSource.from_assembly(input=source.input, assembly=a, circular=False) for a in possible_assemblies]
 
-    # print('//', *out_sources, sep='\n')
-    # print('>>', source)
 
     # If a specific assembly is requested
     if source.assembly is not None:

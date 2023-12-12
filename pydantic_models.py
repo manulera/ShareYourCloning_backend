@@ -168,12 +168,22 @@ class Assembly(Source):
     assembly:  Optional[conlist(tuple[int, int, str, str], min_length=1)] = None
     circular: Optional[bool] = None
 
+    def minimal_overlap(self):
+        """Returns the minimal overlap between the fragments in the assembly"""
+        all_overlaps = list()
+        for f in self.assembly:
+            if f[2] is not None:
+                all_overlaps.append(len(Location.fromstring(f[2])))
+            if f[3] is not None:
+                all_overlaps.append(len(Location.fromstring(f[3])))
+        return min(all_overlaps)
 
 class StickyLigationSource(Assembly):
 
     type: SourceType = SourceType('sticky_ligation')
 
     def from_assembly(assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool) -> 'StickyLigationSource':
+        """Creates a StickyLigationSource from an assembly, input and circularity"""
         return StickyLigationSource(
             assembly=[(part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None)) for part in assembly],
             input=input,
