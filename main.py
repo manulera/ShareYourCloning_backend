@@ -175,7 +175,7 @@ async def get_restriction_enzyme_list():
 async def restriction(source: RestrictionEnzymeDigestionSource,
                       sequences: conlist(SequenceEntity, min_length=1, max_length=1)):
 
-    # Validate enzyme names
+    # TODO: this could be moved to the class
     invalid_enzymes = get_invalid_enzyme_names(source.restriction_enzymes)
     if len(invalid_enzymes):
         raise HTTPException(404, 'These enzymes do not exist: ' + ', '.join(invalid_enzymes))
