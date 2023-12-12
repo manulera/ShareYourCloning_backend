@@ -281,8 +281,6 @@ class StickyLigationTest(unittest.TestCase):
 
         # Restriction cut
         output_list: list[Dseqrecord] = initial_sequence.cut([CommOnly.format('AscI'), CommOnly.format('SacI')])
-        for seq in output_list:
-            print(seq.seq.__repr__())
 
         # Convert to json to use as input
         json_seqs = [format_sequence_genbank(seq) for seq in output_list]
@@ -612,28 +610,32 @@ class RestrictionTest(unittest.TestCase):
 class PCRTest(unittest.TestCase):
 
     def test_pcr(self):
-        template = pydna_parse('examples/sequences/pFA6a-hphMX6.gb')[0]
+
+        template = Dseqrecord(Dseq('TTTTACGTACGTAAAAAAGCGCGCGCTTTTT'))
+
         json_seq = format_sequence_genbank(template)
         json_seq.id = 1
 
         submitted_source = PCRSource(
-            input=[1]
+            input=[1],
+            forward_primer=2,
+            reverse_primer=3,
         )
 
         primer_fwd = PrimerModel(
-            sequence='AGTTTTCATATCTTCCTTTATATTCTATTAATTGAATTTCAAACATCGTTTTATTGAGCTCATTTACATCAACCGGTTCACGGATCCCCGGGTTAATTAA',
+            sequence='ACGTACGT',
             id=2,
-            name='ase1_forward'
+            name='forward'
         )
 
         primer_rvs = PrimerModel(
-            sequence='CTTTTATGAATTATCTATATGCTGTATTCATATGCAAAAATATGTATATTTAAATTTGATCGATTAGGTAAATAAGAAGCGAATTCGAGCTCGTTTAAAC',
+            sequence='GCGCGCGC',
             id=3,
-            name='ase1_reverse'
+            name='reverse'
         )
 
         data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data, params={'minimal_annealing': 13})
+        response = client.post("/pcr", json=data, params={'minimal_annealing': 8})
         payload = response.json()
 
         sources = [PCRSource.model_validate(s) for s in payload['sources']]
@@ -646,10 +648,9 @@ class PCRTest(unittest.TestCase):
         source1 = sources[0]
 
         # The sequence matches what we expect
-        predicted_seq = primer_fwd.sequence + template[source1.fragment_boundaries[0]:source1.fragment_boundaries[1]] + Dseq(primer_rvs.sequence).reverse_complement()
-        self.assertEqual(dseq1.seq, predicted_seq.seq)
-        self.assertEqual(source1.primers[0], primer_fwd.id)
-        self.assertEqual(source1.primers[1], primer_rvs.id)
+        self.assertEqual(str(dseq1.seq), 'ACGTACGTAAAAAAGCGCGCGC')
+        self.assertEqual(source1.forward_primer, primer_fwd.id)
+        self.assertEqual(source1.reverse_primer, primer_rvs.id)
 
         # Now we submit the deterministic PCR (we already know which fragment we want)
 
@@ -666,32 +667,32 @@ class PCRTest(unittest.TestCase):
         dseq2 = sequences[0]
         source2 = sources[0]
         self.assertEqual(source1, source2)
-        self.assertEqual(dseq2.seq, predicted_seq.seq)
+        self.assertEqual(str(dseq2.seq), 'ACGTACGTAAAAAAGCGCGCGC')
 
     def test_wrong_primers(self):
 
-        template = pydna_parse('examples/sequences/pFA6a-hphMX6.gb')[0]
+        template = Dseqrecord(Dseq('TTTTACGTACGTAAAAAAGCGCGCGCTTTTT'))
         json_seq = format_sequence_genbank(template)
         json_seq.id = 1
 
-        submitted_source = PCRSource(input=[1])
+        submitted_source = PCRSource(input=[1], forward_primer=2, reverse_primer=3)
 
         primer_fwd = PrimerModel(
-            sequence='AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+            sequence='CCCCCCCC',
             id=2,
-            name='ase1_forward'
+            name='forward'
 
         )
 
         primer_rvs = PrimerModel(
-            sequence='CTTTTATGAATTATCTATATGCTGTATTCATATGCAAAAATATGTATATTTAAATTTGATCGATTAGGTAAATAAGAAGCGAATTCGAGCTCGTTTAAAC',
+            sequence='GCGCGCGC',
             id=3,
-            name='ase1_reverse'
+            name='reverse'
         )
 
         # Without specifying the pair
         data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data, params={'minimal_annealing': 13})
+        response = client.post("/pcr", json=data, params={'minimal_annealing': 8})
         payload = response.json()
         self.assertEqual(response.status_code, 400)
         self.assertEqual(payload['detail'], 'No pair of annealing primers was found. Try changing the annealing settings.')
@@ -699,44 +700,61 @@ class PCRTest(unittest.TestCase):
         # We submit the right pair of primers, but the wrong annealing information
 
         primer_fwd = PrimerModel(
-            sequence='AGTTTTCATATCTTCCTTTATATTCTATTAATTGAATTTCAAACATCGTTTTATTGAGCTCATTTACATCAACCGGTTCACGGATCCCCGGGTTAATTAA',
+            sequence='ACGTACGT',
             id=2,
-            name='ase1_forward'
+            name='forward'
         )
 
         # This would be the correct annealing info
-        submitted_source.primers = [2, 3]
-        submitted_source.fragment_boundaries = [59, 1718]
-        submitted_source.primer_footprints = [21, 20]
+        submitted_source.forward_primer = 2
+        submitted_source.reverse_primer = 3
+        submitted_source.assembly = [(1, 2, '1..8', '5..12'), (2, -3, '19..26', '1..8')]
 
         data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data, params={'minimal_annealing': 13})
+        response = client.post("/pcr", json=data)
         payload = response.json()
         self.assertEqual(response.status_code, 200)
 
         # This is the wrong annealing info
-        submitted_source.primers = [2, 3]
-        submitted_source.fragment_boundaries = [59, 1200]  # 1200 instead of 1718
-        submitted_source.primer_footprints = [21, 20]
+        submitted_source.forward_primer = 2
+        submitted_source.reverse_primer = 3
+        submitted_source.assembly = [(2, -3, '19..26', '1..8'), (1, 2, '1..8', '5..12')]
 
         data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data, params={'minimal_annealing': 13})
+        response = client.post("/pcr", json=data)
         payload = response.json()
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(payload['detail'], 'The annealing positions of the primers seem to be wrong.')
+        self.assertEqual(payload['detail'], 'The provided assembly is not valid.')
 
-        # This is the wrong annealing info
-        submitted_source.primers = [2, 3]
-        submitted_source.fragment_boundaries = [59, 1718]
+        # Test clashing primers
+        template = Dseqrecord(Dseq('ACGTACGTGCGCGCGC'))
 
-        # Wrong footprint (To return this error, the 'wrong one' cannot mess with the annealing settings
-        # e.g. it could not be [21,40] since it would not align with footprint 20)
-        submitted_source.primer_footprints = [21, 12]
+        json_seq = format_sequence_genbank(template)
+        json_seq.id = 1
+
+        submitted_source = PCRSource(
+            input=[1],
+            forward_primer=2,
+            reverse_primer=3,
+        )
+
+        primer_fwd = PrimerModel(
+            sequence='ACGTACGTG',
+            id=2,
+            name='forward'
+        )
+
+        primer_rvs = PrimerModel(
+            sequence='GCGCGCGCA',
+            id=3,
+            name='reverse'
+        )
+
         data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data, params={'minimal_annealing': 13})
+        response = client.post("/pcr", json=data, params={'minimal_annealing': 8})
         payload = response.json()
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(payload['detail'], 'The annealing positions of the primers seem to be wrong.')
+        self.assertIn('Clashing primers', payload['detail'])
 
 
 class HomologousRecombinationTest(unittest.TestCase):
