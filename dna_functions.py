@@ -1,10 +1,10 @@
 from functools import cmp_to_key
 from urllib.error import HTTPError
-from Bio.Restriction.Restriction import RestrictionBatch, RestrictionType
+from Bio.Restriction.Restriction import RestrictionBatch
 from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from pydantic_models import PCRSource, PrimerModel, RepositoryIdSource, RestrictionEnzymeDigestionSource, \
+from pydantic_models import PCRSource, PrimerModel, RepositoryIdSource, \
     GenbankSequence, SequenceEntity, StickyLigationSource
 from pydna.parsers import parse as pydna_parse
 from itertools import permutations, product
@@ -17,27 +17,31 @@ import regex
 from Bio.SeqFeature import SimpleLocation, Location, CompoundLocation
 from pydna.utils import shift_location
 
+
 def sum_is_sticky(seq1: Dseq, seq2: Dseq, partial: bool=False) -> bool:
     """Return true if the 3' end of seq1 and 5' end of seq2 ends are sticky and compatible for ligation."""
     type_seq1, sticky_seq1 = seq1.three_prime_end()
     type_seq2, sticky_seq2 = seq2.five_prime_end()
 
+    if 'blunt' != type_seq2 and type_seq2 == type_seq1 and str(sticky_seq2) == str(reverse_complement(sticky_seq1)):
+        return len(sticky_seq1)
+
     if not partial:
-        return 'blunt' != type_seq2 and type_seq2 == type_seq1 and str(sticky_seq2) == str(reverse_complement(sticky_seq1))
+        return 0
+
+    if type_seq1 != type_seq2 or type_seq2 == "blunt":
+        return 0
+    elif type_seq2 == "5'":
+        sticky_seq1 = str(reverse_complement(sticky_seq1))
+    elif type_seq2 == "3'":
+        sticky_seq2 = str(reverse_complement(sticky_seq2))
+
+    ovhg_len = min(len(sticky_seq1), len(sticky_seq2))
+    for i in range(1, ovhg_len+1):
+        if sticky_seq1[-i:] == sticky_seq2[:i]:
+            return i
     else:
-        if type_seq1 != type_seq2 or type_seq2 == "blunt":
-            return False
-        elif type_seq2 == "5'":
-            sticky_seq1 = str(reverse_complement(sticky_seq1))
-        elif type_seq2 == "3'":
-            sticky_seq2 = str(reverse_complement(sticky_seq2))
-    
-        ovhg_len = min(len(sticky_seq1), len(sticky_seq2))
-        for i in range(1, ovhg_len+1):
-            if sticky_seq1[-i:] == sticky_seq2[:i]:
-                return True
-        else:
-            return False
+        return 0
 
 
 def format_sequence_genbank(seq: Dseqrecord) -> SequenceEntity:
@@ -45,11 +49,9 @@ def format_sequence_genbank(seq: Dseqrecord) -> SequenceEntity:
     if seq.name.lower() == 'exported':
         correct_name(seq)
     # In principle here we do not set the id from the id of the Dseqrecord
-    overhang_crick_3prime, overhang_watson_3prime = both_overhangs_from_dseq(
-        seq.seq)
     gb_seq = GenbankSequence(file_content=seq.format('genbank'),
-                             overhang_crick_3prime=overhang_crick_3prime,
-                             overhang_watson_3prime=overhang_watson_3prime)
+                             overhang_crick_3prime=seq.seq.ovhg,
+                             overhang_watson_3prime=seq.seq.watson_ovhg())
     return SequenceEntity(sequence=gb_seq)
 
 
@@ -66,85 +68,24 @@ def read_dsrecord_from_json(seq: SequenceEntity) -> Dseqrecord:
     if seq.sequence.overhang_watson_3prime == 0 and seq.sequence.overhang_crick_3prime == 0:
         out_dseq_record = initial_dseqrecord
     else:
-        out_dseq_record = Dseqrecord(dseq_from_both_overhangs(
+        out_dseq_record = Dseqrecord(Dseq.from_full_sequence_and_overhangs(
             str(initial_dseqrecord.seq),
             seq.sequence.overhang_crick_3prime,
-            seq.sequence.overhang_watson_3prime))
-        out_dseq_record.features = initial_dseqrecord.features
+            seq.sequence.overhang_watson_3prime
+        ), features=initial_dseqrecord.features )
     # We set the id to the integer converted to integer (this is only
     # useful for assemblies)
     out_dseq_record.id = str(seq.id)
     return out_dseq_record
 
 
-def dseq_from_both_overhangs(full_sequence: str, overhang_crick_3prime: int, overhang_watson_3prime: int) -> Dseq:
-    full_sequence_rev = str(Dseq(full_sequence).reverse_complement())
-    watson = full_sequence
-    crick = full_sequence_rev
 
-    # If necessary, we trim the left side
-    if overhang_crick_3prime < 0:
-        crick = crick[:overhang_crick_3prime]
-    elif overhang_crick_3prime > 0:
-        watson = watson[overhang_crick_3prime:]
-
-    # If necessary, we trim the right side
-    if overhang_watson_3prime < 0:
-        watson = watson[:overhang_watson_3prime]
-    elif overhang_watson_3prime > 0:
-        crick = crick[overhang_watson_3prime:]
-
-    return Dseq(watson, crick=crick, ovhg=overhang_crick_3prime)
-
-
-def both_overhangs_from_dseq(dseq: Dseq):
-    return dseq.ovhg, len(dseq.watson) - len(dseq.crick) + dseq.ovhg
-
-
-def sort_by(list2sort, reference_list):
-    argsort = sorted(range(len(reference_list)), key=reference_list.__getitem__)
-    return [list2sort[i] for i in argsort]
-
-
-def get_cutsite_order(dseqrecord: Dseqrecord, enzymes: RestrictionBatch) -> tuple[list[RestrictionType], list[int]]:
-    """Return the cutsites in order."""
-    cuts = enzymes.search(dseqrecord.seq, linear=not dseqrecord.circular)
-    positions = list()
-    cutsites = list()
-    for enzyme in cuts:
-        for position in cuts[enzyme]:
-            # batch.search returns 1-based indexes
-            positions.append(position - 1)
-            cutsites.append(str(enzyme))
-
-    if len(positions) == 0:
-        return cutsites, positions
-
-    # Sort both lists by position
-    cutsites = sort_by(cutsites, positions)
-    positions = sorted(positions)
-
-    # For digestion of linear sequences, the first one and last one are the molecule ends
-    if not dseqrecord.circular:
-        cutsites.insert(0, '')
-        cutsites.append('')
-        positions.insert(0, 0)
-        positions.append(len(dseqrecord))
-
-    # For digestion of circular sequences, the first one and last one are the same
-    if dseqrecord.circular:
-        cutsites.append(cutsites[0])
-        positions.append(positions[0])
-
-    return cutsites, positions
-
-
-def get_invalid_enzyme_names(enzyme_names_list):
+def get_invalid_enzyme_names(enzyme_names_list: list[str|None]) -> list[str]:
     rest_batch = RestrictionBatch()
     invalid_names = list()
     for name in enzyme_names_list:
         # Empty enzyme names are the natural edges of the molecule
-        if name != '':
+        if name is not None:
             try:
                 rest_batch.format(name)
             except ValueError:
@@ -152,58 +93,6 @@ def get_invalid_enzyme_names(enzyme_names_list):
     return invalid_names
 
 
-def get_restriction_enzyme_products_list(seq: Dseqrecord, source: RestrictionEnzymeDigestionSource) -> tuple[list[Dseqrecord], list[RestrictionEnzymeDigestionSource]]:
-
-    enzyme_list = source.restriction_enzymes
-    # If the output is known, we remove empty strings (representing pre-existing edges of the molecule)
-    if len(source.fragment_boundaries) > 0:
-        enzyme_list = [e for e in source.restriction_enzymes if e != '']
-    # enzyme_list = sorted(enzyme_list)
-    # TODO: error if enzyme does not exist
-    enzymes = RestrictionBatch(first=enzyme_list)
-
-    fragments: list[Dseqrecord] = seq.cut(enzymes)
-
-    # TODO: potential inconsistent behaviour
-    # cutsites_positions are the positions of the cut in the forward
-    # strand, so they may not match fragment.pos
-    # For example in this case cutsite would be 4,
-    # but the fragment.pos would be 2
-    # NNNN  NN
-    # NN  NNNN
-    # This may cause problem for overlapping sites, for now I just remove
-    # the check
-    cutsites, cutsites_positions = get_cutsite_order(seq, enzymes)
-
-    sources = list()
-
-    # We extract the fragment boundaries like this, because the dseqrecord shifts the
-    # origin
-    fragment_boundaries = [fragment.pos % len(seq) for fragment in seq.seq.cut(enzymes)]
-
-    # Sort fragments by their position in the sequence
-    fragments = sort_by(fragments, fragment_boundaries)
-
-    for i, fragment in enumerate(fragments):
-        newsource = source.model_copy()
-        start = cutsites_positions[i]
-        end = (start + len(fragment))
-        newsource.fragment_boundaries = [start, end]
-
-        # This check is removed, see TODO above
-        # In a circular molecule with a single cut, the length of the fragment is
-        # bigger than the length of the molecule (there are overhang of both sides)
-        # so it is necessary to stack the sequence three times in order to check
-        # if (3 * str(seq.seq))[start:end] != str(fragment.seq):
-        #     extra = 'from cutsites: ' + (3 * str(seq.seq))[start:end] + '\nfrom fragment: ' + str(fragment.seq)
-        #     raise ValueError(f'Something is wrong with cutsite processing:\n{extra}')
-        newsource.restriction_enzymes = [cutsites[i], cutsites[i + 1]]
-        sources.append(newsource)
-
-        # Name the fragment:
-        fragment.annotations['keywords'] = f'{seq.name}_{newsource.restriction_enzymes[0]}[{start}-{end}]{newsource.restriction_enzymes[1]}'
-
-    return fragments, sources
 
 
 def get_pcr_products_list(template: Dseqrecord, source: PCRSource, primers: list[Primer], minimal_annealing: int) -> tuple[list[Dseqrecord], list[PCRSource]]:
@@ -393,7 +282,6 @@ def location_edges(location: Location):
     if isinstance(location, SimpleLocation):
         return location.start, location.end
     if isinstance(location, CompoundLocation):
-        print(location.parts)
         return location.parts[0].start, location.parts[-1].end
 
 

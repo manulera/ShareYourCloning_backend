@@ -4,18 +4,17 @@ from pydantic import conlist, create_model
 from pydna.parsers import parse as pydna_parse
 from Bio.SeqIO import read as seqio_read
 from pydna.genbank import Genbank
-from dna_functions import assembly_list_is_valid, get_assembly_list_from_sticky_ligation_source, get_invalid_enzyme_names, get_pcr_products_list, get_restriction_enzyme_products_list, \
-    format_sequence_genbank, get_sticky_ligation_products_list, perform_assembly, \
-    read_dsrecord_from_json, read_primer_from_json, request_from_addgene, get_homologous_recombination_locations, perform_homologous_recombination
+from dna_functions import get_invalid_enzyme_names, get_pcr_products_list, format_sequence_genbank, \
+    read_dsrecord_from_json, read_primer_from_json, request_from_addgene
 from pydantic_models import PCRSource, PrimerModel, SequenceEntity, SequenceFileFormat, \
     RepositoryIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource, \
     UploadedFileSource, HomologousRecombinationSource
 from fastapi.middleware.cors import CORSMiddleware
+from Bio.Restriction.Restriction import RestrictionBatch
 from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
-from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
 from Bio.Restriction.Restriction_Dictionary import rest_dict
-from assembly2 import Assembly, assemble, assembly_is_valid, assembly2str
+from assembly2 import Assembly, assemble, assembly_is_valid, sticky_end_sub_strings, is_sublist, assembly2str
 from Bio.SeqFeature import Location
 # Instance of the API object
 app = FastAPI()
@@ -176,45 +175,40 @@ async def get_restriction_enzyme_list():
 async def restriction(source: RestrictionEnzymeDigestionSource,
                       sequences: conlist(SequenceEntity, min_length=1, max_length=1)):
 
-    # Validate enzyme names
+    # TODO: this could be moved to the class
     invalid_enzymes = get_invalid_enzyme_names(source.restriction_enzymes)
     if len(invalid_enzymes):
         raise HTTPException(404, 'These enzymes do not exist: ' + ', '.join(invalid_enzymes))
 
-    dseq = read_dsrecord_from_json(sequences[0])
+    seqr = read_dsrecord_from_json(sequences[0])
     # TODO: return error if the id of the sequence does not correspond
 
-    # If the request provides the fragment_boundaries, the program should return only one output.
-    output_is_known = False
-    if len(source.fragment_boundaries) > 0:
-        if len(source.fragment_boundaries) != 2 or len(source.restriction_enzymes) != 2:
-            raise HTTPException(
-                400, 'If `fragment_boundaries` are provided, the length of `fragment_boundaries` and `restriction_enzymes` must be 2.')
-        output_is_known = True
-
-    fragments, out_sources = get_restriction_enzyme_products_list(dseq, source)
-
-    out_sequences = [format_sequence_genbank(seq) for seq in fragments]
-
-    # Return an error if some of the enzymes do not cut
-    if len(out_sequences) == 0:
-        raise HTTPException(400, 'The enzymes do not cut.')
-
-    all_enzymes = set(enzyme for s in out_sources for enzyme in s.restriction_enzymes)
+    enzymes = RestrictionBatch(first=[e for e in source.restriction_enzymes if e is not None])
+    cutsites = seqr.seq.get_cutsites(*enzymes)
+    cutsite_pairs = seqr.seq.get_cutsite_pairs(cutsites)
+    sources = [RestrictionEnzymeDigestionSource.from_cutsites(*p, source.input, source.id) for p in cutsite_pairs]
+    print(sources)
+    all_enzymes = set(enzyme for s in sources for enzyme in s.restriction_enzymes)
     enzymes_not_cutting = set(source.restriction_enzymes) - set(all_enzymes)
     if len(enzymes_not_cutting):
         raise HTTPException(400, 'These enzymes do not cut: ' + ', '.join(enzymes_not_cutting))
 
-    # If the user has provided boundaries, we verify that they are correct, and return only those as the output
-    if output_is_known:
-        for i, out_source in enumerate(out_sources):
-            if out_source == source:
-                return {'sequences': [out_sequences[i]], 'sources': [out_source]}
-        # If we don't find it, there was a mistake
-        raise HTTPException(
-            400, 'The fragment boundaries / enzymes provided do not correspond to the ones predicted.')
+    # If the output is known
+    if source.left_edge is not None or source.right_edge is not None:
+        # TODO: this could be moved to the class
+        if len(source.restriction_enzymes) != 2:
+            raise HTTPException(400, 'If either `left_edge` or `right_edge` is provided, the length of `restriction_enzymes` must be 2.')
 
-    return {'sources': out_sources, 'sequences': out_sequences}
+        for i, s in enumerate(sources):
+            if s == source:
+                return {'sequences': [format_sequence_genbank(seqr.apply_cut(*cutsite_pairs[i]))], 'sources': [s]}
+
+        raise HTTPException(400, 'Invalid restriction enzyme pair.')
+
+    products = [format_sequence_genbank(seqr.apply_cut(*p)) for p in cutsite_pairs]
+
+    return {'sequences': products, 'sources': sources}
+
 
 
 @ app.post('/sticky_ligation', response_model=create_model(
@@ -223,29 +217,43 @@ async def restriction(source: RestrictionEnzymeDigestionSource,
     sequences=(list[SequenceEntity], ...)
 ))
 async def sticky_ligation(source: StickyLigationSource,
-                          sequences: conlist(SequenceEntity, min_length=1)):
-    dseqs = [read_dsrecord_from_json(seq) for seq in sequences]
-    if len(source.fragments_inverted) > 0:
-        # TODO Error if the list has different order or the ids are wrong.
-        # TODO check input for unique ids
-        # TODO Modify frontend to allow for partially overlapping sticky ends (partial bool parameter)
-        assembly_list = get_assembly_list_from_sticky_ligation_source(dseqs, source)
-        if not assembly_list_is_valid(assembly_list, source.circularised, partial=False):
-            raise HTTPException(
-                400, 'Fragments are not compatible for sticky ligation')
-        output_sequence = format_sequence_genbank(perform_assembly(assembly_list, source.circularised))
+                          sequences: conlist(SequenceEntity, min_length=1),
+                          allow_partial_overlap: bool = Query(True, description='Allow for partially overlapping sticky ends.')):
 
-        return {'sequences': [output_sequence], 'sources': [source]}
+    # Fragments in the same order as in source.input
+    fragments = list()
+    for i in source.input:
+        for seq in sequences:
+            if seq.id == i:
+                fragments.append(read_dsrecord_from_json(seq))
+                break
+        else:
+            raise HTTPException(400, f'Invalid fragment id in input: {i}')
 
-    products_dseq, out_sources = get_sticky_ligation_products_list(dseqs)
-    if len(products_dseq) == 0:
-        raise HTTPException(
-            400, 'No combination of these fragments is compatible for sticky ligation')
+    asm = Assembly(fragments, algorithm=sticky_end_sub_strings, limit=allow_partial_overlap, use_all_fragments=True, use_fragment_order=False)
+    circular_assemblies = asm.get_circular_assemblies()
 
-    out_sequences = [format_sequence_genbank(seq) for seq
-                     in products_dseq]
+    linear_assemblies = asm.get_linear_assemblies()
+    # Remove linear assemblies which are sub-assemblies of circular assemblies
+    linear_assemblies = [a for a in linear_assemblies if not any(is_sublist(a, c, True) for c in circular_assemblies)]
+    possible_assemblies = circular_assemblies + linear_assemblies
 
-    return {'sequences': out_sequences, 'sources': out_sources}
+    out_sources = [StickyLigationSource.from_assembly(id= source.id, input=source.input, assembly=a, circular=(a[0][0] == a[-1][1])) for a in possible_assemblies]
+
+    # If a specific assembly is requested
+    if source.assembly is not None:
+        for i, s in enumerate(out_sources):
+            if s == source:
+                # TODO: remove enumeration by better parsing
+                return {'sequences': [format_sequence_genbank(assemble(fragments, possible_assemblies[i], s.circular))], 'sources': [s]}
+        raise HTTPException(400, 'The provided assembly is not valid.')
+
+    if len(possible_assemblies) == 0:
+        raise HTTPException(400, 'No ligations were found.')
+
+    out_sequences = [format_sequence_genbank(assemble(fragments, a, s.circular)) for s, a in zip(out_sources, possible_assemblies)]
+
+    return {'sources': out_sources, 'sequences': out_sequences}
 
 
 @ app.post('/pcr', response_model=create_model(
@@ -300,12 +308,10 @@ async def homologous_recombination(
 ):
     template = read_dsrecord_from_json(sequences[0])
     insert = read_dsrecord_from_json(sequences[1])
+
+    # If an assembly is provided, we ignore minimal_homology
     if source.assembly is not None:
-        # Format the locations
-        assembly = [(part[0], part[1], Location.fromstring(part[2], None), Location.fromstring(part[3], None)) for part in source.assembly]
-        if source.assembly[0][:2] != (1,2) or source.assembly[1][:2] != (2, 1) or not assembly_is_valid([template, source], assembly, False, True):
-            raise HTTPException(400, 'The provided assembly is not valid.')
-        return {'sequences': [format_sequence_genbank(assemble([template, insert], assembly, False))], 'sources': [source]}
+        minimal_homology = source.minimal_overlap()
 
     asm = Assembly((template, insert, template), limit=minimal_homology, use_all_fragments=True)
 
@@ -314,16 +320,20 @@ async def homologous_recombination(
 
     # Replace the index of last fragment (3) by 1, since it is repeated
     possible_assemblies = [(a[0], (2, 1, a[1][2], a[1][3]), ) for a in possible_assemblies]
+    out_sources = [HomologousRecombinationSource.from_assembly(id= source.id, input=source.input, assembly=a, circular=False) for a in possible_assemblies]
+
+
+    # If a specific assembly is requested
+    if source.assembly is not None:
+        for i, s in enumerate(out_sources):
+            if s == source:
+                return {'sequences': [format_sequence_genbank(assemble([template, insert], possible_assemblies[i], False))], 'sources': [s]}
+        raise HTTPException(400, 'The provided assembly is not valid.')
+
     if len(possible_assemblies) == 0:
         raise HTTPException(400, 'No homologous recombination was found.')
 
-    out_sequences = []
-    out_sources = []
+    out_sequences = [format_sequence_genbank(assemble([template, insert], a, False)) for a in possible_assemblies]
 
-    for assembly in possible_assemblies:
-        out_sequences.append(format_sequence_genbank(assemble([template, insert], assembly, False)))
-        new_source = source.model_copy()
-        new_source.assembly = [(part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None)) for part in assembly]
-        out_sources.append(new_source)
 
     return {'sources': out_sources, 'sequences': out_sequences}

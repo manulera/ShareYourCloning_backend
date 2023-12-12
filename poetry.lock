@@ -1072,7 +1072,7 @@ gel = ["matplotlib (>=3.4.3)", "pillow (>=8.4.0)", "scipy (>=1.9.3)"]
 type = "git"
 url = "https://github.com/BjornFJohansson/pydna"
 reference = "issue_157"
-resolved_reference = "bf8aee2c1bf15ea674750cf9d9020e7d94cb04f7"
+resolved_reference = "31f36de8b35617c2fb7d52e678e28495c11cbb99"
 
 [[package]]
 name = "pyfiglet"

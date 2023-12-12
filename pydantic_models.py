@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Optional
 from Bio.SeqFeature import SeqFeature, Location
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
-
+from Bio.Restriction.Restriction import RestrictionType
 # Enumerations:
 
 class SourceType(str, Enum):
@@ -92,6 +92,9 @@ class Source(BaseModel):
     type: Optional[SourceType]
     info: dict = {}
 
+    class Config:
+        extra = "forbid"
+
 
 class UploadedFileSource(Source):
     """Describes a sequence from a file uploaded by the user
@@ -113,21 +116,13 @@ class RepositoryIdSource(Source):
 # TODO There is some abstract common thing between restriction and PCR, since
 # they select a subset of the molecule, perhaps they can be merged in some way.
 
-class SequenceSubsetSource(Source):
-    """An abstract class for sources that select a subset of a sequence, such as PCR and digestion."""
+class SequenceCut(Source):
+    """A class to represent a cut in a sequence"""
 
-    # This can only take one input
-    input: conlist(int, min_length=1, max_length=1)
+    left_edge : Optional[tuple[int, int]] = None
+    right_edge : Optional[tuple[int, int]] = None
 
-    # Boundaries of a fragment (length should be either empty, or length = 2)
-    fragment_boundaries: list[int] = Field([], description='Edges of the fragment that will be taken:\n \
-    * For a PCR, these are the positions of the 3\' binding sites of the primers, such that sequence[start:end]\
-    would be the part of the sequence where primers don\'t align.\n\
-    * For restriction enzymes the extremes of the overhangs\n\
-    For both, 0-based indexing, [first,second)')
-
-
-class RestrictionEnzymeDigestionSource(SequenceSubsetSource):
+class RestrictionEnzymeDigestionSource(SequenceCut):
     """Documents a restriction enzyme digestion, and the selection of one of the fragments."""
 
     type: SourceType = SourceType('restriction')
@@ -135,10 +130,17 @@ class RestrictionEnzymeDigestionSource(SequenceSubsetSource):
     # The order of the enzymes in the list corresponds to the fragment_boundaries.
     # For instance, if a fragment 5' is cut with EcoRI and the 3' with BamHI,
     # restriction_enzymes = ['EcoRI', 'BamHI']
-    restriction_enzymes: conlist(str, min_length=1)
+    restriction_enzymes: conlist(str|None, min_length=1)
 
+    def from_cutsites(left: tuple[tuple[int,int], RestrictionType], right: tuple[tuple[int,int], RestrictionType], input: list[int], id: int) -> 'RestrictionEnzymeDigestionSource':
+        return RestrictionEnzymeDigestionSource(
+            restriction_enzymes=[None if left is None else str(left[1]), None if right is None else str(right[1])],
+            left_edge=None if left is None else left[0],
+            right_edge=None if right is None else right[0],
+            input=input
+        )
 
-class PCRSource(SequenceSubsetSource):
+class PCRSource(Source):
     """Documents a PCR, and the selection of one of the products."""
 
     type: SourceType = SourceType('PCR')
@@ -150,30 +152,56 @@ class PCRSource(SequenceSubsetSource):
     primer_footprints: conlist(int, max_length=2) = Field([], description='The number of basepairs that are anealed\
     in each primer (same order as in `primers`). Missmatch support should be added in the future.')
 
+    # Used to be common with RestrictionEnzymeDigestionSource, but it is not anymore
+    # This can only take one input
+    input: conlist(int, min_length=1, max_length=1)
+
+    # Boundaries of a fragment (length should be either empty, or length = 2)
+    fragment_boundaries: list[int] = Field([], description='Edges of the fragment that will be taken:\n \
+    * For a PCR, these are the positions of the 3\' binding sites of the primers, such that sequence[start:end]\
+    would be the part of the sequence where primers don\'t align.\n\
+    * For restriction enzymes the extremes of the overhangs\n\
+    For both, 0-based indexing, [first,second)')
+
 
 class Assembly(Source):
     assembly:  Optional[conlist(tuple[int, int, str, str], min_length=1)] = None
-    is_circular: Optional[bool] = None
+    circular: Optional[bool] = None
 
-class StickyLigationSource(Source):
-    """Documents a ligation with sticky ends. This might consist of \
-    a single fragment's circularisation"""
+    def minimal_overlap(self):
+        """Returns the minimal overlap between the fragments in the assembly"""
+        all_overlaps = list()
+        for f in self.assembly:
+            if f[2] is not None:
+                all_overlaps.append(len(Location.fromstring(f[2])))
+            if f[3] is not None:
+                all_overlaps.append(len(Location.fromstring(f[3])))
+        return min(all_overlaps)
 
-    # TODO: this should support at some point specifying the order of the fragments
-    # of the assembly + whether there is circularization.
-    input: conlist(int, min_length=1)
+class StickyLigationSource(Assembly):
+
     type: SourceType = SourceType('sticky_ligation')
-    fragments_inverted: list[bool] = []
-    circularised: Optional[bool] = None
 
-    # TODO include this
-    # @validator('fragments_inverted')
-    # def lists_have_equal_length(cls, v, values):
-    #     assert len(v) == len(values['input']) or len(v) == 0, '`fragments_inverted` must\
-    #         be either empty, or have the same length as `input`'
+    def from_assembly(assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int) -> 'StickyLigationSource':
+        """Creates a StickyLigationSource from an assembly, input and circularity"""
+        return StickyLigationSource(
+            id=id,
+            assembly=[(part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None)) for part in assembly],
+            input=input,
+            circular=circular
+        )
+
 
 class HomologousRecombinationSource(Assembly):
 
     # This can only take two inputs, the first one is the template, the second one is the insert
     type: SourceType = SourceType('homologous_recombination')
     input: conlist(int, min_length=2, max_length=2)
+
+    def from_assembly(assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int) -> 'HomologousRecombinationSource':
+        return HomologousRecombinationSource(
+            id=id,
+            assembly=[(part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None)) for part in assembly],
+            input=input,
+            circular=circular
+        )

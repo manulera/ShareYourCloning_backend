@@ -8,8 +8,8 @@
         "**/*.pyc": true,
         "**/__pycache__": true
     },
-    "python.linting.enabled": true,
-    "python.linting.flake8Enabled": true,
-    "python.linting.flake8Path": ".venv/bin/flake8",
+    // "python.linting.enabled": true,
+    // "python.linting.flake8Enabled": true,
+    // "python.linting.flake8Path": ".venv/bin/flake8",
     "python.defaultInterpreterPath": ".venv/bin/python",
 }
