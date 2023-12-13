@@ -221,7 +221,7 @@ async def sticky_ligation(source: StickyLigationSource,
                           allow_partial_overlap: bool = Query(True, description='Allow for partially overlapping sticky ends.')):
 
     # Fragments in the same order as in source.input
-    fragments = (next((read_dsrecord_from_json(seq) for seq in sequences if seq.id == id), None) for id in source.input)
+    fragments = [next((read_dsrecord_from_json(seq) for seq in sequences if seq.id == id), None) for id in source.input]
     if any(f is None for f in fragments):
         raise HTTPException(400, f'Invalid fragment id in input')
 
