@@ -275,6 +275,7 @@ async def pcr(source: PCRSource,
 
     asm = PCRAssembly(fragments, limit=minimal_annealing)
     try:
+        print(asm.G.edges)
         possible_assemblies = asm.get_linear_assemblies()
     except ValueError as e:
         raise HTTPException(400, *e.args)

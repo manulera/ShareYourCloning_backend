@@ -547,7 +547,7 @@ class PCRAssembly(Assembly):
             if u == 1:
                 matches = filter(lambda x: x[0] + x[2] == len(forward_primer), matches)
             elif v == -3:
-                matches = filter(lambda x: x[1] + x[2] == len(reverse_primer), matches)
+                matches = filter(lambda x: x[1] == 0, matches)
             for match in matches:
                 add_edges_from_match(match, u, v, u_seq, v_seq, G)
 
