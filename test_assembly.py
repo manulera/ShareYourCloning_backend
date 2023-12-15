@@ -1,12 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from Bio.Restriction import AatII, AjiI, AgeI, EcoRV, ZraI, SalI
+from pydna.amplify import pcr
+from pydna.dseq import Dseq
+from pydna.readers import read
+import assembly2 as assembly
+from Bio.SeqFeature import ExactPosition, FeatureLocation, SeqFeature
+from importlib import reload
+from pydna.dseqrecord import Dseqrecord
+from pydna.parsers import parse
+from pydna.utils import eq
 import pytest
 
 
 def test_built():
-    from importlib import reload
-    import assembly2 as assembly
 
     reload(assembly)
     asm = assembly.Assembly(assembly.example_fragments, limit=5)
@@ -18,14 +26,6 @@ def test_built():
 
 
 def test_new_assembly():
-    from pydna.dseqrecord import Dseqrecord
-    import assembly2 as assembly
-    from pydna.parsers import parse
-    from pydna.utils import eq
-    from importlib import reload
-    from Bio.SeqFeature import SeqFeature
-    from Bio.SeqFeature import FeatureLocation
-    from Bio.SeqFeature import ExactPosition
 
     reload(assembly)
 
@@ -212,8 +212,6 @@ def test_new_assembly():
     c3 = assembly.Assembly((a, b, c), limit=14)
     assert str(c3.assemble_circular()[0].seq) == "acgatgctatactggCCCCCtgtgctgtgctctaTTTTTtattctggctgtatctGGGGGT"
 
-    from pydna.parsers import parse
-    from pydna.utils import eq
 
     text1 = """
     >A_AgTEFp_b_631 NP+geg/4Ykv2pIwEqiLylYKPYOE
@@ -247,11 +245,6 @@ def test_new_assembly():
 
 
 def test_assembly():
-    import assembly2 as assembly
-    from pydna.parsers import parse
-    from pydna.utils import eq
-    from importlib import reload
-    from pydna.dseqrecord import Dseqrecord
 
     reload(assembly)
 
@@ -483,12 +476,6 @@ algorithm..: common_sub_strings"""
 
 
 def test_MXblaster1():
-    import assembly2 as assembly
-    from pydna.parsers import parse
-    from pydna.amplify import pcr
-    from pydna.readers import read
-    from pydna.utils import eq
-    from importlib import reload
 
     reload(assembly)
 
@@ -516,7 +503,6 @@ def test_MXblaster1():
     pCAPs_pSU0 = read("test_files/pCAPs-pSU0.gb")
 
     # cut the pCAPs vectors for cloning
-    from Bio.Restriction import EcoRV, ZraI
 
     pCAPs_ZraI = pCAPs.linearize(ZraI)
     pCAPs_PCR_prod = pcr(primer[492], primer[493], pCAPs)
@@ -584,8 +570,6 @@ def test_MXblaster1():
 
     assert pCAPs_MX4blaster1.useguid() == "X9WqaNk2lw6FbZlJr995MaDfn-M"
 
-    from Bio.Restriction import AjiI, AgeI
-
     AX023560 = read("test_files/AX023560.gb")
 
     GAL10prom_slice = slice(AX023560.features[1].location.start, AX023560.features[1].location.end)
@@ -641,12 +625,6 @@ def test_MXblaster1():
 
 def test_assemble_pGUP1():
 
-    from pydna.readers import read
-    import assembly2 as assembly
-    from pydna.utils import eq
-    from pydna.amplify import pcr
-    from importlib import reload
-
     reload(assembly)
 
     GUP1rec1sens = read("test_files/GUP1rec1sens.txt")
@@ -656,7 +634,6 @@ def test_assemble_pGUP1():
 
     insert = pcr(GUP1rec1sens, GUP1rec2AS, GUP1_locus)
 
-    from Bio.Restriction import SalI
 
     his3, lin_vect = pGREG505.cut(SalI)
 
@@ -686,25 +663,19 @@ def test_assemble_pGUP1():
 
 
 def test_pYPK7_TDH3_GAL2_PGI1():
-    from pydna.readers import read
-    from pydna.assembly import Assembly
 
     pMEC1142 = read("test_files/pYPK0_TDH3_GAL2_PGI1.gb")
 
     pYPKp7 = read("test_files/pYPKp7.gb")
 
-    from Bio.Restriction import AatII
-
     pYPKp7_AatII = pYPKp7.linearize(AatII)
 
-    z = Assembly((pYPKp7_AatII, pMEC1142), limit=300)
+    z = assembly.Assembly((pYPKp7_AatII, pMEC1142), limit=300)
 
     assert z.assemble_circular()[1].cseguid() == "eDYovOVEKFIbc7REPlTsnScycQY"
 
 
 def test_marker_replacement_on_plasmid():
-    from pydna.assembly import Assembly
-    from pydna.parsers import parse
 
     f, r, _, _ = parse(
         """
@@ -723,18 +694,13 @@ def test_marker_replacement_on_plasmid():
     """
     )
 
-    from pydna.readers import read
-
     pAG32 = read("test_files/pAG32.gb")
     pMEC1135 = read("test_files/pMEC1135.gb")
 
-    from pydna.amplify import pcr
-
     hygromycin_product = pcr(f, r, pAG32)
-
-    asm_hyg = Assembly((pMEC1135, hygromycin_product, pMEC1135))
-
-    candidate, other = asm_hyg.assemble_linear()
+    # This is an homologous recombination, so constrains should be applied
+    asm_hyg = assembly.Assembly((pMEC1135, hygromycin_product, pMEC1135), limit=50)
+    candidate = asm_hyg.assemble_linear()[0]
 
     # AmpR feature
     assert pMEC1135.features[-1].extract(pMEC1135).seq == candidate.features[-1].extract(candidate).seq
@@ -743,9 +709,6 @@ def test_marker_replacement_on_plasmid():
 def test_linear_with_annotations2():
     # Thanks to James Bagley for finding this bug
     # https://github.com/JamesBagley
-    from pydna._pretty import pretty_str
-    from pydna.assembly import Assembly
-    from pydna.dseqrecord import Dseqrecord
 
     a = Dseqrecord("acgatgctatactgtgCCNCCtgtgctgtgctcta")
     a.add_feature(0, 10, label='a_feat')
@@ -765,7 +728,7 @@ def test_linear_with_annotations2():
     a.name = "aaa"  # 1234567890123456
     b.name = "bbb"
     c.name = "ccc"
-    asm = Assembly((a, b, c), limit=14)
+    asm = assembly.Assembly((a, b, c), limit=14)
     x = asm.assemble_linear()[0]
     # print(x.features)
     # print(x)
@@ -784,25 +747,22 @@ def test_linear_with_annotations2():
             assert feat.extract(x).seq == feature_sequences[feat.qualifiers['label']].seq
 
 def test_sticky_ligation_algorithm():
-    from assembly2 import sticky_end_sub_strings
-    from pydna.dseqrecord import Dseqrecord
-    from pydna.dseq import Dseq
 
     # Test full overlap
     seqrA = Dseqrecord(Dseq.from_full_sequence_and_overhangs('AAAGAT', 0, 3))
     seqrB = Dseqrecord(Dseq.from_full_sequence_and_overhangs('GATAAA', 3, 0))
 
-    common = sticky_end_sub_strings(seqrA, seqrB, 0)
+    common = assembly.sticky_end_sub_strings(seqrA, seqrB, 0)
     assert common == [(3, 0, 3)]
 
     # Test partial overlap
     seqrB = Dseqrecord(Dseq.from_full_sequence_and_overhangs('ATAAA', 2, 0))
-    common = sticky_end_sub_strings(seqrA, seqrB, 1)
+    common = assembly.sticky_end_sub_strings(seqrA, seqrB, 1)
     assert common == [(4, 0, 2)]
 
     # Test no overlap
     seqrB = Dseqrecord(Dseq.from_full_sequence_and_overhangs('CCCCC', 2, 0))
-    common = sticky_end_sub_strings(seqrA, seqrB, 1)
+    common = assembly.sticky_end_sub_strings(seqrA, seqrB, 1)
     assert common == []
 
 # acgatgctatactgtgCCNCCtgtgctgtgctcta
@@ -812,19 +772,79 @@ def test_sticky_ligation_algorithm():
 #                                          GtattctggctgtatcGGGGGtacgatgctatactgtg
 
 def test_fill_dseq():
-    from pydna.dseq import Dseq as _Dseq
-    from assembly2 import fill_dseq
 
-    solution = _Dseq('ACGT')
+    solution = Dseq('ACGT')
     for query in [
-        _Dseq('ACGT', 'T', 0),
-        _Dseq('ACGT', 'G', -1),
-        _Dseq('ACGT', 'C', -2),
-        _Dseq('ACGT', 'A', -3),
+        Dseq('ACGT', 'T', 0),
+        Dseq('ACGT', 'G', -1),
+        Dseq('ACGT', 'C', -2),
+        Dseq('ACGT', 'A', -3),
     ]:
-        assert fill_dseq(query) == solution
+        assert assembly.fill_dseq(query) == solution
+
+def test_pcr_assembly():
+
+    primer1 = Dseqrecord(Dseq('ACGTACGT'))
+    primer2 = Dseqrecord(Dseq('GCGCGCGC')).reverse_complement()
+
+    seq = Dseqrecord(Dseq('TTTTACGTACGTAAAAAAGCGCGCGCTTTTT'))
+
+    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8)
+
+    prods = asm.assemble_linear()
+
+    assert len(prods) == 1
+    assert str(prods[0].seq) == 'ACGTACGTAAAAAAGCGCGCGC'
+
+    # Try to pass the reverse complement
+    asm = assembly.PCRAssembly([primer1, seq.reverse_complement(), primer2], limit=8)
+    prods = asm.assemble_linear()
+
+    assert len(prods) == 1
+    assert str(prods[0].seq) == 'ACGTACGTAAAAAAGCGCGCGC'
+
+    # When the product exactly matches the template
+    asm = assembly.PCRAssembly([primer1, Dseqrecord(Dseq('ACGTACGTAAAAAAGCGCGCGC')), primer2], limit=8)
+    prods = asm.assemble_linear()
+
+    assert len(prods) == 1
+    assert str(prods[0].seq) == 'ACGTACGTAAAAAAGCGCGCGC'
+
+    # Primers with overhangs work
+    primer1 = Dseqrecord(Dseq('TTTACGTACGT'))
+    primer2 = Dseqrecord(Dseq('GCGCGCGCTTT')).reverse_complement()
+
+    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8)
+    prods = asm.assemble_linear()
+
+    assert len(prods) == 1
+    assert str(prods[0].seq) == 'TTTACGTACGTAAAAAAGCGCGCGCTTT'
 
 
-if __name__ == "__main__":
-    # pytest.main([__file__, "-x", "-vv", "-s"])
-    pytest.main([__file__, "-x", "-vv", "-s", "--profile"])
+
+def test_pcr_assembly_invalid():
+
+    primer1 = Dseqrecord(Dseq('ACGTACGT'))
+    primer2 = Dseqrecord(Dseq('GCGCGCGC')).reverse_complement()
+
+    seq = Dseqrecord(Dseq('TTTTACGTACGTAAAAAAGCGCGCGCTTTTT'))
+
+    # Limit too high
+    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=15)
+    prods = asm.assemble_linear()
+
+    assert len(prods) == 0
+
+    # Clashing primers
+    seq = Dseqrecord(Dseq('ACGTACGTGCGCGCGC'))
+    primer1 = Dseqrecord(Dseq('ACGTACGTG'))
+    primer2 = Dseqrecord(Dseq('TGCGCGCGC')).reverse_complement()
+
+    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8)
+
+    try:
+        asm.assemble_linear()
+    except ValueError:
+        pass
+    else:
+        assert False, 'Clashing primers should give ValueError'

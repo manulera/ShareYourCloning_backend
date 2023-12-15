@@ -1,11 +1,12 @@
 from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request
 from pydna.dseqrecord import Dseqrecord
+from pydna.dseq import Dseq
 from pydantic import conlist, create_model
 from pydna.parsers import parse as pydna_parse
 from Bio.SeqIO import read as seqio_read
 from pydna.genbank import Genbank
-from dna_functions import get_invalid_enzyme_names, get_pcr_products_list, format_sequence_genbank, \
-    read_dsrecord_from_json, read_primer_from_json, request_from_addgene
+from dna_functions import get_invalid_enzyme_names, format_sequence_genbank, \
+    read_dsrecord_from_json, request_from_addgene
 from pydantic_models import PCRSource, PrimerModel, SequenceEntity, SequenceFileFormat, \
     RepositoryIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource, \
     UploadedFileSource, HomologousRecombinationSource
@@ -14,8 +15,7 @@ from Bio.Restriction.Restriction import RestrictionBatch
 from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
 from Bio.Restriction.Restriction_Dictionary import rest_dict
-from assembly2 import Assembly, assemble, assembly_is_valid, sticky_end_sub_strings, is_sublist, assembly2str
-from Bio.SeqFeature import Location
+from assembly2 import Assembly, assemble, assembly_is_valid, sticky_end_sub_strings, is_sublist, assembly2str, PCRAssembly
 # Instance of the API object
 app = FastAPI()
 
@@ -187,7 +187,7 @@ async def restriction(source: RestrictionEnzymeDigestionSource,
     cutsites = seqr.seq.get_cutsites(*enzymes)
     cutsite_pairs = seqr.seq.get_cutsite_pairs(cutsites)
     sources = [RestrictionEnzymeDigestionSource.from_cutsites(*p, source.input, source.id) for p in cutsite_pairs]
-    print(sources)
+
     all_enzymes = set(enzyme for s in sources for enzyme in s.restriction_enzymes)
     enzymes_not_cutting = set(source.restriction_enzymes) - set(all_enzymes)
     if len(enzymes_not_cutting):
@@ -221,14 +221,9 @@ async def sticky_ligation(source: StickyLigationSource,
                           allow_partial_overlap: bool = Query(True, description='Allow for partially overlapping sticky ends.')):
 
     # Fragments in the same order as in source.input
-    fragments = list()
-    for i in source.input:
-        for seq in sequences:
-            if seq.id == i:
-                fragments.append(read_dsrecord_from_json(seq))
-                break
-        else:
-            raise HTTPException(400, f'Invalid fragment id in input: {i}')
+    fragments = [next((read_dsrecord_from_json(seq) for seq in sequences if seq.id == id), None) for id in source.input]
+    if any(f is None for f in fragments):
+        raise HTTPException(400, f'Invalid fragment id in input')
 
     asm = Assembly(fragments, algorithm=sticky_end_sub_strings, limit=allow_partial_overlap, use_all_fragments=True, use_fragment_order=False)
     circular_assemblies = asm.get_circular_assemblies()
@@ -265,33 +260,40 @@ async def pcr(source: PCRSource,
               sequences: conlist(SequenceEntity, min_length=1, max_length=1),
               primers: conlist(PrimerModel, min_length=1, max_length=2),
               minimal_annealing: int = Query(20, description='The minimal annealing length for each primer.')):
+
     dseq = read_dsrecord_from_json(sequences[0])
-    primers_pydna = [read_primer_from_json(p) for p in primers]
+    forward_primer = next((Dseqrecord(Dseq(p.sequence)) for p in primers if p.id == source.forward_primer), None)
+    reverse_primer = next((Dseqrecord(Dseq(p.sequence)) for p in primers if p.id == source.reverse_primer), None)
+    if forward_primer is None or reverse_primer is None:
+        raise HTTPException(404, 'Invalid primer id.')
 
-    # If the footprints are set, the output should be known
-    output_is_known = len(source.primer_footprints) > 0 or len(source.primers) > 0 or len(source.fragment_boundaries) > 0
+    # TODO: This will have to be re-written if we allow mismatches
+    # If an assembly is provided, we ignore minimal_annealing
+    if source.assembly is not None:
+        minimal_annealing = source.minimal_overlap()
+    fragments = [forward_primer, dseq, reverse_primer]
 
-    # TODO: return error if the id of the sequence does not correspond.
-    # TODO: return error if the ids not present in the list.
+    asm = PCRAssembly(fragments, limit=minimal_annealing)
+    try:
+        print(asm.G.edges)
+        possible_assemblies = asm.get_linear_assemblies()
+    except ValueError as e:
+        raise HTTPException(400, *e.args)
 
-    # Error if no pair is generated.
-    products, out_sources = get_pcr_products_list(dseq, source, primers_pydna, minimal_annealing)
-    if len(products) == 0:
-        raise HTTPException(
-            400, 'No pair of annealing primers was found.' + ('' if output_is_known else ' Try changing the annealing settings.')
-        )
+    out_sources = [PCRSource.from_assembly(id= source.id, input=source.input, assembly=a, forward_primer=source.forward_primer, reverse_primer=source.reverse_primer) for a in possible_assemblies]
 
-    out_sequences = [format_sequence_genbank(seq) for seq
-                     in products]
+    # If a specific assembly is requested
+    if source.assembly is not None:
+        for i, s in enumerate(out_sources):
+            if s == source:
+                # TODO: remove enumeration by better parsing
+                return {'sequences': [format_sequence_genbank(assemble(fragments, possible_assemblies[i], s.circular))], 'sources': [s]}
+        raise HTTPException(400, 'The provided assembly is not valid.')
 
-    # If the user has provided boundaries, we verify that they are correct.
-    if output_is_known:
-        for i, out_source in enumerate(out_sources):
-            if out_source == source:
-                return {'sequences': [out_sequences[i]], 'sources': [out_source]}
-        # If we don't find it, there was a mistake
-        raise HTTPException(
-            400, 'The annealing positions of the primers seem to be wrong.')
+    if len(possible_assemblies) == 0:
+        raise HTTPException(400, 'No pair of annealing primers was found. Try changing the annealing settings.')
+
+    out_sequences = [format_sequence_genbank(assemble(fragments, a, s.circular)) for s, a in zip(out_sources, possible_assemblies)]
 
     return {'sources': out_sources, 'sequences': out_sequences}
 
@@ -334,6 +336,5 @@ async def homologous_recombination(
         raise HTTPException(400, 'No homologous recombination was found.')
 
     out_sequences = [format_sequence_genbank(assemble([template, insert], a, False)) for a in possible_assemblies]
-
 
     return {'sources': out_sources, 'sequences': out_sequences}

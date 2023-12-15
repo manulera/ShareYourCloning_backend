@@ -4,13 +4,10 @@ from Bio.Restriction.Restriction import RestrictionBatch
 from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from pydantic_models import PCRSource, PrimerModel, RepositoryIdSource, \
-    GenbankSequence, SequenceEntity, StickyLigationSource
+from pydantic_models import PrimerModel, RepositoryIdSource, \
+    GenbankSequence, SequenceEntity
 from pydna.parsers import parse as pydna_parse
-from itertools import permutations, product
 from pydna.primer import Primer
-from pydna.amplify import Anneal
-from pydna.amplicon import Amplicon
 import requests
 from bs4 import BeautifulSoup
 import regex
@@ -91,103 +88,6 @@ def get_invalid_enzyme_names(enzyme_names_list: list[str|None]) -> list[str]:
             except ValueError:
                 invalid_names.append(name)
     return invalid_names
-
-
-
-
-def get_pcr_products_list(template: Dseqrecord, source: PCRSource, primers: list[Primer], minimal_annealing: int) -> tuple[list[Dseqrecord], list[PCRSource]]:
-    anneal = Anneal(primers, template, limit=minimal_annealing)
-    amplicon: Amplicon
-    sources = list()
-
-    for amplicon in anneal.products:
-        new_source = source.model_copy()
-        new_source.primers = [int(amplicon.forward_primer.id), int(amplicon.reverse_primer.id)]
-        new_source.fragment_boundaries = [amplicon.forward_primer.position, amplicon.reverse_primer.position]
-        new_source.primer_footprints = [amplicon.forward_primer._fp, amplicon.reverse_primer._fp]
-        sources.append(new_source)
-
-    return anneal.products, sources
-
-
-def assembly_is_duplicate(assembly: StickyLigationSource) -> bool:
-    """
-    For linear assemblies we apply the constrain that first fragment is not inverted.
-    For circular assemblies, we apply that constrain, plus that the smallest id comes first.
-    """
-    if assembly.circularised:
-        return assembly.fragments_inverted[0] or min(assembly.input) != assembly.input[0]
-    else:
-        return assembly.fragments_inverted[0]
-
-
-def get_assembly_list_from_sticky_ligation_source(seqs: list[Dseqrecord], source: StickyLigationSource) -> list[Dseqrecord]:
-
-    assembly: list[Dseqrecord] = list()
-    for index, id in enumerate(source.input):
-        # Find the element in the list that has that id and add it to the assembly
-        assembly.append(next(seq for seq in seqs if int(seq.id) == id))
-
-        # Invert it necessary
-        if source.fragments_inverted[index]:
-            assembly[-1] = assembly[-1].reverse_complement()
-    return assembly
-
-
-def perform_assembly(assembly: tuple[Dseqrecord], circularise) -> Dseqrecord:
-    out = sum((f for f in assembly), Dseqrecord(''))
-    if circularise:
-        out = out.looped()
-    return out
-
-
-def assembly_list_is_valid(assembly: tuple[Dseqrecord], circularise=False, partial=False) -> bool:
-    for i in range(0, len(assembly) - 1):
-        if not sum_is_sticky(assembly[i].seq, assembly[i + 1].seq, partial):
-            return False
-
-    if circularise:
-        return assembly_list_can_be_circularised(assembly)
-
-    return True
-
-
-def assembly_list_can_be_circularised(assembly: tuple[Dseqrecord]):
-    return sum_is_sticky(assembly[-1].seq, assembly[0].seq)
-
-
-def get_sticky_ligation_products_list(seqs: list[Dseqrecord]) -> tuple[list[Dseqrecord], list[StickyLigationSource]]:
-
-    sequence_ids = [s.id for s in seqs]
-
-    # We generate all possible combinations of sequence ids, fragment_inverted and circularised
-    # without duplicates (see assembly_is_duplicate).
-
-    possible_sources = list()
-    for _input in permutations(sequence_ids):
-        for fragments_inverted in product([True, False], repeat=len(_input)):
-            for circularised in [True, False]:
-                possible_source = StickyLigationSource(input=_input, fragments_inverted=fragments_inverted,
-                                                       circularised=circularised)
-                if assembly_is_duplicate(possible_source):
-                    continue
-                possible_sources.append(possible_source)
-
-    # Here we filter those that are compatible
-    valid_sources = list()
-    products = list()
-    for source in possible_sources:
-        assembly_list = get_assembly_list_from_sticky_ligation_source(seqs, source)
-        if assembly_list_is_valid(assembly_list, source.circularised):
-
-            # For now, if the assembly can be circularised, we make it happen
-            # (we exclude linear assemblies that could be circularised)
-            if not source.circularised and assembly_list_can_be_circularised(assembly_list):
-                continue
-            valid_sources.append(source)
-            products.append(perform_assembly(assembly_list, source.circularised))
-
-    return products, valid_sources
 
 
 def get_sequences_from_gb_file_url(url: str) -> Dseqrecord:

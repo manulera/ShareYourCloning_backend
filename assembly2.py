@@ -3,6 +3,7 @@
 from pydna.utils import shift_location as _shift_location, flatten
 from pydna._pretty import pretty_str as _pretty_str
 from pydna.common_sub_strings import common_sub_strings as common_sub_strings_str
+from pydna.common_sub_strings import terminal_overlap as terminal_overlap_str
 from pydna.dseqrecord import Dseqrecord as _Dseqrecord
 from pydna.dseq import Dseq as _Dseq
 import networkx as _nx
@@ -14,6 +15,9 @@ from Bio.Seq import reverse_complement
 
 def common_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
     return common_sub_strings_str(str(seqx.seq).upper(), str(seqy.seq).upper(), limit)
+
+def terminal_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
+    return terminal_overlap_str(str(seqx.seq).upper(), str(seqy.seq).upper(), limit)
 
 def sticky_end_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=0):
     """For now, if limit 0 / False only full overlaps are considered."""
@@ -514,6 +518,62 @@ class Assembly:
                 al=self.algorithm.__name__,
             )
         )
+
+class PCRAssembly(Assembly):
+
+    def __init__(self, frags: tuple[_Dseqrecord, _Dseqrecord, _Dseqrecord], limit=25, algorithm=common_sub_strings):
+
+        # TODO: allow for the same fragment to be included more than once?
+        G = _nx.MultiDiGraph()
+        # Add positive and negative nodes for forward and reverse fragments
+        forward_primer, template, reverse_primer = frags
+        G.add_node(1, seq=forward_primer)
+        G.add_node(2, seq=template)
+        G.add_node(-2, seq=template.reverse_complement())
+        G.add_node(-3, seq=reverse_primer.reverse_complement())
+
+        combinations = (
+                (1, 2),
+                (1, -2),
+                (2, -3),
+                (-2, -3)
+        )
+        for u, v in combinations:
+            u_seq = G.nodes[u]['seq']
+            v_seq = G.nodes[v]['seq']
+            matches = algorithm(u_seq, v_seq, limit)
+            # For now we use the same algorithm function, and filter after those in which
+            # the primer anneals until its 3'-most base, but a separate algorithm could be used.
+            if u == 1:
+                matches = filter(lambda x: x[0] + x[2] == len(forward_primer), matches)
+            elif v == -3:
+                matches = filter(lambda x: x[1] == 0, matches)
+            for match in matches:
+                add_edges_from_match(match, u, v, u_seq, v_seq, G)
+
+        # These two are constrained
+        self.use_fragment_order=True
+        self.use_all_fragments=True
+
+        self.G = G
+        self.fragments = frags
+        self.limit = limit
+        self.algorithm = algorithm
+
+        return
+
+    def get_linear_assemblies(self):
+        """Adds extra constrains to prevent clashing primers."""
+        assemblies = super().get_linear_assemblies()
+        # Error if clashing primers
+        for a in assemblies:
+            edge_pairs = zip(a, a[1:])
+            for (u1, v1, _, start_location), (u2, v2, end_location, _) in edge_pairs:
+                # Incompatible as described in figure above
+                if start_location.parts[-1].end > end_location.parts[0].start:
+                    raise ValueError('Clashing primers in assembly ' + assembly2str(a))
+
+        return assemblies
 
 
 example_fragments = (

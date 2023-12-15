@@ -140,30 +140,6 @@ class RestrictionEnzymeDigestionSource(SequenceCut):
             input=input
         )
 
-class PCRSource(Source):
-    """Documents a PCR, and the selection of one of the products."""
-
-    type: SourceType = SourceType('PCR')
-
-    primers: conlist(int, max_length=2) = Field([], description='id of\
-        the forward and reverse primer (in that order). If the reverse and forward is the same,\
-        the id should be submitted twice. It accepts a single input if primer_footprints is not set.')
-
-    primer_footprints: conlist(int, max_length=2) = Field([], description='The number of basepairs that are anealed\
-    in each primer (same order as in `primers`). Missmatch support should be added in the future.')
-
-    # Used to be common with RestrictionEnzymeDigestionSource, but it is not anymore
-    # This can only take one input
-    input: conlist(int, min_length=1, max_length=1)
-
-    # Boundaries of a fragment (length should be either empty, or length = 2)
-    fragment_boundaries: list[int] = Field([], description='Edges of the fragment that will be taken:\n \
-    * For a PCR, these are the positions of the 3\' binding sites of the primers, such that sequence[start:end]\
-    would be the part of the sequence where primers don\'t align.\n\
-    * For restriction enzymes the extremes of the overhangs\n\
-    For both, 0-based indexing, [first,second)')
-
-
 class Assembly(Source):
     assembly:  Optional[conlist(tuple[int, int, str, str], min_length=1)] = None
     circular: Optional[bool] = None
@@ -177,6 +153,27 @@ class Assembly(Source):
             if f[3] is not None:
                 all_overlaps.append(len(Location.fromstring(f[3])))
         return min(all_overlaps)
+
+class PCRSource(Assembly):
+    """Documents a PCR, and the selection of one of the products."""
+
+    type: SourceType = SourceType('PCR')
+    circular: bool = False
+    forward_primer: int = Field(..., description='The forward primer')
+    reverse_primer: int = Field(..., description='The reverse primer')
+
+    # This can only take one input
+    input: conlist(int, min_length=1, max_length=1)
+
+    def from_assembly(assembly: list[tuple[int, int, Location, Location]], input: list[int], id: int, forward_primer: int, reverse_primer: int) -> 'PCRSource':
+        """Creates a PCRSource from an assembly, input and id"""
+        return PCRSource(
+            id=id,
+            assembly=[(part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None)) for part in assembly],
+            input=input,
+            forward_primer=forward_primer,
+            reverse_primer=reverse_primer
+        )
 
 class StickyLigationSource(Assembly):
 
