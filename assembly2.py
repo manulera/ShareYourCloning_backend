@@ -44,16 +44,24 @@ def sticky_end_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=0):
         return [(len(seqx)-overlap, 0, overlap)]
     return []
 
-def fill_dseq(seq: _Dseq):
-    """Fill the overhangs of a dseq with the complementary sequence."""
+def fill_left(seq: _Dseq):
+    """Fill the left overhang of a sequence with the complementary sequence."""
     new_watson = seq.watson
     new_crick = seq.crick
+
     # Watson 5' overhang
     if seq.ovhg < 0:
         new_crick = new_crick + reverse_complement(seq.watson[:-seq.ovhg])
     # Crick 5' overhang
     elif seq.ovhg > 0:
         new_watson = reverse_complement(seq.crick[-seq.ovhg:]) + new_watson
+
+    return _Dseq(new_watson, new_crick, 0)
+
+def fill_right(seq: _Dseq):
+    """Fill the right overhang of a sequence with the complementary sequence."""
+    new_watson = seq.watson
+    new_crick = seq.crick
 
     # Watson 3' overhang
     watson_ovhg = seq.watson_ovhg()
@@ -64,7 +72,10 @@ def fill_dseq(seq: _Dseq):
     elif watson_ovhg > 0:
         new_crick = reverse_complement(seq.watson[-watson_ovhg:]) + new_crick
 
-    return _Dseq(new_watson, new_crick, 0)
+    return _Dseq(new_watson, new_crick, seq.ovhg)
+
+def fill_dseq(seq: _Dseq):
+    return fill_left(fill_right(seq))
 
 def remove_subassemblies(assemblies):
     """Filter out subassemblies, i.e. assemblies that are contained within another assembly.
@@ -159,8 +170,8 @@ def assemble(fragments, assembly, is_circular):
         # Shift the features of the right fragment to the left by `overlap`
         new_features = [f._shift(len(out_dseqrecord)-overlap) for f in fragment.features]
         # Join the left sequence including the overlap with the right sequence without the overlap
-        # we use fill_dseq so that it works for ligation of sticky ends
-        out_dseqrecord = _Dseqrecord(fill_dseq(out_dseqrecord.seq) + fill_dseq(fragment.seq)[overlap:], features=out_dseqrecord.features + new_features)
+        # we use fill_right so that it works for ligation of sticky ends
+        out_dseqrecord = _Dseqrecord(fill_right(out_dseqrecord.seq) + fill_left(fragment.seq)[overlap:], features=out_dseqrecord.features + new_features)
 
     # For circular assemblies, close the loop and wrap origin-spanning features
     if is_circular:
