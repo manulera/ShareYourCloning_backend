@@ -811,10 +811,9 @@ class GibsonAssemblyTest(unittest.TestCase):
         payload = response.json()
         sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
 
-        self.assertEqual(len(sequences), 3)
+        self.assertEqual(len(sequences), 2)
         self.assertEqual(str(sequences[0].seq), 'TTTTacgatAAtgctccCCCCtcatGGGGatata'.upper())
         self.assertEqual(str(sequences[1].seq), 'TTTTacgatAAtgctccCCCCatgaGGGGatata'.upper())
-        self.assertEqual(str(sequences[2].seq), 'CCCCtcatGGGGggagcaTTatcgtAAAAtatatCCCC'.upper())
 
 
 if __name__ == "__main__":

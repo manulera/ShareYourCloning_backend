@@ -83,8 +83,6 @@ def reverse_complement_assembly(assembly: list[tuple[int, int, Location, Locatio
         f_u = fragments[abs(u)-1]
         f_v = fragments[abs(v)-1]
         new_assembly.append((-v, -u, locv._flip(len(f_v)), locu._flip(len(f_u))))
-    # print('>', assembly2str(assembly))
-    # print('<', assembly2str(new_assembly[::-1]))
     return new_assembly[::-1]
 
 def filter_linear_subassemblies(linear_assemblies, circular_assemblies, fragments):
