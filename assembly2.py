@@ -8,8 +8,7 @@ from pydna.dseqrecord import Dseqrecord as _Dseqrecord
 from pydna.dseq import Dseq as _Dseq
 import networkx as _nx
 import itertools as _itertools
-from Bio.SeqFeature import SimpleLocation
-from pydna.utils import shift_location
+from Bio.SeqFeature import SimpleLocation, Location
 from dna_functions import sum_is_sticky
 from Bio.Seq import reverse_complement
 
@@ -76,6 +75,25 @@ def fill_right(seq: _Dseq):
 
 def fill_dseq(seq: _Dseq):
     return fill_left(fill_right(seq))
+
+def reverse_complement_assembly(assembly: list[tuple[int, int, Location, Location]], fragments: list[_Dseqrecord]) -> list[tuple[int, int, Location, Location]]:
+    """Complement an assembly, i.e. reverse the order of the fragments and the orientation of the overlaps."""
+    new_assembly = list()
+    for u, v, locu, locv in assembly:
+        f_u = fragments[abs(u)-1]
+        f_v = fragments[abs(v)-1]
+        new_assembly.append((-v, -u, locv._flip(len(f_v)), locu._flip(len(f_u))))
+    # print('>', assembly2str(assembly))
+    # print('<', assembly2str(new_assembly[::-1]))
+    return new_assembly[::-1]
+
+def filter_linear_subassemblies(linear_assemblies, circular_assemblies, fragments):
+    """Remove linear assemblies which are sub-assemblies of circular assemblies"""
+    all_circular_assemblies = circular_assemblies + [reverse_complement_assembly(c, fragments) for c in circular_assemblies]
+    filtered_assemblies = [l for l in linear_assemblies if not any(is_sublist(l, c, True) for c in all_circular_assemblies)]
+    # I don't think the line below is necessary, but just in case
+    # filtered_assemblies = [l for l in filtered_assemblies if not any(is_sublist(reverse_complement_assembly(l, fragments), c, True) for c in all_circular_assemblies)]
+    return filtered_assemblies
 
 def remove_subassemblies(assemblies):
     """Filter out subassemblies, i.e. assemblies that are contained within another assembly.
@@ -170,7 +188,7 @@ def assemble(fragments, assembly, is_circular):
         # Shift the features of the right fragment to the left by `overlap`
         new_features = [f._shift(len(out_dseqrecord)-overlap) for f in fragment.features]
         # Join the left sequence including the overlap with the right sequence without the overlap
-        # we use fill_right so that it works for ligation of sticky ends
+        # we use fill_right / fill_left so that it works for ligation of sticky ends
         out_dseqrecord = _Dseqrecord(fill_right(out_dseqrecord.seq) + fill_left(fragment.seq)[overlap:], features=out_dseqrecord.features + new_features)
 
     # For circular assemblies, close the loop and wrap origin-spanning features
@@ -246,7 +264,8 @@ def is_sublist(sublist, my_list, my_list_is_cyclic=False):
     if my_list_is_cyclic:
         my_list = my_list + my_list
     for i in range(len(my_list) - n + 1):
-        if my_list[i:i+n] == sublist:
+        # Just in case tuples were passed
+        if list(my_list[i:i+n]) == list(sublist):
             return True
     return False
 
@@ -338,8 +357,8 @@ def add_edges_from_match(match, index_first, index_secnd, first, secnd, graph: _
     """
     x_start, y_start, length = match
     # We use shift_location with 0 to wrap origin-spanning features
-    locs = [shift_location(SimpleLocation(x_start, x_start + length, 1), 0, len(first)),
-            shift_location(SimpleLocation(y_start, y_start + length, 1), 0, len(secnd))]
+    locs = [_shift_location(SimpleLocation(x_start, x_start + length, 1), 0, len(first)),
+            _shift_location(SimpleLocation(y_start, y_start + length, 1), 0, len(secnd))]
     rc_locs = [locs[0]._flip(len(first)), locs[1]._flip(len(secnd))]
 
     # For an homology-like assembly, we could do as below, and not do the other combinations,

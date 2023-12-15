@@ -15,7 +15,7 @@ from Bio.Restriction.Restriction import RestrictionBatch
 from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
 from Bio.Restriction.Restriction_Dictionary import rest_dict
-from assembly2 import Assembly, assemble, sticky_end_sub_strings, is_sublist, assembly2str, PCRAssembly, gibson_overlap
+from assembly2 import Assembly, assemble, sticky_end_sub_strings, assembly2str, PCRAssembly, gibson_overlap, filter_linear_subassemblies
 # Instance of the API object
 app = FastAPI()
 
@@ -227,10 +227,7 @@ async def sticky_ligation(source: StickyLigationSource,
 
     asm = Assembly(fragments, algorithm=sticky_end_sub_strings, limit=allow_partial_overlap, use_all_fragments=True, use_fragment_order=False)
     circular_assemblies = asm.get_circular_assemblies()
-
-    linear_assemblies = asm.get_linear_assemblies()
-    # Remove linear assemblies which are sub-assemblies of circular assemblies
-    linear_assemblies = [a for a in linear_assemblies if not any(is_sublist(a, c, True) for c in circular_assemblies)]
+    linear_assemblies = filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
     possible_assemblies = circular_assemblies + linear_assemblies
 
     out_sources = [StickyLigationSource.from_assembly(id= source.id, input=source.input, assembly=a, circular=(a[0][0] == a[-1][1])) for a in possible_assemblies]
@@ -275,7 +272,6 @@ async def pcr(source: PCRSource,
 
     asm = PCRAssembly(fragments, limit=minimal_annealing)
     try:
-        print(asm.G.edges)
         possible_assemblies = asm.get_linear_assemblies()
     except ValueError as e:
         raise HTTPException(400, *e.args)
@@ -352,12 +348,9 @@ async def gibson_assembly(source: GibsonAssemblySource,
 
     asm = Assembly(fragments, algorithm=gibson_overlap, limit=minimal_homology, use_all_fragments=True, use_fragment_order=False)
     circular_assemblies = asm.get_circular_assemblies()
-
-    linear_assemblies = asm.get_linear_assemblies()
-    # Remove linear assemblies which are sub-assemblies of circular assemblies
-    linear_assemblies = [a for a in linear_assemblies if not any(is_sublist(a, c, True) for c in circular_assemblies)]
+    linear_assemblies = filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
     possible_assemblies = circular_assemblies + linear_assemblies
-
+    print(possible_assemblies)
     out_sources = [GibsonAssemblySource.from_assembly(id= source.id, input=source.input, assembly=a, circular=(a[0][0] == a[-1][1])) for a in possible_assemblies]
 
     # If a specific assembly is requested
