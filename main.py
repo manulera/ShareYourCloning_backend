@@ -9,13 +9,13 @@ from dna_functions import get_invalid_enzyme_names, format_sequence_genbank, \
     read_dsrecord_from_json, request_from_addgene
 from pydantic_models import PCRSource, PrimerModel, SequenceEntity, SequenceFileFormat, \
     RepositoryIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource, \
-    UploadedFileSource, HomologousRecombinationSource
+    UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
 from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
 from Bio.Restriction.Restriction_Dictionary import rest_dict
-from assembly2 import Assembly, assemble, assembly_is_valid, sticky_end_sub_strings, is_sublist, assembly2str, PCRAssembly
+from assembly2 import Assembly, assemble, assembly_is_valid, sticky_end_sub_strings, is_sublist, assembly2str, PCRAssembly, terminal_overlap
 # Instance of the API object
 app = FastAPI()
 
@@ -338,3 +338,39 @@ async def homologous_recombination(
     out_sequences = [format_sequence_genbank(assemble([template, insert], a, False)) for a in possible_assemblies]
 
     return {'sources': out_sources, 'sequences': out_sequences}
+
+@ app.post('/gibson_assembly', response_model=create_model(
+    'GibsonAssemblyResponse',
+    sources=(list[GibsonAssemblySource], ...),
+    sequences=(list[SequenceEntity], ...)
+))
+async def gibson_assembly(source: GibsonAssemblySource,
+                          sequences: conlist(SequenceEntity, min_length=1),
+                          minimal_homology: int = Query(40, description='The minimum homology between consecutive fragments in the assembly.'),):
+
+    fragments = [read_dsrecord_from_json(seq) for seq in sequences]
+
+    asm = Assembly(fragments, algorithm=terminal_overlap, limit=minimal_homology, use_all_fragments=True, use_fragment_order=False)
+    circular_assemblies = asm.get_circular_assemblies()
+
+    linear_assemblies = asm.get_linear_assemblies()
+    # Remove linear assemblies which are sub-assemblies of circular assemblies
+    linear_assemblies = [a for a in linear_assemblies if not any(is_sublist(a, c, True) for c in circular_assemblies)]
+    possible_assemblies = circular_assemblies + linear_assemblies
+
+    out_sources = [GibsonAssemblySource.from_assembly(id= source.id, input=source.input, assembly=a, circular=(a[0][0] == a[-1][1])) for a in possible_assemblies]
+
+    # If a specific assembly is requested
+    if source.assembly is not None:
+        for i, s in enumerate(out_sources):
+            if s == source:
+                return {'sequences': [format_sequence_genbank(assemble(fragments, possible_assemblies[i], s.circular))], 'sources': [s]}
+        raise HTTPException(400, 'The provided assembly is not valid.')
+
+    if len(possible_assemblies) == 0:
+        raise HTTPException(400, 'No terminal homology was found.')
+
+    out_sequences = [format_sequence_genbank(assemble(fragments, a, s.circular)) for s, a in zip(out_sources, possible_assemblies)]
+
+    return {'sources': out_sources, 'sequences': out_sequences}
+

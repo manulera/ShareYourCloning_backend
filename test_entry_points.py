@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
 from pydantic_models import RepositoryIdSource, PCRSource, PrimerModel, \
-    RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource, UploadedFileSource, HomologousRecombinationSource
+    RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource, UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource
 from pydna.dseqrecord import Dseqrecord
 import unittest
 from pydna.dseq import Dseq
@@ -785,6 +785,36 @@ class HomologousRecombinationTest(unittest.TestCase):
         sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
         self.assertEqual(len(sequences), 1)
         self.assertEqual(str(sequences[0].seq), 'TTTTacgatCCCtgctccCCCC'.upper())
+
+
+class GibsonAssemblyTest(unittest.TestCase):
+
+    def test_gibson_assembly(self):
+        # A circular one
+        fragments = [
+            Dseqrecord('TTTTacgatAAtgctccCCCC', circular=False),
+            Dseqrecord('CCCCtcatGGGG', circular=False),
+            Dseqrecord('GGGGatataTTTT', circular=False)
+        ]
+
+        json_fragments = [format_sequence_genbank(f) for f in fragments]
+        for i, f in enumerate(json_fragments):
+            f.id = i + 1
+
+        source = GibsonAssemblySource(
+            input=[1, 2, 3],
+        )
+
+        data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
+        response = client.post('/gibson_assembly', json=data, params={'minimal_homology': 4})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+        self.assertEqual(len(sequences), 3)
+        self.assertEqual(str(sequences[0].seq), 'TTTTacgatAAtgctccCCCCtcatGGGGatata'.upper())
+        self.assertEqual(str(sequences[1].seq), 'TTTTacgatAAtgctccCCCCatgaGGGGatata'.upper())
+        self.assertEqual(str(sequences[2].seq), 'CCCCtcatGGGGggagcaTTatcgtAAAAtatatCCCC'.upper())
 
 
 if __name__ == "__main__":

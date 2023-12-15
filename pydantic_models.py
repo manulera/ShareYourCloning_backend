@@ -14,6 +14,7 @@ class SourceType(str, Enum):
     sticky_ligation = 'sticky_ligation'
     PCR = 'PCR'
     homologous_recombination = 'homologous_recombination'
+    gibson_assembly = 'gibson_assembly'
 
 
 class SequenceFileFormat(str, Enum):
@@ -197,6 +198,19 @@ class HomologousRecombinationSource(Assembly):
 
     def from_assembly(assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int) -> 'HomologousRecombinationSource':
         return HomologousRecombinationSource(
+            id=id,
+            assembly=[(part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None)) for part in assembly],
+            input=input,
+            circular=circular
+        )
+
+class GibsonAssemblySource(Assembly):
+
+    type: SourceType = SourceType('gibson_assembly')
+    input: conlist(int, min_length=2)
+
+    def from_assembly(assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int) -> 'GibsonAssemblySource':
+        return GibsonAssemblySource(
             id=id,
             assembly=[(part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None)) for part in assembly],
             input=input,
