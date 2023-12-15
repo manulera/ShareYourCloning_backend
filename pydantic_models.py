@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from pydantic.types import constr, conlist
 from enum import Enum
 from typing import Optional
@@ -92,9 +92,7 @@ class Source(BaseModel):
     output: Optional[int] = None
     type: Optional[SourceType]
     info: dict = {}
-
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra='forbid')
 
 
 class UploadedFileSource(Source):
