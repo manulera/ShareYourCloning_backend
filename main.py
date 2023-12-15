@@ -15,7 +15,7 @@ from Bio.Restriction.Restriction import RestrictionBatch
 from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
 from Bio.Restriction.Restriction_Dictionary import rest_dict
-from assembly2 import Assembly, assemble, assembly_is_valid, sticky_end_sub_strings, is_sublist, assembly2str, PCRAssembly, terminal_overlap
+from assembly2 import Assembly, assemble, sticky_end_sub_strings, is_sublist, assembly2str, PCRAssembly, gibson_overlap
 # Instance of the API object
 app = FastAPI()
 
@@ -350,7 +350,7 @@ async def gibson_assembly(source: GibsonAssemblySource,
 
     fragments = [read_dsrecord_from_json(seq) for seq in sequences]
 
-    asm = Assembly(fragments, algorithm=terminal_overlap, limit=minimal_homology, use_all_fragments=True, use_fragment_order=False)
+    asm = Assembly(fragments, algorithm=gibson_overlap, limit=minimal_homology, use_all_fragments=True, use_fragment_order=False)
     circular_assemblies = asm.get_circular_assemblies()
 
     linear_assemblies = asm.get_linear_assemblies()

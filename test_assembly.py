@@ -857,7 +857,7 @@ def test_fragments_only_once():
             Dseqrecord('GGGGatataTTTT', circular=False)
         ]
 
-    asm = assembly.Assembly(fragments, limit=4, algorithm=assembly.terminal_overlap, use_all_fragments=True, use_fragment_order=False)
+    asm = assembly.Assembly(fragments, limit=4, algorithm=assembly.gibson_overlap, use_all_fragments=True, use_fragment_order=False)
     for a in asm.get_linear_assemblies():
         nodes_used = [f[0] for f in assembly.edge_representation2subfragment_representation(a, False)]
         assert len(nodes_used) == len(set(nodes_used))

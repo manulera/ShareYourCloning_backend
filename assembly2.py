@@ -19,6 +19,24 @@ def common_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
 def terminal_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
     return terminal_overlap_str(str(seqx.seq).upper(), str(seqy.seq).upper(), limit)
 
+def gibson_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
+    """
+    The order matters, we want alignments like:
+    oooo------xxxx
+              xxxx------oooo
+    Not like:
+              oooo------xxxx
+    xxxx------oooo
+
+    """
+    stringx = str(seqx.seq).upper()
+    stringy = str(seqy.seq).upper()
+    return [
+        m
+        for m in common_sub_strings_str(stringx, stringy, limit)
+        if (m[1] == 0 and m[0] + m[2] == len(stringx))
+    ]
+
 def sticky_end_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=0):
     """For now, if limit 0 / False only full overlaps are considered."""
     overlap = sum_is_sticky(seqx.seq, seqy.seq, limit )
