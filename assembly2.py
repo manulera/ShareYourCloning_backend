@@ -19,6 +19,24 @@ def common_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
 def terminal_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
     return terminal_overlap_str(str(seqx.seq).upper(), str(seqy.seq).upper(), limit)
 
+def gibson_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
+    """
+    The order matters, we want alignments like:
+    oooo------xxxx
+              xxxx------oooo
+    Not like:
+              oooo------xxxx
+    xxxx------oooo
+
+    """
+    stringx = str(seqx.seq).upper()
+    stringy = str(seqy.seq).upper()
+    return [
+        m
+        for m in common_sub_strings_str(stringx, stringy, limit)
+        if (m[1] == 0 and m[0] + m[2] == len(stringx))
+    ]
+
 def sticky_end_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=0):
     """For now, if limit 0 / False only full overlaps are considered."""
     overlap = sum_is_sticky(seqx.seq, seqy.seq, limit )
@@ -71,7 +89,7 @@ def remove_subassemblies(assemblies):
 def assembly2str(assembly):
     return str(tuple(f'{u}{lu}:{v}{lv}' for u, v, lu, lv in assembly))
 
-def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments):
+def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragments_only_once=True):
     """Function used to filter paths returned from the graph, see conditions tested below.
     """
 
@@ -116,6 +134,11 @@ def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments):
     for (u1, v1, _, start_location), (u2, v2, end_location, _) in edge_pairs:
         # Incompatible as described in figure above
         if start_location.parts[-1].end >= end_location.parts[0].end:
+            return False
+
+    if fragments_only_once:
+        nodes_used = [f[0] for f in edge_representation2subfragment_representation(assembly, is_circular)]
+        if len(nodes_used) != len(set(map(abs,nodes_used))):
             return False
 
     return True

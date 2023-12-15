@@ -15,7 +15,7 @@ from Bio.SeqFeature import SimpleLocation, Location, CompoundLocation
 from pydna.utils import shift_location
 
 
-def sum_is_sticky(seq1: Dseq, seq2: Dseq, partial: bool=False) -> bool:
+def sum_is_sticky(seq1: Dseq, seq2: Dseq, partial: bool=False) -> int:
     """Return true if the 3' end of seq1 and 5' end of seq2 ends are sticky and compatible for ligation."""
     type_seq1, sticky_seq1 = seq1.three_prime_end()
     type_seq2, sticky_seq2 = seq2.five_prime_end()
