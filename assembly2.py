@@ -71,7 +71,7 @@ def remove_subassemblies(assemblies):
 def assembly2str(assembly):
     return str(tuple(f'{u}{lu}:{v}{lv}' for u, v, lu, lv in assembly))
 
-def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments):
+def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragments_only_once=True):
     """Function used to filter paths returned from the graph, see conditions tested below.
     """
 
@@ -116,6 +116,11 @@ def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments):
     for (u1, v1, _, start_location), (u2, v2, end_location, _) in edge_pairs:
         # Incompatible as described in figure above
         if start_location.parts[-1].end >= end_location.parts[0].end:
+            return False
+
+    if fragments_only_once:
+        nodes_used = [f[0] for f in edge_representation2subfragment_representation(assembly, is_circular)]
+        if len(nodes_used) != len(set(map(abs,nodes_used))):
             return False
 
     return True

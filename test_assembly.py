@@ -848,3 +848,21 @@ def test_pcr_assembly_invalid():
         pass
     else:
         assert False, 'Clashing primers should give ValueError'
+
+def test_fragments_only_once():
+
+    fragments = [
+            Dseqrecord('TTTTacgatAAtgctccCCCC', circular=False),
+            Dseqrecord('CCCCtcatGGGG', circular=False),
+            Dseqrecord('GGGGatataTTTT', circular=False)
+        ]
+
+    asm = assembly.Assembly(fragments, limit=4, algorithm=assembly.terminal_overlap, use_all_fragments=True, use_fragment_order=False)
+    for a in asm.get_linear_assemblies():
+        nodes_used = [f[0] for f in assembly.edge_representation2subfragment_representation(a, False)]
+        assert len(nodes_used) == len(set(nodes_used))
+
+    for a in asm.get_circular_assemblies():
+        nodes_used = [f[0] for f in assembly.edge_representation2subfragment_representation(a, True)]
+        assert len(nodes_used) == len(set(nodes_used))
+
