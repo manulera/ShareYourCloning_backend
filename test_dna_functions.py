@@ -9,11 +9,11 @@ class TestPartialSticky(unittest.TestCase):
     # General test functions
     def expectTrue(self, seq_left, seq_right, partial):
         with self.subTest():
-            self.assertTrue(sum_is_sticky(seq_left, seq_right, partial))
+            self.assertTrue(sum_is_sticky(seq_left.three_prime_end(), seq_right.five_prime_end(), partial))
 
     def expectFalse(self, seq_left, seq_right, partial):
         with self.subTest():
-            self.assertFalse(sum_is_sticky(seq_left, seq_right, partial))
+            self.assertFalse(sum_is_sticky(seq_left.three_prime_end(), seq_right.five_prime_end(), partial))
 
 
 class MultiTestPartialSticky(TestPartialSticky):

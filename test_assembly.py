@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from Bio.Restriction import AatII, AjiI, AgeI, EcoRV, ZraI, SalI
+from Bio.Restriction import AatII, AjiI, AgeI, EcoRV, ZraI, SalI, EcoRI, RgaI
 from pydna.amplify import pcr
 from pydna.dseq import Dseq
 from pydna.readers import read
@@ -865,4 +865,21 @@ def test_fragments_only_once():
     for a in asm.get_circular_assemblies():
         nodes_used = [f[0] for f in assembly.edge_representation2subfragment_representation(a, True)]
         assert len(nodes_used) == len(set(nodes_used))
+
+def test_end_from_cutsite():
+
+    seqs = (
+        Dseq('AAAGAATTCAAA', circular=True),
+        Dseq('CCGCGATCGCCC', circular=True),
+        Dseq('AAGATATCAA', circular=True)
+    )
+    enzymes = (EcoRI, RgaI, EcoRV)
+    expected_results = (("5'", 'aatt'), ("3'", 'at'), ('blunt', ''))
+
+    for seq, enz, res in zip(seqs, enzymes, expected_results):
+        for shift in range(len(seqs)):
+            seq_shifted = seq.shifted(shift)
+            cut = seq_shifted.get_cutsites(enz)[0]
+            assert assembly.end_from_cutsite(cut, seq_shifted) == res
+
 

@@ -11,6 +11,36 @@ import itertools as _itertools
 from Bio.SeqFeature import SimpleLocation, Location
 from dna_functions import sum_is_sticky
 from Bio.Seq import reverse_complement
+from Bio.Restriction.Restriction import RestrictionBatch, AbstractCut
+
+def end_from_cutsite(cutsite: tuple[tuple[int,int],AbstractCut], seq: _Dseq):
+    if cutsite is None:
+        raise ValueError('None is not supported')
+    cut_watson, cut_crick = cutsite[0]
+    enz = cutsite[1]
+    if enz.ovhg < 0:
+        # TODO check the edge in circular
+        return "5'", str(seq[cut_watson:cut_crick].reverse_complement()).lower()
+    elif enz.ovhg > 0:
+        return "3'", str(seq[cut_crick:cut_watson].reverse_complement()).lower()
+    return 'blunt', ''
+
+def restriction_ligation_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=RestrictionBatch):
+    """Find overlaps. Like in stiky and gibson, the order matters"""
+    cuts_x = seqx.seq.get_cutsites(*enzymes)
+    cuts_y = seqy.seq.get_cutsites(*enzymes)
+    matches = list()
+    for cut_x, cut_y in _itertools.product(cuts_x, cuts_y):
+        overlap = sum_is_sticky(
+            end_from_cutsite(cut_x, seqx.seq),
+            end_from_cutsite(cut_y, seqy.seq)
+        )
+        if overlap:
+            left_x = cut_x[0][0] if cut_x[1].ovhg < 0 else cut_x[0][1]
+            left_y = cut_y[0][0] if cut_y[1].ovhg < 0 else cut_y[0][1]
+            matches.append((left_x, left_y, overlap))
+    return matches
+
 
 def common_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
     return common_sub_strings_str(str(seqx.seq).upper(), str(seqy.seq).upper(), limit)
@@ -21,12 +51,15 @@ def terminal_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
 def gibson_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
     """
     The order matters, we want alignments like:
+    Alignment:
     oooo------xxxx
               xxxx------oooo
+    Product: oooo------xxxx------oooo
+
     Not like:
               oooo------xxxx
     xxxx------oooo
-
+    Product (unwanted): oooo
     """
     stringx = str(seqx.seq).upper()
     stringy = str(seqy.seq).upper()
@@ -38,7 +71,7 @@ def gibson_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
 
 def sticky_end_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=0):
     """For now, if limit 0 / False only full overlaps are considered."""
-    overlap = sum_is_sticky(seqx.seq, seqy.seq, limit )
+    overlap = sum_is_sticky(seqx.seq.three_prime_end(), seqy.seq.five_prime_end(), limit )
     if overlap:
         return [(len(seqx)-overlap, 0, overlap)]
     return []
