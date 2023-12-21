@@ -152,7 +152,7 @@ def assembly2str(assembly):
 def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragments_only_once=True):
     """Function used to filter paths returned from the graph, see conditions tested below.
     """
-
+    print(assembly2str(assembly), end=' ')
     if is_circular is None:
         return False
 
@@ -161,6 +161,7 @@ def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragm
         return False
 
     if use_all_fragments and len(fragments) != len(set(flatten(map(abs, e[:2]) for e in assembly))):
+        print('use all')
         return False
 
     # Here we check whether subsequent pairs of fragments are compatible, for instance:
@@ -186,6 +187,7 @@ def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragm
     if is_circular:
         # In a circular assembly, first and last fragment must be the same
         if assembly[0][0] != assembly[-1][1]:
+            print('not circular')
             return False
         edge_pairs = zip(assembly, assembly[1:] + assembly[:1])
     else:
@@ -193,12 +195,16 @@ def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragm
 
     for (u1, v1, _, start_location), (u2, v2, end_location, _) in edge_pairs:
         # Incompatible as described in figure above
-        if start_location.parts[-1].end >= end_location.parts[0].end:
+        fragment = fragments[abs(v1)-1]
+        if not fragment.circular and start_location.parts[-1].end >= end_location.parts[0].end:
+            print('location beyond')
+            print(v1, u2)
             return False
 
     if fragments_only_once:
         nodes_used = [f[0] for f in edge_representation2subfragment_representation(assembly, is_circular)]
         if len(nodes_used) != len(set(map(abs,nodes_used))):
+            print('fragments only once')
             return False
 
     return True

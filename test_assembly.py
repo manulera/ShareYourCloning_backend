@@ -882,4 +882,29 @@ def test_end_from_cutsite():
             cut = seq_shifted.get_cutsites(enz)[0]
             assert assembly.end_from_cutsite(cut, seq_shifted) == res
 
+def test_restriction_ligation_assembly():
+    # TODO test partial overlap as well
+    # TODO think of topology requirements for inputs / this should work linearising a circle
+    # even if the final product is not a circle
+    # TODO: when validating an assembly, if the fragment is circular, it should not be rejected on
+    # test of position of overlap of one after the other, like in the is_circular thing.
 
+    seq_pairs = (
+        (Dseqrecord('AAAGAATTCAAA'), Dseqrecord('CCCCGAATTCCCC')),
+        (Dseqrecord('AAAGCGATCGCAAA'), Dseqrecord('CCCCGCGATCGCCCC'))
+        )
+    enzymes = [EcoRI, RgaI]
+    for (a, b), enz in zip(seq_pairs, enzymes):
+        a1, a2 = a.cut([enz])
+        b1, b2 = b.cut([enz])
+
+        products = [
+            a1 + b2,
+            a1 + b1.reverse_complement(),
+            b1 + a2,
+            b1 + a1.reverse_complement()
+        ]
+
+        algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [enz])
+        f = assembly.Assembly([a, b], algorithm=algo, use_fragment_order=False)
+        assert products == f.assemble_linear()
