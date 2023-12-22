@@ -13,17 +13,24 @@ from dna_functions import sum_is_sticky
 from Bio.Seq import reverse_complement
 from Bio.Restriction.Restriction import RestrictionBatch, AbstractCut
 
-def end_from_cutsite(cutsite: tuple[tuple[int,int],AbstractCut], seq: _Dseq):
+def ends_from_cutsite(cutsite: tuple[tuple[int,int],AbstractCut], seq: _Dseq):
     if cutsite is None:
         raise ValueError('None is not supported')
     cut_watson, cut_crick = cutsite[0]
     enz = cutsite[1]
     if enz.ovhg < 0:
         # TODO check the edge in circular
-        return "5'", str(seq[cut_watson:cut_crick].reverse_complement()).lower()
+        return (
+            ("5'", str(seq[cut_watson:cut_crick].reverse_complement()).lower()),
+            ("5'", str(seq[cut_watson:cut_crick]).lower()),
+        )
     elif enz.ovhg > 0:
-        return "3'", str(seq[cut_crick:cut_watson].reverse_complement()).lower()
-    return 'blunt', ''
+        return (
+            ("3'", str(seq[cut_crick:cut_watson]).lower()),
+            ("3'", str(seq[cut_crick:cut_watson].reverse_complement()).lower()),
+        )
+
+    return ('blunt', ''), ('blunt', '')
 
 def restriction_ligation_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=RestrictionBatch):
     """Find overlaps. Like in stiky and gibson, the order matters"""
@@ -32,8 +39,8 @@ def restriction_ligation_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=R
     matches = list()
     for cut_x, cut_y in _itertools.product(cuts_x, cuts_y):
         overlap = sum_is_sticky(
-            end_from_cutsite(cut_x, seqx.seq),
-            end_from_cutsite(cut_y, seqy.seq)
+            ends_from_cutsite(cut_x, seqx.seq)[0],
+            ends_from_cutsite(cut_y, seqy.seq)[1]
         )
         if overlap:
             left_x = cut_x[0][0] if cut_x[1].ovhg < 0 else cut_x[0][1]
@@ -152,7 +159,6 @@ def assembly2str(assembly):
 def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragments_only_once=True):
     """Function used to filter paths returned from the graph, see conditions tested below.
     """
-    print(assembly2str(assembly), end=' ')
     if is_circular is None:
         return False
 
@@ -161,7 +167,6 @@ def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragm
         return False
 
     if use_all_fragments and len(fragments) != len(set(flatten(map(abs, e[:2]) for e in assembly))):
-        print('use all')
         return False
 
     # Here we check whether subsequent pairs of fragments are compatible, for instance:
@@ -187,7 +192,6 @@ def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragm
     if is_circular:
         # In a circular assembly, first and last fragment must be the same
         if assembly[0][0] != assembly[-1][1]:
-            print('not circular')
             return False
         edge_pairs = zip(assembly, assembly[1:] + assembly[:1])
     else:
@@ -197,14 +201,11 @@ def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragm
         # Incompatible as described in figure above
         fragment = fragments[abs(v1)-1]
         if not fragment.circular and start_location.parts[-1].end >= end_location.parts[0].end:
-            print('location beyond')
-            print(v1, u2)
             return False
 
     if fragments_only_once:
         nodes_used = [f[0] for f in edge_representation2subfragment_representation(assembly, is_circular)]
         if len(nodes_used) != len(set(map(abs,nodes_used))):
-            print('fragments only once')
             return False
 
     return True
@@ -259,25 +260,48 @@ def edge_representation2subfragment_representation(assembly, is_circular):
 
     return subfragment_representation
 
-def get_assembly_subfragments(fragment, subfragment_representation):
+def get_assembly_subfragments(fragments: list[_Dseqrecord], subfragment_representation):
     """From the fragment representation returned by edge_representation2subfragment_representation, get the subfragments that are joined together.
 
         Subfragments are the slices of the fragments that are joined together
 
         For example:
         ```
-            -- A --
-        cccccgtatcgtgtcccccc
-            -- B --
-            acatcgtgtactgtcatattc
+          --A--
+        TACGTAAT
+          --B--
+         TCGTAACGA
+
+        Gives: TACGTAA / CGTAACGA
         ```
+        To reproduce:
+        ```
+        a = Dseqrecord('TACGTAAT')
+        b = Dseqrecord('TCGTAACGA')
+        f = Assembly([a, b], limit=5)
+        a0 = f.get_linear_assemblies()[0]
+        print(assembly2str(a0))
+        a0_subfragment_rep =edge_representation2subfragment_representation(a0, False)
+        for f in get_assembly_subfragments([a, b], a0_subfragment_rep):
+            print(f.seq)
+
+        # prints TACGTAA and CGTAACGA
+        ```
+
         Subfragments: `cccccgtatcgtgt`, `atcgtgtactgtcatattc`
     """
     subfragments = list()
     for node, start_location, end_location in subfragment_representation:
-        seq = fragment[node-1] if node > 0 else fragment[-node-1].reverse_complement()
+        seq = fragments[node-1] if node > 0 else fragments[-node-1].reverse_complement()
         start = 0 if start_location is None else start_location.parts[0].start
         end = None if end_location is None else end_location.parts[-1].end
+        # Special case, some of it could be handled by better Dseqrecord slicing in the future
+        if seq.circular and start_location == end_location:
+            # This could be definitely be done better, but for now it works:
+            dummy_cut = ((start, end), type('DynamicClass', (), {'ovhg': start-end})())
+            open_seq = seq.apply_cut(dummy_cut, dummy_cut)
+            subfragments.append(_Dseqrecord(fill_dseq(open_seq.seq), features=open_seq.features))
+            continue
         subfragments.append(seq[start:end])
     return subfragments
 
@@ -319,7 +343,7 @@ def circular_permutation_min_abs(lst):
     min_abs_index = min(range(len(lst)), key=lambda i: abs(lst[i]))
     return lst[min_abs_index:] + lst[:min_abs_index]
 
-def add_edges_from_match(match, index_first, index_secnd, first, secnd, graph: _nx.MultiDiGraph):
+def add_edges_from_match(match, index_first, index_secnd, first: _Dseqrecord, secnd: _Dseqrecord, graph: _nx.MultiDiGraph):
     """Add edges to the graph from a match returned by an `algorithm` function (see pydna.common_substrings).
 
     TODO: this is now outdated, and combinations are handled differently.
@@ -411,6 +435,7 @@ def add_edges_from_match(match, index_first, index_secnd, first, secnd, graph: _
         (index_first, index_secnd, locs),
         (-index_secnd, -index_first, rc_locs[::-1]),
     )
+
     for u, v, l in combinations:
         graph.add_edge(u, v, f'{u}{l[0]}:{v}{l[1]}', locations=l)
 
@@ -582,6 +607,29 @@ class Assembly:
         assemblies = sum(map(self.cycle2circular_assemblies, sorted_cycles),[])
         return [a for a in assemblies if assembly_is_valid(self.fragments, a, True, self.use_all_fragments)]
 
+    def format_insertion_assembly(self, assembly):
+        edge_pair_index = list()
+
+        for i, ((u1, v1, _, start_location), (u2, v2, end_location, _)) in enumerate(zip(assembly, assembly[1:] + assembly[:1])):
+            fragment = self.fragments[abs(v1)-1]
+            if not fragment.circular and (start_location.parts[-1].start > end_location.parts[0].end or start_location == end_location):
+                edge_pair_index.append(i)
+
+        if len(edge_pair_index) != 1:
+            return None
+
+        shift_by = len(assembly) - edge_pair_index[0] - 1
+        return assembly[shift_by:] + assembly[:shift_by]
+
+    def get_insertion_assemblies(self):
+        # We find cycles first
+        assemblies = sum(map(self.cycle2circular_assemblies, _nx.cycles.simple_cycles(self.G)),[])
+        # We select those that contain exactly only one suitable edge
+        assemblies = [b for a in assemblies if (b := self.format_insertion_assembly(a)) is not None]
+        # First fragment should be in the + orientation
+        assemblies = list(filter(lambda x: x[0][0] > 0, assemblies))
+        return [a for a in assemblies if assembly_is_valid(self.fragments, a, False, self.use_all_fragments, False)]
+
     def assemble_linear(self):
         """Assemble linear constructs, from assemblies returned by self.get_linear_assemblies."""
         assemblies = self.get_linear_assemblies()
@@ -591,6 +639,11 @@ class Assembly:
         """Assemble circular constructs, from assemblies returned by self.get_circular_assemblies."""
         assemblies = self.get_circular_assemblies()
         return [assemble(self.fragments, a, True) for a in assemblies]
+
+    def assemble_insertion(self):
+        """Assemble insertion constructs, from assemblies returned by self.get_insertion_assemblies."""
+        assemblies = self.get_insertion_assemblies()
+        return [assemble(self.fragments, a, False) for a in assemblies]
 
     def __repr__(self):
         # https://pyformat.info

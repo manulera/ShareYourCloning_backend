@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from Bio.Restriction import AatII, AjiI, AgeI, EcoRV, ZraI, SalI, EcoRI, RgaI
+from Bio.Restriction import AatII, AjiI, AgeI, EcoRV, ZraI, SalI, EcoRI, RgaI, BsaI, BsrI
 from pydna.amplify import pcr
 from pydna.dseq import Dseq
 from pydna.readers import read
@@ -672,7 +672,7 @@ def test_pYPK7_TDH3_GAL2_PGI1():
 
     z = assembly.Assembly((pYPKp7_AatII, pMEC1142), limit=300)
 
-    assert z.assemble_circular()[1].cseguid() == "eDYovOVEKFIbc7REPlTsnScycQY"
+    assert "eDYovOVEKFIbc7REPlTsnScycQY" in map(lambda x: x.cseguid(), z.assemble_circular())
 
 
 def test_marker_replacement_on_plasmid():
@@ -866,7 +866,7 @@ def test_fragments_only_once():
         nodes_used = [f[0] for f in assembly.edge_representation2subfragment_representation(a, True)]
         assert len(nodes_used) == len(set(nodes_used))
 
-def test_end_from_cutsite():
+def test_ends_from_cutsite():
 
     seqs = (
         Dseq('AAAGAATTCAAA', circular=True),
@@ -880,7 +880,20 @@ def test_end_from_cutsite():
         for shift in range(len(seqs)):
             seq_shifted = seq.shifted(shift)
             cut = seq_shifted.get_cutsites(enz)[0]
-            assert assembly.end_from_cutsite(cut, seq_shifted) == res
+            assert assembly.ends_from_cutsite(cut, seq_shifted) == (res, res)
+
+    a = Dseq('AAGGTCTCAacccAA', circular=False)
+
+    cut = a.get_cutsites([BsaI])[0]
+    a1,a2 = a.cut([BsaI])
+    assert assembly.ends_from_cutsite(cut, a) == (a1.three_prime_end(), a2.five_prime_end())
+
+    a = Dseq('ACcTGatacACTGGATactA', circular=False)
+
+    cut = a.get_cutsites([BsrI])[0]
+    a1,a2 = a.cut([BsrI])
+    assert assembly.ends_from_cutsite(cut, a) == (a1.three_prime_end(), a2.five_prime_end())
+
 
 def test_restriction_ligation_assembly():
     # TODO test partial overlap as well
@@ -908,3 +921,143 @@ def test_restriction_ligation_assembly():
         algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [enz])
         f = assembly.Assembly([a, b], algorithm=algo, use_fragment_order=False)
         assert products == f.assemble_linear()
+
+    # Insertion in a vector
+    fragments = [
+        Dseqrecord('GAATTCaaaGAATTC'),
+        Dseqrecord('CCCCGAATTCCCC', circular=True)
+    ]
+
+    algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [EcoRI])
+    f = assembly.Assembly(fragments, algorithm=algo, use_fragment_order=False)
+    a1, a2, a3 = fragments[0].cut([EcoRI])
+    b1, = fragments[1].cut([EcoRI])
+    result_cseguids = [
+            (b1.seq + a2.seq).looped().cseguid(),
+            (b1.seq + a2.seq.reverse_complement()).looped().cseguid(),
+        ]
+
+    assert result_cseguids == [x.cseguid() for x in f.assemble_circular()]
+
+def test_golden_gate():
+
+    # Circular assembly
+    insert1 = Dseqrecord('GGTCTCAattaAAAAAttaaAGAGACC')
+    insert2 = Dseqrecord('GGTCTCAttaaCCCCCatatAGAGACC')
+    insert3 = Dseqrecord('GGTCTCAatatGGGGGccggAGAGACC')
+
+    vector = Dseqrecord('TTTTattaAGAGACCTTTTTGGTCTCAccggTTTT', circular=True)
+
+    i1_pre, i1, i1_post = insert1.cut(BsaI)
+    _, i2, _ = insert2.cut(BsaI)
+    i3_pre, i3, i3_post = insert3.cut(BsaI)
+    _ , v = vector.cut(BsaI)
+
+    sum_output = (i1 + i2 + i3 + v).looped()
+    algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [BsaI])
+    asm = assembly.Assembly([insert1, insert2, insert3, vector], use_fragment_order=False, limit=10, algorithm=algo)
+    assembly_output = asm.assemble_circular()
+    assert len(assembly_output) == 1
+    assert assembly_output[0].cseguid() == sum_output.cseguid()
+
+    # Linear assembly (all four possibilities)
+    sum_output = (i1 + i2 + i3)
+    algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [BsaI])
+    asm = assembly.Assembly([insert1, insert2, insert3], use_fragment_order=False, limit=10, algorithm=algo, use_all_fragments=True)
+    results = [
+        i1_pre + i1 + i2 + i3 + i3_post,
+        i1_pre + i1 + i2 + i3_pre.reverse_complement(),
+        i3_pre + i2.reverse_complement() + i1.reverse_complement() + i1_pre.reverse_complement(),
+        i3_pre + i2.reverse_complement() + i1_post
+    ]
+
+    for a in asm.get_linear_assemblies():
+        print(assembly.assembly2str(a))
+        print(assembly.assemble([insert1, insert2, insert3], a, False).seq)
+    for result, product in zip(results, asm.assemble_linear()):
+        assert result.seq == product.seq
+
+
+def test_insertion_assembly():
+
+    # Insertion of linear sequence into linear sequence (like
+    # homologous recombination of PCR product with homology arms in genome)
+    a = Dseqrecord('1CGTACGCACAxxxxCGTACGCACAC2')
+    b = Dseqrecord('3CGTACGCACAyyyyCGTACGCACAT4')
+
+    f = assembly.Assembly([a, b],  use_fragment_order=False, limit=10)
+
+    # All possibilities, including the single insertions
+    results = [
+        '1CGTACGCACAyyyyCGTACGCACAxxxxCGTACGCACAC2',
+        '1CGTACGCACAyyyyCGTACGCACAC2',
+        '3CGTACGCACAxxxxCGTACGCACAyyyyCGTACGCACAT4',
+        '1CGTACGCACAxxxxCGTACGCACAyyyyCGTACGCACAC2',
+        '3CGTACGCACAxxxxCGTACGCACAT4',
+        '3CGTACGCACAyyyyCGTACGCACAxxxxCGTACGCACAT4',
+    ]
+    for assem, result in zip(f.get_insertion_assemblies(), results):
+        assert result == str(assembly.assemble([a, b], assem, False).seq)
+
+    # TODO: debatable whether this kind of homologous recombination should happen.
+
+    a = Dseqrecord('1CGTACGCACAxxxxC2')
+    b = Dseqrecord('3CGTACGCACAyyyyCGTACGCACAT4')
+    f = assembly.Assembly([a, b],  use_fragment_order=False, limit=10)
+    results = ['1CGTACGCACAyyyyCGTACGCACAxxxxC2']
+    for assem, result in zip(f.get_insertion_assemblies(), results):
+        assert result == str(assembly.assemble([a, b], assem, False).seq)
+
+    a = Dseqrecord('1CGTACGCACAxxxxC2')
+    b = Dseqrecord('3CGTACGCACAyyyyT4')
+    f = assembly.Assembly([a, b],  use_fragment_order=False, limit=10)
+    assert len(f.get_insertion_assemblies()) == 0
+
+    # Does not work for circular molecules
+    a = Dseqrecord('1CGTACGCACAxxxxCGTACGCACAC2', circular=True)
+    b = Dseqrecord('3CGTACGCACAyyyyCGTACGCACAT4', circular=True)
+    assert assembly.Assembly([a, b],  use_fragment_order=False, limit=10).get_insertion_assemblies() == []
+
+    a = Dseqrecord('1CGTACGCACAxxxxC2', circular=True)
+    b = Dseqrecord('3CGTACGCACAyyyyCGTACGCACAT4', circular=True)
+    assert assembly.Assembly([a, b],  use_fragment_order=False, limit=10).get_insertion_assemblies() == []
+
+    a = Dseqrecord('1CGTACGCACAxxxxC2', circular=True)
+    b = Dseqrecord('3CGTACGCACAyyyyT4', circular=True)
+    assert assembly.Assembly([a, b],  use_fragment_order=False, limit=10).get_insertion_assemblies() == []
+
+
+def circles_assembly():
+    a = Dseqrecord('xxxACGTAyyy', circular=True)
+    b = Dseqrecord('bbACGTAbb', circular=True)
+
+    f = assembly.Assembly([a, b],  use_fragment_order=False, limit=5)
+    circular_assemblies = f.get_circular_assemblies()
+    assert len(circular_assemblies) == 1
+    assert str(assembly.assemble([a, b], circular_assemblies[0], True)) == 'ACGTAyyyxxxACGTAbbbb'
+
+
+    # When more than two are provided, sequential homologous recombinations are returned
+    a = Dseqrecord('aaACGTAACGTAaa', circular=True)
+    b = Dseqrecord('ccACGTAACGTAcc', circular=True)
+    c = Dseqrecord('ggACGTAACGTAgg', circular=True)
+
+    f = assembly.Assembly([a, b, c],  use_fragment_order=False, limit=10, use_all_fragments=True)
+    # All possibilities, including the single insertions
+    results = [
+        'ACGTAACGTAaaaaACGTAACGTAccccACGTAACGTAgggg',
+        'ACGTAACGTAaaaaACGTAACGTAggggACGTAACGTAcccc',
+    ]
+    for assem, result in zip(f.get_insertion_assemblies(), results):
+        assert result == str(assembly.assemble([a, b, c], assem, False).seq)
+
+
+    # TODO: debatable whether this kind of homologous recombination should happen, same as above
+    a = Dseqrecord('xxxACGTAyyy', circular=True)
+    b = Dseqrecord('bbACGTAbbACGTAbb', circular=False)
+
+    f = assembly.Assembly([a, b],  use_fragment_order=False, limit=5)
+    assert len(circular_assemblies) == 1
+    assert str(assembly.assemble([a, b], circular_assemblies[0], True)) == 'ACGTAyyyxxxACGTAbb'
+
+
