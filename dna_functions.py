@@ -52,14 +52,6 @@ def format_sequence_genbank(seq: Dseqrecord) -> SequenceEntity:
     return SequenceEntity(sequence=gb_seq)
 
 
-def read_primer_from_json(primer: PrimerModel) -> Primer:
-    return Primer(
-        primer.sequence,
-        id=str(primer.id),
-        name=primer.name,
-    )
-
-
 def read_dsrecord_from_json(seq: SequenceEntity) -> Dseqrecord:
     initial_dseqrecord: Dseqrecord = pydna_parse(seq.sequence.file_content)[0]
     if seq.sequence.overhang_watson_3prime == 0 and seq.sequence.overhang_crick_3prime == 0:

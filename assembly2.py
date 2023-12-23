@@ -58,12 +58,13 @@ def terminal_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
 def gibson_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
     """
     The order matters, we want alignments like:
-    Alignment:
+
     oooo------xxxx
               xxxx------oooo
     Product: oooo------xxxx------oooo
 
     Not like:
+
               oooo------xxxx
     xxxx------oooo
     Product (unwanted): oooo
