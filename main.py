@@ -304,22 +304,22 @@ async def homologous_recombination(
     sequences: conlist(SequenceEntity, min_length=2, max_length=2),
     minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.')
 ):
-    template = read_dsrecord_from_json(sequences[0])
-    insert = read_dsrecord_from_json(sequences[1])
+    # source.input contains the ids of the sequences in the order template, insert
+    template, insert = [next((read_dsrecord_from_json(seq) for seq in sequences if seq.id == id), None) for id in source.input]
+
+    if template.circular or insert.circular:
+        # TODO: add support for the other cases
+        raise HTTPException(400, 'The template and the insert must be linear.')
 
     # If an assembly is provided, we ignore minimal_homology
     if source.assembly is not None:
         minimal_homology = source.minimal_overlap()
 
-    asm = Assembly((template, insert, template), limit=minimal_homology, use_all_fragments=True)
+    asm = Assembly((template, insert), limit=minimal_homology, use_all_fragments=True)
 
     # The condition is that the first and last fragments are the template
-    possible_assemblies = [a for a in asm.get_linear_assemblies() if a[0][0] == 1 and a[-1][1] == 3]
-
-    # Replace the index of last fragment (3) by 1, since it is repeated
-    possible_assemblies = [(a[0], (2, 1, a[1][2], a[1][3]), ) for a in possible_assemblies]
+    possible_assemblies = [a for a in asm.get_insertion_assemblies() if a[0][0] == 1]
     out_sources = [HomologousRecombinationSource.from_assembly(id= source.id, input=source.input, assembly=a, circular=False) for a in possible_assemblies]
-
 
     # If a specific assembly is requested
     if source.assembly is not None:
