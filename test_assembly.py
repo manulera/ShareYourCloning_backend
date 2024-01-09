@@ -920,7 +920,7 @@ def test_restriction_ligation_assembly():
 
         algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [enz])
         f = assembly.Assembly([a, b], algorithm=algo, use_fragment_order=False)
-        assert products == f.assemble_linear()
+        assert sorted(products) == sorted(f.assemble_linear())
 
     # Insertion in a vector
     fragments = [
@@ -971,9 +971,6 @@ def test_golden_gate():
         i3_pre + i2.reverse_complement() + i1_post
     ]
 
-    for a in asm.get_linear_assemblies():
-        print(assembly.assembly2str(a))
-        print(assembly.assemble([insert1, insert2, insert3], a, False).seq)
     for result, product in zip(results, asm.assemble_linear()):
         assert result.seq == product.seq
 
@@ -996,8 +993,9 @@ def test_insertion_assembly():
         '3CGTACGCACAxxxxCGTACGCACAT4',
         '3CGTACGCACAyyyyCGTACGCACAxxxxCGTACGCACAT4',
     ]
-    for assem, result in zip(f.get_insertion_assemblies(), results):
-        assert result == str(assembly.assemble([a, b], assem, False).seq)
+
+    assembly_products = [str(assembly.assemble([a, b], assem, False).seq) for assem in f.get_insertion_assemblies()]
+    assert sorted(assembly_products) == sorted(results)
 
     # TODO: debatable whether this kind of homologous recombination should happen.
 

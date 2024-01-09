@@ -138,8 +138,8 @@ def remove_subassemblies(assemblies):
     """Filter out subassemblies, i.e. assemblies that are contained within another assembly.
 
     For example:
-        [(1, 2, '1[8:14](+):2[1:7](+)'), (2, 3, '2[10:17](+):3[1:8](+)')]
-        [(1, 2, '1[8:14](+):2[1:7](+)')]
+        [(1, 2, '1[8:14]:2[1:7]'), (2, 3, '2[10:17]:3[1:8]')]
+        [(1, 2, '1[8:14]:2[1:7]')]
     The second one is a subassembly of the first one.
     """
 
@@ -155,6 +155,14 @@ def remove_subassemblies(assemblies):
     return filtered_assemblies
 
 def assembly2str(assembly):
+    """Convert an assembly to a string representation, for example:
+    ((1, 2, [8:14], [1:7]),(2, 3, [10:17], [1:8]))
+    becomes:
+    ('1[8:14]:2[1:7]', '2[10:17]:3[1:8]')
+
+    The reason for this is that by default, a feature '[8:14]' when present in a tuple
+    is printed to the console as `SimpleLocation(ExactPosition(8), ExactPosition(14), strand=1)` (very long).
+    """
     return str(tuple(f'{u}{lu}:{v}{lv}' for u, v, lu, lv in assembly))
 
 def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragments_only_once=True):
@@ -344,101 +352,6 @@ def circular_permutation_min_abs(lst):
     min_abs_index = min(range(len(lst)), key=lambda i: abs(lst[i]))
     return lst[min_abs_index:] + lst[:min_abs_index]
 
-def add_edges_from_match(match, index_first, index_secnd, first: _Dseqrecord, secnd: _Dseqrecord, graph: _nx.MultiDiGraph):
-    """Add edges to the graph from a match returned by an `algorithm` function (see pydna.common_substrings).
-
-    TODO: this is now outdated, and combinations are handled differently.
-
-    The edges added to the graph have the following format: (index_first, index_secnd, key, locations), where:
-    - index_first and index_secnd are the indices of the fragments in the input list of fragments.
-      The index is positive if the fragment is in the forward orientation, negative if it is in the reverse orientation.
-    - key is a string that represents the location of the overlap. In the format: 'u[start:end](strand):v[start:end](strand)'.
-    - locations is a list of two FeatureLocation objects, representing the location of the overlap in the first and second fragment.
-
-    All possible combinations of fragments and orientations are added to the graph, see the example below where fragments 1 and 2 share
-    an overlap represented by ===. There are two possible fragments recombined, first part of 1 and second part of 2, and first part of 2
-    with second part of 1. Edges representing the joining of reverse complements of both fragments are also added.
-
-    ```
-
-    1 ---         ---
-          \\     /
-           =====
-          /     \\
-    2 ---         ---
-    ```
-
-    ```
-    example_fragments = (
-        Dseqrecord("AacgatCAtgctcc", name="a"),
-        Dseqrecord("TtgctccTAAattctgc", name="b"),
-    )
-
-    graph = nx.MultiDiGraph()
-    # Nodes represent these fragments in their current orientation
-    graph.add_nodes_from([1, 2])
-
-    matches = common_sub_strings(str(example_fragments[0].seq).upper(), str(example_fragments[1].seq).upper(), 5)
-
-    add_edges_from_match(matches[0], 1, 2, example_fragments[0], example_fragments[1], graph)
-
-    for edge in graph.edges:
-        u, v, key = edge
-        print('u:', u)
-        print('v:', v)
-        print('key:', key)
-        locations = graph.get_edge_data(u, v, key)['locations']
-        print('locations: ',locations)
-        print()
-    ```
-
-    Prints this:
-    ```
-    u: 1
-    v: 2
-    key: 1[8:14](+):2[1:7](+)
-    locations:  [SimpleLocation(ExactPosition(8), ExactPosition(14), strand=1), SimpleLocation(ExactPosition(1), ExactPosition(7), strand=1)]
-
-    u: 2
-    v: 1
-    key: 2[1:7](+):1[8:14](+)
-    locations:  [SimpleLocation(ExactPosition(1), ExactPosition(7), strand=1), SimpleLocation(ExactPosition(8), ExactPosition(14), strand=1)]
-
-    u: -1
-    v: -2
-    key: -1[0:6](-):-2[10:16](-)
-    locations:  [SimpleLocation(ExactPosition(0), ExactPosition(6), strand=-1), SimpleLocation(ExactPosition(10), ExactPosition(16), strand=-1)]
-
-    u: -2
-    v: -1
-    key: -2[10:16](-):-1[0:6](-)
-    locations:  [SimpleLocation(ExactPosition(10), ExactPosition(16), strand=-1), SimpleLocation(ExactPosition(0), ExactPosition(6), strand=-1)]
-    ```
-
-
-    """
-    x_start, y_start, length = match
-    # We use shift_location with 0 to wrap origin-spanning features
-    locs = [_shift_location(SimpleLocation(x_start, x_start + length, 1), 0, len(first)),
-            _shift_location(SimpleLocation(y_start, y_start + length, 1), 0, len(secnd))]
-    rc_locs = [locs[0]._flip(len(first)), locs[1]._flip(len(secnd))]
-
-    # For an homology-like assembly, we could do as below, and not do the other combinations,
-    # but for a non-symmetrical assembly, such as a sticky end assembly, 1 -> 2 is not the same as 2 -> 1.
-    # combinations = (
-    #         (index_first, index_secnd, locs),
-    #         (index_secnd, index_first, locs[::-1]),
-    #         (-index_first, -index_secnd, rc_locs),
-    #         (-index_secnd, -index_first, rc_locs[::-1]),
-    #     )
-
-    combinations = (
-        (index_first, index_secnd, locs),
-        (-index_secnd, -index_first, rc_locs[::-1]),
-    )
-
-    for u, v, l in combinations:
-        graph.add_edge(u, v, f'{u}{l[0]}:{v}{l[1]}', locations=l)
 
 class Assembly:
     """Assembly of a list of linear DNA fragments into linear or circular
@@ -458,18 +371,21 @@ class Assembly:
         'u[start:end](strand):v[start:end](strand)'.
         - Edges have a 'locations' attribute, which is a list of two FeatureLocation objects,
         representing the location of the overlap in the first and second fragment.
+        - You can think of an edge as a representation of the join of two fragments.
 
-    If fragment 1 and 2 share a subsequence of 6bp, [8:14](+) in fragment 1 and [1:7](+) in fragment 2,
+    If fragment 1 and 2 share a subsequence of 6bp, [8:14] in fragment 1 and [1:7] in fragment 2,
     there will be 4 edges representing that overlap in the graph, for all possible
     orientations of the fragments (see add_edges_from_match for details):
-    - `(1, 2, '1[8:14](+):2[1:7](+)')`
-    - `(2, 1, '2[1:7](+):1[8:14](+)')`
-    - `(-1, -2, '-1[0:6](-):-2[10:16](-)')`
-    - `(-2, -1, '-2[10:16](-):-1[0:6](-)')`
+    - `(1, 2, '1[8:14]:2[1:7]')`
+    - `(2, 1, '2[1:7]:1[8:14]')`
+    - `(-1, -2, '-1[0:6]:-2[10:16]')`
+    - `(-2, -1, '-2[10:16]:-1[0:6]')`
 
-    An assembly can be represented as a tuple of graph edges, like this:
-    - Linear: ((1, 2, '1[8:14](+):2[1:7](+)'), (2, 3, '2[10:17](+):3[1:8](+)'))
-    - Circular: ((1, 2, '1[8:14](+):2[1:7](+)'), (2, 3, '2[10:17](+):3[1:8](+)'), (3, 1, '3[12:17](+):1[1:6](+)'))
+    An assembly can be thought of as a tuple of graph edges, but instead of representing them with node indexes and keys, we represent them
+    as u, v, locu, locv, where u and v are the nodes connected by the edge, and locu and locv are the locations of the overlap in the first
+    and second fragment. Assemblies are then represented as:
+    - Linear: ((1, 2, [8:14], [1:7]), (2, 3, [10:17], [1:8]))
+    - Circular: ((1, 2, [8:14], [1:7]), (2, 3, [10:17], [1:8]), (3, 1, [12:17], [1:6]))
     Note that the first and last fragment are the same in a circular assembly.
 
     The following constrains are applied to remove duplicate assemblies:
@@ -498,52 +414,47 @@ class Assembly:
     Examples
     --------
 
-    from assembly2 import Assembly, example_fragments
+    from assembly2 import Assembly, example_fragments, assembly2str
+
     asm = Assembly(example_fragments, limit=5, use_fragment_order=False)
     print('Linear ===============')
     for assembly in asm.get_linear_assemblies():
-        print(' ', assembly)
+        print(' ', assembly2str(assembly))
     print('Circular =============')
     for assembly in asm.get_circular_assemblies():
-        print(' ', assembly)
+        print(' ', assembly2str(assembly))
 
     # Prints
     Linear ===============
-      ((1, 2, '1[8:14](+):2[1:7](+)'), (2, 3, '2[10:17](+):3[1:8](+)'))
-      ((2, 3, '2[10:17](+):3[1:8](+)'), (3, 1, '3[12:17](+):1[1:6](+)'))
-      ((3, 1, '3[12:17](+):1[1:6](+)'), (1, 2, '1[8:14](+):2[1:7](+)'))
-      ((1, 3, '1[1:6](+):3[12:17](+)'),)
-      ((2, 1, '2[1:7](+):1[8:14](+)'),)
-      ((3, 2, '3[1:8](+):2[10:17](+)'),)
+        ('1[8:14]:2[1:7]', '2[10:17]:3[1:8]')
+        ('2[10:17]:3[1:8]', '3[12:17]:1[1:6]')
+        ('3[12:17]:1[1:6]', '1[8:14]:2[1:7]')
+        ('1[1:6]:3[12:17]',)
+        ('2[1:7]:1[8:14]',)
+        ('3[1:8]:2[10:17]',)
     Circular =============
-      ((1, 2, '1[8:14](+):2[1:7](+)'), (2, 3, '2[10:17](+):3[1:8](+)'), (3, 1, '3[12:17](+):1[1:6](+)'))
+        ('1[8:14]:2[1:7]', '2[10:17]:3[1:8]', '3[12:17]:1[1:6]')
 
     """
 
     def __init__(self, frags: list[_Dseqrecord], limit=25, algorithm=common_sub_strings, use_fragment_order=True, use_all_fragments=False):
         # TODO: allow for the same fragment to be included more than once?
-        G = _nx.MultiDiGraph()
+        self.G = _nx.MultiDiGraph()
         # Add positive and negative nodes for forward and reverse fragments
-        G.add_nodes_from((i + 1, {'seq': f}) for (i, f) in enumerate(frags))
-        G.add_nodes_from((-(i + 1), {'seq': f.reverse_complement()}) for (i, f) in enumerate(frags))
+        self.G.add_nodes_from((i + 1, {'seq': f}) for (i, f) in enumerate(frags))
+        self.G.add_nodes_from((-(i + 1), {'seq': f.reverse_complement()}) for (i, f) in enumerate(frags))
 
         # Iterate over all possible combinations of fragments
-        edge_pairs = _itertools.combinations(filter(lambda x : x>0, G.nodes), 2)
-        for index_first, index_secnd in edge_pairs:
-            combinations = (
-                (index_first, index_secnd),
-                (index_secnd, index_first),
-                (index_first, -index_secnd),
-                (-index_secnd, index_first)
-            )
-            for u, v in combinations:
-                u_seq = G.nodes[u]['seq']
-                v_seq = G.nodes[v]['seq']
+        fragment_pairs = _itertools.combinations(filter(lambda x : x>0, self.G.nodes), 2)
+        for i, j in fragment_pairs:
+            # All the relative orientations of the fragments in the pair
+            for u, v in _itertools.product([i, -i], [j, -j]):
+                u_seq = self.G.nodes[u]['seq']
+                v_seq = self.G.nodes[v]['seq']
                 matches = algorithm(u_seq, v_seq, limit)
                 for match in matches:
-                    add_edges_from_match(match, u, v, u_seq, v_seq, G)
+                    self.add_edges_from_match(match, u, v, u_seq, v_seq)
 
-        self.G = G
         self.fragments = frags
         self.limit = limit
         self.algorithm = algorithm
@@ -552,6 +463,29 @@ class Assembly:
 
         return
 
+    def add_edges_from_match(self, match, u: int, v: int, first: _Dseqrecord, secnd: _Dseqrecord):
+        """Add edges to the graph from a match returned by an `algorithm` function (see pydna.common_substrings). For
+        format of edges (see documentation of the Assembly class).
+
+        Matches are directional, because not all `algorithm` functions return the same match for (u,v) and (v,u). For example,
+        homologous recombination does but sticky end ligation does not. The function returns two edges:
+        - Fragments in the orientation they were passed, with locations of the match (u, v, loc_u, loc_v)
+        - Reverse complement of the fragments with inverted order, with flipped locations (-v, -u, flip(loc_v), flip(loc_u))/
+
+        """
+        x_start, y_start, length = match
+        # We use shift_location with 0 to wrap origin-spanning features
+        locs = [_shift_location(SimpleLocation(x_start, x_start + length), 0, len(first)),
+                _shift_location(SimpleLocation(y_start, y_start + length), 0, len(secnd))]
+        rc_locs = [locs[0]._flip(len(first)), locs[1]._flip(len(secnd))]
+
+        combinations = (
+            (u, v, locs),
+            (-v, -u, rc_locs[::-1]),
+        )
+
+        for u, v, l in combinations:
+            self.G.add_edge(u, v, f'{u}{l[0]}:{v}{l[1]}', locations=l)
 
     def format_assembly_edge(self, assembly_edge):
         """Go from the (u, v, key) to the (u, v, locu, locv) format."""
@@ -668,13 +602,13 @@ class PCRAssembly(Assembly):
     def __init__(self, frags: tuple[_Dseqrecord, _Dseqrecord, _Dseqrecord], limit=25, algorithm=common_sub_strings):
 
         # TODO: allow for the same fragment to be included more than once?
-        G = _nx.MultiDiGraph()
+        self.G = _nx.MultiDiGraph()
         # Add positive and negative nodes for forward and reverse fragments
         forward_primer, template, reverse_primer = frags
-        G.add_node(1, seq=forward_primer)
-        G.add_node(2, seq=template)
-        G.add_node(-2, seq=template.reverse_complement())
-        G.add_node(-3, seq=reverse_primer.reverse_complement())
+        self.G.add_node(1, seq=forward_primer)
+        self.G.add_node(2, seq=template)
+        self.G.add_node(-2, seq=template.reverse_complement())
+        self.G.add_node(-3, seq=reverse_primer.reverse_complement())
 
         combinations = (
                 (1, 2),
@@ -683,8 +617,8 @@ class PCRAssembly(Assembly):
                 (-2, -3)
         )
         for u, v in combinations:
-            u_seq = G.nodes[u]['seq']
-            v_seq = G.nodes[v]['seq']
+            u_seq = self.G.nodes[u]['seq']
+            v_seq = self.G.nodes[v]['seq']
             matches = algorithm(u_seq, v_seq, limit)
             # For now we use the same algorithm function, and filter after those in which
             # the primer anneals until its 3'-most base, but a separate algorithm could be used.
@@ -693,13 +627,12 @@ class PCRAssembly(Assembly):
             elif v == -3:
                 matches = filter(lambda x: x[1] == 0, matches)
             for match in matches:
-                add_edges_from_match(match, u, v, u_seq, v_seq, G)
+                self.add_edges_from_match(match, u, v, u_seq, v_seq)
 
         # These two are constrained
         self.use_fragment_order=True
         self.use_all_fragments=True
 
-        self.G = G
         self.fragments = frags
         self.limit = limit
         self.algorithm = algorithm
