@@ -15,10 +15,10 @@ from Bio.SeqFeature import SimpleLocation, Location, CompoundLocation
 from pydna.utils import shift_location
 
 
-def sum_is_sticky(seq1: Dseq, seq2: Dseq, partial: bool=False) -> int:
+def sum_is_sticky(three_prime_end: tuple[str,str], five_prime_end: tuple[str,str], partial: bool=False) -> int:
     """Return true if the 3' end of seq1 and 5' end of seq2 ends are sticky and compatible for ligation."""
-    type_seq1, sticky_seq1 = seq1.three_prime_end()
-    type_seq2, sticky_seq2 = seq2.five_prime_end()
+    type_seq1, sticky_seq1 = three_prime_end
+    type_seq2, sticky_seq2 = five_prime_end
 
     if 'blunt' != type_seq2 and type_seq2 == type_seq1 and str(sticky_seq2) == str(reverse_complement(sticky_seq1)):
         return len(sticky_seq1)
@@ -50,14 +50,6 @@ def format_sequence_genbank(seq: Dseqrecord) -> SequenceEntity:
                              overhang_crick_3prime=seq.seq.ovhg,
                              overhang_watson_3prime=seq.seq.watson_ovhg())
     return SequenceEntity(sequence=gb_seq)
-
-
-def read_primer_from_json(primer: PrimerModel) -> Primer:
-    return Primer(
-        primer.sequence,
-        id=str(primer.id),
-        name=primer.name,
-    )
 
 
 def read_dsrecord_from_json(seq: SequenceEntity) -> Dseqrecord:
