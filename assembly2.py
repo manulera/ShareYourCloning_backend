@@ -165,6 +165,12 @@ def assembly2str(assembly):
     """
     return str(tuple(f'{u}{lu}:{v}{lv}' for u, v, lu, lv in assembly))
 
+def assembly2str_tuple(assembly):
+    """Convert an assembly to a string representation, like
+    ((1, 2, [8:14], [1:7]),(2, 3, [10:17], [1:8]))
+    """
+    return str(tuple((u, v, str(lu), str(lv)) for u, v, lu, lv in assembly))
+
 def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragments_only_once=True):
     """Function used to filter paths returned from the graph, see conditions tested below.
     """
@@ -370,7 +376,7 @@ class Assembly:
         - key is a string that represents the location of the overlap. In the format:
         'u[start:end](strand):v[start:end](strand)'.
         - Edges have a 'locations' attribute, which is a list of two FeatureLocation objects,
-        representing the location of the overlap in the first and second fragment.
+        representing the location of the overlap in the u and v fragment, respectively.
         - You can think of an edge as a representation of the join of two fragments.
 
     If fragment 1 and 2 share a subsequence of 6bp, [8:14] in fragment 1 and [1:7] in fragment 2,
