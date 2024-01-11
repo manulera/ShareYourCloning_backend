@@ -997,7 +997,8 @@ def test_insertion_assembly():
     assembly_products = [str(assembly.assemble([a, b], assem, False).seq) for assem in f.get_insertion_assemblies()]
     assert sorted(assembly_products) == sorted(results)
 
-    # TODO: debatable whether this kind of homologous recombination should happen.
+    # TODO: debatable whether this kind of homologous recombination should happen, or how
+    # the overlap restrictions should be applied.
 
     a = Dseqrecord('1CGTACGCACAxxxxC2')
     b = Dseqrecord('3CGTACGCACAyyyyCGTACGCACAT4')

@@ -401,7 +401,6 @@ class Assembly:
         - If use_fragment_order is False, the first fragment is always in the forward orientation.
         - If use_fragment_order is True, the first fragment is always the first fragment in the input list,
         in forward or reverse order, and the last one is the last fragment in the input list, in forward or reverse order.
-        This leads
 
     Parameters
     ----------
