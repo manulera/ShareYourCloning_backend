@@ -5,7 +5,9 @@ from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
 from pydantic_models import RepositoryIdSource, PCRSource, PrimerModel, \
-    RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource, UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource
+    RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource, \
+    UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource, \
+    RestrictionAndLigationSource
 from pydna.dseqrecord import Dseqrecord
 import unittest
 from pydna.dseq import Dseq
@@ -814,6 +816,29 @@ class GibsonAssemblyTest(unittest.TestCase):
         self.assertEqual(len(sequences), 2)
         self.assertEqual(str(sequences[0].seq), 'TTTTacgatAAtgctccCCCCtcatGGGGatata'.upper())
         self.assertEqual(str(sequences[1].seq), 'TTTTacgatAAtgctccCCCCatgaGGGGatata'.upper())
+
+
+class RestrictionAndLigationTest(unittest.TestCase):
+
+    def test_restriction_and_ligation(self):
+        fragments = [Dseqrecord('AAAGAATTCAAA'), Dseqrecord('CCCCGAATTCCCC')]
+        [format_sequence_genbank(f) for f in fragments]
+        json_fragments = [format_sequence_genbank(f) for f in fragments]
+        for i, f in enumerate(json_fragments):
+            f.id = i + 1
+
+        source = RestrictionAndLigationSource(
+            input=[1, 2, 3],
+            restriction_enzymes=['EcoRI'],
+        )
+
+        data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
+        response = client.post('/restriction_and_ligation', json=data, params={'minimal_homology': 4})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sequences']), 4)
+        self.assertEqual(len(payload['sources']), 4)
 
 
 if __name__ == "__main__":

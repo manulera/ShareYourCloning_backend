@@ -32,7 +32,7 @@ def ends_from_cutsite(cutsite: tuple[tuple[int,int],AbstractCut], seq: _Dseq):
 
     return ('blunt', ''), ('blunt', '')
 
-def restriction_ligation_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=RestrictionBatch):
+def restriction_ligation_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=RestrictionBatch, partial=False):
     """Find overlaps. Like in stiky and gibson, the order matters"""
     cuts_x = seqx.seq.get_cutsites(*enzymes)
     cuts_y = seqy.seq.get_cutsites(*enzymes)
@@ -40,7 +40,8 @@ def restriction_ligation_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=R
     for cut_x, cut_y in _itertools.product(cuts_x, cuts_y):
         overlap = sum_is_sticky(
             ends_from_cutsite(cut_x, seqx.seq)[0],
-            ends_from_cutsite(cut_y, seqy.seq)[1]
+            ends_from_cutsite(cut_y, seqy.seq)[1],
+            partial
         )
         if overlap:
             left_x = cut_x[0][0] if cut_x[1].ovhg < 0 else cut_x[0][1]

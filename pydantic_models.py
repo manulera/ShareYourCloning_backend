@@ -15,6 +15,7 @@ class SourceType(str, Enum):
     PCR = 'PCR'
     homologous_recombination = 'homologous_recombination'
     gibson_assembly = 'gibson_assembly'
+    restriction_and_ligation = 'restriction_and_ligation'
 
 
 class SequenceFileFormat(str, Enum):
@@ -139,7 +140,7 @@ class RestrictionEnzymeDigestionSource(SequenceCut):
             input=input
         )
 
-class Assembly(Source):
+class AssemblySource(Source):
     assembly:  Optional[conlist(tuple[int, int, str, str], min_length=1)] = None
     circular: Optional[bool] = None
 
@@ -153,7 +154,7 @@ class Assembly(Source):
                 all_overlaps.append(len(Location.fromstring(f[3])))
         return min(all_overlaps)
 
-class PCRSource(Assembly):
+class PCRSource(AssemblySource):
     """Documents a PCR, and the selection of one of the products."""
 
     type: SourceType = SourceType('PCR')
@@ -174,7 +175,7 @@ class PCRSource(Assembly):
             reverse_primer=reverse_primer
         )
 
-class StickyLigationSource(Assembly):
+class StickyLigationSource(AssemblySource):
 
     type: SourceType = SourceType('sticky_ligation')
 
@@ -188,7 +189,7 @@ class StickyLigationSource(Assembly):
         )
 
 
-class HomologousRecombinationSource(Assembly):
+class HomologousRecombinationSource(AssemblySource):
 
     # This can only take two inputs, the first one is the template, the second one is the insert
     type: SourceType = SourceType('homologous_recombination')
@@ -202,7 +203,7 @@ class HomologousRecombinationSource(Assembly):
             circular=circular
         )
 
-class GibsonAssemblySource(Assembly):
+class GibsonAssemblySource(AssemblySource):
 
     type: SourceType = SourceType('gibson_assembly')
     input: conlist(int, min_length=2)
@@ -213,4 +214,18 @@ class GibsonAssemblySource(Assembly):
             assembly=[(part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None)) for part in assembly],
             input=input,
             circular=circular
+        )
+
+class RestrictionAndLigationSource(AssemblySource):
+    type: SourceType = SourceType('restriction_and_ligation')
+    input: conlist(int, min_length=2)
+    restriction_enzymes: conlist(str, min_length=1)
+
+    def from_assembly(assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int, restriction_enzymes=list['str']) -> 'RestrictionAndLigationSource':
+        return RestrictionAndLigationSource(
+            id=id,
+            assembly=[(part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None)) for part in assembly],
+            input=input,
+            circular=circular,
+            restriction_enzymes=restriction_enzymes
         )
