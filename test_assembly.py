@@ -955,7 +955,8 @@ def test_golden_gate():
 
     sum_output = (i1 + i2 + i3 + v).looped()
     algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [BsaI])
-    asm = assembly.Assembly([insert1, insert2, insert3, vector], use_fragment_order=False, limit=10, algorithm=algo)
+    asm = assembly.Assembly([insert1, insert2, insert3, vector], use_fragment_order=False, algorithm=algo)
+
     assembly_output = asm.assemble_circular()
     assert len(assembly_output) == 1
     assert assembly_output[0].cseguid() == sum_output.cseguid()

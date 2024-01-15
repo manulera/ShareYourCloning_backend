@@ -296,7 +296,6 @@ class StickyLigationTest(unittest.TestCase):
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post("/sticky_ligation", json=data)
         payload = response.json()
-        print(payload)
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
         sources = [StickyLigationSource.model_validate(s) for s in payload['sources']]
 
@@ -839,6 +838,31 @@ class RestrictionAndLigationTest(unittest.TestCase):
         payload = response.json()
         self.assertEqual(len(payload['sequences']), 4)
         self.assertEqual(len(payload['sources']), 4)
+
+    def test_golden_gate(self):
+        fragments =[ Dseqrecord('GGTCTCAattaAAAAAttaaAGAGACC'),
+            Dseqrecord('GGTCTCAttaaCCCCCatatAGAGACC'),
+            Dseqrecord('GGTCTCAatatGGGGGccggAGAGACC'),
+            Dseqrecord('TTTTattaAGAGACCTTTTTGGTCTCAccggTTTT', circular=True),
+        ]
+
+        json_fragments = [format_sequence_genbank(f) for f in fragments]
+        for i, f in enumerate(json_fragments):
+            f.id = i + 1
+
+        source = RestrictionAndLigationSource(
+            input=[1, 2, 3, 4],
+            restriction_enzymes=['BsaI'],
+        )
+
+        data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
+        response = client.post('/restriction_and_ligation', json=data, params={'minimal_homology': 4})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sequences']), 1)
+        self.assertEqual(len(payload['sources']), 1)
+
 
 
 if __name__ == "__main__":

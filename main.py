@@ -374,17 +374,16 @@ async def gibson_assembly(source: GibsonAssemblySource,
 )
 async def restriction_and_ligation(source: RestrictionAndLigationSource,
                                    sequences: conlist(SequenceEntity, min_length=1),
-                                   allow_partial_overlap: bool = Query(True, description='Allow for partially overlapping sticky ends.')):
+                                   allow_partial_overlap: bool = Query(False, description='Allow for partially overlapping sticky ends.')):
 
     fragments = [read_dsrecord_from_json(seq) for seq in sequences]
-
     invalid_enzymes = get_invalid_enzyme_names(source.restriction_enzymes)
     if len(invalid_enzymes):
         raise HTTPException(404, 'These enzymes do not exist: ' + ', '.join(invalid_enzymes))
     enzymes = RestrictionBatch(first=[e for e in source.restriction_enzymes if e is not None])
+    algo = lambda x, y, l : restriction_ligation_overlap(x, y, enzymes, False)
 
-    algo = lambda x, y, l : restriction_ligation_overlap(x, y, enzymes, allow_partial_overlap)
-    asm = Assembly(fragments, algorithm=algo, limit=allow_partial_overlap, use_all_fragments=True, use_fragment_order=False)
+    asm = Assembly(fragments, algorithm=algo, use_fragment_order=False, use_all_fragments=True)
 
     circular_assemblies = asm.get_circular_assemblies()
     linear_assemblies = filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
