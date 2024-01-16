@@ -856,7 +856,7 @@ class RestrictionAndLigationTest(unittest.TestCase):
         )
 
         data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
-        response = client.post('/restriction_and_ligation', json=data, params={'minimal_homology': 4})
+        response = client.post('/restriction_and_ligation', json=data, params={'circular_only': True})
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()

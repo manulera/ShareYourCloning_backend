@@ -343,14 +343,15 @@ async def homologous_recombination(
 ))
 async def gibson_assembly(source: GibsonAssemblySource,
                           sequences: conlist(SequenceEntity, min_length=1),
-                          minimal_homology: int = Query(40, description='The minimum homology between consecutive fragments in the assembly.'),):
+                          minimal_homology: int = Query(40, description='The minimum homology between consecutive fragments in the assembly.'),
+                          circular_only: bool = Query(False, description='Only return circular assemblies.')):
 
     fragments = [read_dsrecord_from_json(seq) for seq in sequences]
 
     asm = Assembly(fragments, algorithm=gibson_overlap, limit=minimal_homology, use_all_fragments=True, use_fragment_order=False)
-    circular_assemblies = asm.get_circular_assemblies()
-    linear_assemblies = filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
-    possible_assemblies = circular_assemblies + linear_assemblies
+    possible_assemblies = asm.get_circular_assemblies()
+    if not circular_only:
+        possible_assemblies += filter_linear_subassemblies(asm.get_linear_assemblies(), possible_assemblies, fragments)
 
     out_sources = [GibsonAssemblySource.from_assembly(id= source.id, input=source.input, assembly=a, circular=(a[0][0] == a[-1][1])) for a in possible_assemblies]
 
@@ -374,20 +375,21 @@ async def gibson_assembly(source: GibsonAssemblySource,
 )
 async def restriction_and_ligation(source: RestrictionAndLigationSource,
                                    sequences: conlist(SequenceEntity, min_length=1),
-                                   allow_partial_overlap: bool = Query(False, description='Allow for partially overlapping sticky ends.')):
+                                   allow_partial_overlap: bool = Query(False, description='Allow for partially overlapping sticky ends.'),
+                                   circular_only: bool = Query(False, description='Only return circular assemblies.')):
 
     fragments = [read_dsrecord_from_json(seq) for seq in sequences]
     invalid_enzymes = get_invalid_enzyme_names(source.restriction_enzymes)
     if len(invalid_enzymes):
         raise HTTPException(404, 'These enzymes do not exist: ' + ', '.join(invalid_enzymes))
     enzymes = RestrictionBatch(first=[e for e in source.restriction_enzymes if e is not None])
-    algo = lambda x, y, l : restriction_ligation_overlap(x, y, enzymes, False)
+    algo = lambda x, y, l : restriction_ligation_overlap(x, y, enzymes, allow_partial_overlap)
 
     asm = Assembly(fragments, algorithm=algo, use_fragment_order=False, use_all_fragments=True)
 
-    circular_assemblies = asm.get_circular_assemblies()
-    linear_assemblies = filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
-    possible_assemblies = circular_assemblies + linear_assemblies
+    possible_assemblies = asm.get_circular_assemblies()
+    if not circular_only:
+        possible_assemblies += filter_linear_subassemblies(asm.get_linear_assemblies(), possible_assemblies, fragments)
 
     out_sources = [RestrictionAndLigationSource.from_assembly(id= source.id, input=source.input, assembly=a, circular=(a[0][0] == a[-1][1]), restriction_enzymes=source.restriction_enzymes) for a in possible_assemblies]
 
