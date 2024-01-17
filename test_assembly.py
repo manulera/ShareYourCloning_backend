@@ -1005,28 +1005,26 @@ def test_restriction_ligation_assembly():
 
     # Cutting from plasmid
     f1 = Dseqrecord('aaGAATTCaaaGTCGACaa', circular=True)
-    f2 = Dseqrecord('ccGAATTCccc')
-    f3 = Dseqrecord('ttGTCGACttt')
+    f2 = Dseqrecord('ccGAATTCccGTCGACc')
 
 
     f1_0, f1_1 = f1.cut([EcoRI, SalI])
-    f2_0, f2_1 = f2.cut([EcoRI])
-    f3_0, f3_1 = f3.cut([SalI])
+    f2_0, f2_1, f2_3 = f2.cut([EcoRI, SalI])
 
     result_seqs = sorted([
-            str((f2_0 + f1_0 + f3_1).seq),
+            (f1_1 + f2_1).looped().cseguid(),
         ])
-    print(*result_seqs, sep='\n')
+    print((f1_1 + f2_1).looped().seq)
     algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [EcoRI, SalI])
     # We shift
     for shift in range(len(f1)):
         f1_shifted = f1.shifted(shift)
-        f = assembly.Assembly([f2, f1_shifted, f3], algorithm=algo, use_fragment_order=False, use_all_fragments=True)
-        observed_seqs = sorted([str(s.seq) for s in f.assemble_linear()])
-        print(shift)
-        print(*observed_seqs, sep='\n')
-        print()
-        assert result_seqs == observed_seqs
+        f = assembly.Assembly([f1_shifted, f2], algorithm=algo, use_fragment_order=False, use_all_fragments=True)
+        observed_cseguids = sorted(x.cseguid() for x in f.assemble_circular())
+        for seq in f.assemble_circular():
+            print(seq.seq)
+        assert len(result_cseguids) == len(observed_cseguids)
+        assert result_cseguids == observed_cseguids
 
     # TODO: Check if features are transferred properly
 
