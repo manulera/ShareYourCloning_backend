@@ -317,10 +317,15 @@ def get_assembly_subfragments(fragments: list[_Dseqrecord], subfragment_represen
         seq = fragments[node-1] if node > 0 else fragments[-node-1].reverse_complement()
         start = 0 if start_location is None else start_location.parts[0].start
         end = None if end_location is None else end_location.parts[-1].end
+
         # Special case, some of it could be handled by better Dseqrecord slicing in the future
         if seq.circular and start_location == end_location:
-            # This could be definitely be done better, but for now it works:
-            dummy_cut = ((start, end), type('DynamicClass', (), {'ovhg': start-end})())
+            # The overhang is different for origin-spanning features, for instance
+            # for a feature join{[12:13], [0:3]} in a sequence of length 13, the overhang
+            # is -4, not 9
+            ovhg = start-end if len(start_location.parts) == 1 else start - end - len(seq)
+            # TODO: If the cut model would include the ovhg, this hack would not be necessary:
+            dummy_cut = ((start, end), type('DynamicClass', (), {'ovhg': ovhg})())
             open_seq = seq.apply_cut(dummy_cut, dummy_cut)
             subfragments.append(_Dseqrecord(fill_dseq(open_seq.seq), features=open_seq.features))
             continue
@@ -490,6 +495,26 @@ class Assembly:
         locs = [_shift_location(SimpleLocation(x_start, x_start + length), 0, len(first)),
                 _shift_location(SimpleLocation(y_start, y_start + length), 0, len(secnd))]
         rc_locs = [locs[0]._flip(len(first)), locs[1]._flip(len(secnd))]
+
+        # TODO: fix _shift_location in pydna, should be if strand != -1
+        # newparts.extend(parttuple if strand == 1 else parttuple[::-1]
+
+        if len(locs[0].parts) == 2:
+            locs[0].parts = locs[0].parts[::-1]
+        if len(locs[1].parts) == 2:
+            locs[1].parts = locs[1].parts[::-1]
+
+        # TODO: this comment is a mistake I think -> remove
+        # In addition, the rc_locs inversion is needed because compound
+        # locations that represent origin-spanning features are flipped
+        # in a way where the meaning of start and end changes.
+        # For instance, a feature join{[12:13], [0:3]} in a molecule of
+        # length 13 is flipped into join{[0:1], [10:13]}. Then, f.parts[0].start
+        # and f.parts[1].end changes meaning.
+        # if len(rc_locs[0].parts) == 2:
+        #     rc_locs[0].parts = rc_locs[0].parts[::-1]
+        # if len(rc_locs[1].parts) == 2:
+        #     rc_locs[1].parts = rc_locs[1].parts[::-1]
 
         combinations = (
             (u, v, locs),

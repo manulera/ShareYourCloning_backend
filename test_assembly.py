@@ -794,7 +794,7 @@ def test_sticky_ligation_algorithm_and_assembly():
     assert assembly.sticky_end_sub_strings(seqrA, seqrB, 1) == []
 
 
-def test_restriction_and_ligation_algorithm():
+def test_restriction_ligation_algorithm():
 
     # Full overlap, negative ovhg
     seqrA = Dseqrecord('AAAGAATTCAAA')
@@ -825,6 +825,16 @@ def test_restriction_and_ligation_algorithm():
     seqrB = Dseqrecord('AAGCTT')
     assert assembly.restriction_ligation_overlap(seqrA, seqrB, [HindIII, FauI], True) == [(10, 1, 1)]
     assert assembly.restriction_ligation_overlap(seqrB, seqrA, [HindIII, FauI], True) == []
+
+    # Circular molecule
+    seqrA = Dseqrecord('GAATTCaaa')
+    seqrB = Dseqrecord('CCCCGAATTCCCC', circular=True)
+    for shift in range(len(seqrB)):
+        index_in_circular = 5 - shift
+        if index_in_circular < 0:
+            index_in_circular = len(seqrB) + index_in_circular
+        assert assembly.restriction_ligation_overlap(seqrA, seqrB.shifted(shift), [EcoRI], False) == [(1, index_in_circular, 4)]
+
 
 def test_fill_dseq():
 
@@ -989,7 +999,36 @@ def test_restriction_ligation_assembly():
     for shift in range(len(f2)):
         f2_shifted = f2.shifted(shift)
         f = assembly.Assembly([f1, f2_shifted], algorithm=algo, use_fragment_order=False)
-        assert result_cseguids == sorted(x.cseguid() for x in f.assemble_circular())
+        observed_cseguids = sorted(x.cseguid() for x in f.assemble_circular())
+        assert len(result_cseguids) == len(observed_cseguids)
+        assert result_cseguids == observed_cseguids
+
+    # Cutting from plasmid
+    f1 = Dseqrecord('aaGAATTCaaaGTCGACaa', circular=True)
+    f2 = Dseqrecord('ccGAATTCccc')
+    f3 = Dseqrecord('ttGTCGACttt')
+
+
+    f1_0, f1_1 = f1.cut([EcoRI, SalI])
+    f2_0, f2_1 = f2.cut([EcoRI])
+    f3_0, f3_1 = f3.cut([SalI])
+
+    result_seqs = sorted([
+            str((f2_0 + f1_0 + f3_1).seq),
+        ])
+    print(*result_seqs, sep='\n')
+    algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [EcoRI, SalI])
+    # We shift
+    for shift in range(len(f1)):
+        f1_shifted = f1.shifted(shift)
+        f = assembly.Assembly([f2, f1_shifted, f3], algorithm=algo, use_fragment_order=False, use_all_fragments=True)
+        observed_seqs = sorted([str(s.seq) for s in f.assemble_linear()])
+        print(shift)
+        print(*observed_seqs, sep='\n')
+        print()
+        assert result_seqs == observed_seqs
+
+    # TODO: Check if features are transferred properly
 
     # Partial overlaps -> enzyme with negative overhang
     fragments = [
