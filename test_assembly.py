@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from Bio.Restriction import AatII, AjiI, AgeI, EcoRV, ZraI, SalI, EcoRI, RgaI, BsaI, BsrI
+from Bio.Restriction import AatII, AjiI, AgeI, EcoRV, ZraI, SalI, EcoRI, RgaI, BsaI, BsrI, DrdI, HindIII, FauI
 from pydna.amplify import pcr
 from pydna.dseq import Dseq
 from pydna.readers import read
@@ -746,30 +746,85 @@ def test_linear_with_annotations2():
             print(feature_sequences[feat.qualifiers['label']].seq, 'original feat')
             assert feat.extract(x).seq == feature_sequences[feat.qualifiers['label']].seq
 
-def test_sticky_ligation_algorithm():
+def test_sticky_ligation_algorithm_and_assembly():
 
     # Test full overlap
     seqrA = Dseqrecord(Dseq.from_full_sequence_and_overhangs('AAAGAT', 0, 3))
     seqrB = Dseqrecord(Dseq.from_full_sequence_and_overhangs('GATAAA', 3, 0))
 
-    common = assembly.sticky_end_sub_strings(seqrA, seqrB, 0)
-    assert common == [(3, 0, 3)]
+    # AAAGAT   AAA
+    # TTT   CTATTT
+    assert assembly.sticky_end_sub_strings(seqrA, seqrB, 0) == [(3, 0, 3)]
+    asm = assembly.Assembly([seqrA, seqrB], limit=False, algorithm=assembly.sticky_end_sub_strings)
+    assert str(asm.assemble_linear()[0].seq) == 'AAAGATAAA'
 
     # Test partial overlap
+    # AAAGAT AAA
+    # TTT  TATTT
     seqrB = Dseqrecord(Dseq.from_full_sequence_and_overhangs('ATAAA', 2, 0))
-    common = assembly.sticky_end_sub_strings(seqrA, seqrB, 1)
-    assert common == [(4, 0, 2)]
+    assert assembly.sticky_end_sub_strings(seqrA, seqrB, 1) == [(4, 0, 2)]
+
+    # We test partial overlap settings here
+    asm = assembly.Assembly([seqrA, seqrB], limit=False, algorithm=assembly.sticky_end_sub_strings)
+    assert asm.assemble_linear() == []
+    asm = assembly.Assembly([seqrA, seqrB], limit=True, algorithm=assembly.sticky_end_sub_strings)
+    assert str(asm.assemble_linear()[0].seq) == 'AAAGATAAA'
 
     # Test no overlap
+    # AAAGAT CCC
+    # TTT  GGGGG
     seqrB = Dseqrecord(Dseq.from_full_sequence_and_overhangs('CCCCC', 2, 0))
-    common = assembly.sticky_end_sub_strings(seqrA, seqrB, 1)
-    assert common == []
+    assert assembly.sticky_end_sub_strings(seqrA, seqrB, 1) == []
 
-# acgatgctatactgtgCCNCCtgtgctgtgctcta
-#                      TGTGCTGTGCTCTA
-#                      tgtgctgtgctctaTTTTTTTtattctggctgtatcCCCCCC
-#                                           TATTCTGGCTGTATC
-#                                          GtattctggctgtatcGGGGGtacgatgctatactgtg
+    # Same examples, with opposite overhangs
+    seqrA = Dseqrecord(Dseq.from_full_sequence_and_overhangs('AAAGAT', 0, -3))
+    seqrB = Dseqrecord(Dseq.from_full_sequence_and_overhangs('GATAAA', -3, 0))
+    assert assembly.sticky_end_sub_strings(seqrA, seqrB, 0) == [(3, 0, 3)]
+    asm = assembly.Assembly([seqrA, seqrB], limit=False, algorithm=assembly.sticky_end_sub_strings)
+    assert str(asm.assemble_linear()[0].seq) == 'AAAGATAAA'
+
+    seqrB = Dseqrecord(Dseq.from_full_sequence_and_overhangs('ATAAA', -2, 0))
+    assert assembly.sticky_end_sub_strings(seqrA, seqrB, 1) == [(4, 0, 2)]
+    asm = assembly.Assembly([seqrA, seqrB], limit=False, algorithm=assembly.sticky_end_sub_strings)
+    assert asm.assemble_linear() == []
+    asm = assembly.Assembly([seqrA, seqrB], limit=True, algorithm=assembly.sticky_end_sub_strings)
+    assert str(asm.assemble_linear()[0].seq) == 'AAAGATAAA'
+
+    seqrB = Dseqrecord(Dseq.from_full_sequence_and_overhangs('CCCCC', -2, 0))
+    assert assembly.sticky_end_sub_strings(seqrA, seqrB, 1) == []
+
+
+def test_restriction_and_ligation_algorithm():
+
+    # Full overlap, negative ovhg
+    seqrA = Dseqrecord('AAAGAATTCAAA')
+    seqrB = Dseqrecord('CCCCGAATTCCCCGAATTC')
+    assert assembly.restriction_ligation_overlap(seqrA, seqrB, [EcoRI], False) == [(4, 5, 4), (4, 14, 4)]
+    assert assembly.restriction_ligation_overlap(seqrB, seqrA, [EcoRI], False) == [(5, 4, 4), (14, 4, 4)]
+
+    # Full overlap, positive ovhg
+    seqrA = Dseqrecord('TTGCGATCGCTT')
+    seqrB = Dseqrecord('AAGCGATCGCAAGCGATCGCAA')
+    assert assembly.restriction_ligation_overlap(seqrA, seqrB, [RgaI], False) == [(5, 5, 2), (5, 15, 2)]
+    assert assembly.restriction_ligation_overlap(seqrB, seqrA, [RgaI], False) == [(5, 5, 2), (15, 5, 2)]
+
+    # Full overlap, using two different enzymes
+    seqrA = Dseqrecord('GACTAATGGGTC')
+    seqrB = Dseqrecord('AAGCGATCGCAAGCGATCGCAA')
+    assert assembly.restriction_ligation_overlap(seqrA, seqrB, [RgaI, DrdI], False) == [(5, 5, 2), (5, 15, 2)]
+    assert assembly.restriction_ligation_overlap(seqrB, seqrA, [RgaI, DrdI], False) == [(5, 5, 2), (15, 5, 2)]
+
+    # Partial overlap, positive ovhg
+    seqrA = Dseqrecord('GACTAAAGGGTC')
+    seqrB = Dseqrecord('AAGCGATCGCAAGCGATCGCAA')
+    assert assembly.restriction_ligation_overlap(seqrA, seqrB, [RgaI, DrdI], True) == [(6, 5, 1), (6, 15, 1)]
+    assert assembly.restriction_ligation_overlap(seqrB, seqrA, [RgaI, DrdI], True) == []
+
+    # Partial overlap, negative ovhg
+    seqrA = Dseqrecord('CCCGCAAAAAAAAA')
+    seqrB = Dseqrecord('AAGCTT')
+    assert assembly.restriction_ligation_overlap(seqrA, seqrB, [HindIII, FauI], True) == [(10, 1, 1)]
+    assert assembly.restriction_ligation_overlap(seqrB, seqrA, [HindIII, FauI], True) == []
 
 def test_fill_dseq():
 
@@ -896,11 +951,7 @@ def test_ends_from_cutsite():
 
 
 def test_restriction_ligation_assembly():
-    # TODO test partial overlap as well
-    # TODO think of topology requirements for inputs / this should work linearising a circle
-    # even if the final product is not a circle
-    # TODO: when validating an assembly, if the fragment is circular, it should not be rejected on
-    # test of position of overlap of one after the other, like in the is_circular thing.
+    # TODO circular examples
 
     seq_pairs = (
         (Dseqrecord('AAAGAATTCAAA'), Dseqrecord('CCCCGAATTCCCC')),
@@ -923,21 +974,59 @@ def test_restriction_ligation_assembly():
         assert sorted(products) == sorted(f.assemble_linear())
 
     # Insertion in a vector
-    fragments = [
-        Dseqrecord('GAATTCaaaGAATTC'),
-        Dseqrecord('CCCCGAATTCCCC', circular=True)
-    ]
+    f1 = Dseqrecord('GAATTCaaaGAATTC')
+    f2 = Dseqrecord('CCCCGAATTCCCC', circular=True)
 
-    algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [EcoRI])
-    f = assembly.Assembly(fragments, algorithm=algo, use_fragment_order=False)
-    a1, a2, a3 = fragments[0].cut([EcoRI])
-    b1, = fragments[1].cut([EcoRI])
-    result_cseguids = [
+    _, a2, a3 = f1.cut([EcoRI])
+    b1, = f2.cut([EcoRI])
+    result_cseguids = sorted([
             (b1.seq + a2.seq).looped().cseguid(),
             (b1.seq + a2.seq.reverse_complement()).looped().cseguid(),
-        ]
+        ])
 
-    assert result_cseguids == [x.cseguid() for x in f.assemble_circular()]
+    algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [EcoRI])
+    # We shift
+    for shift in range(len(f2)):
+        f2_shifted = f2.shifted(shift)
+        f = assembly.Assembly([f1, f2_shifted], algorithm=algo, use_fragment_order=False)
+        assert result_cseguids == sorted(x.cseguid() for x in f.assemble_circular())
+
+    # Partial overlaps -> enzyme with negative overhang
+    fragments = [
+        Dseqrecord('GGTCTCCCCAATT'),
+        Dseqrecord('GGTCTCCAACCAA')
+    ]
+
+    # Not allowing partial overlaps
+    algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [BsaI], False)
+    f = assembly.Assembly(fragments, algorithm=algo, use_fragment_order=False)
+    assert len(f.get_linear_assemblies()) == 0
+
+    # Allowing partial overlaps
+    algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [BsaI], True)
+    f = assembly.Assembly(fragments, algorithm=algo, use_fragment_order=False)
+    assert len(f.get_linear_assemblies()) == 2
+    p1, p2 = f.assemble_linear()
+    assert str(p1.seq) == 'GGTCTCCCCAACCAA'
+    assert str(p2.seq) == 'GGTCTCCAACCAATT'
+
+    # Partial overlaps -> enzyme with positive overhang
+    fragments = [
+        Dseqrecord('GACACCAGAGTC'),
+        Dseqrecord('GACTAACGGGTC')
+    ]
+
+    # Not allowing partial overlaps
+    algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [DrdI], False)
+    f = assembly.Assembly(fragments, algorithm=algo, use_fragment_order=False)
+    assert len(f.get_linear_assemblies()) == 0
+
+    # Allowing partial overlaps
+    algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [DrdI], True)
+    f = assembly.Assembly(fragments, algorithm=algo, use_fragment_order=False)
+    products = f.assemble_linear()
+    assert str(products[0].seq) == 'GACACCACGGGTC'
+    assert str(products[1].seq) == 'GACTAACAGAGTC'
 
 def test_golden_gate():
 

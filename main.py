@@ -311,8 +311,7 @@ async def homologous_recombination(
     # source.input contains the ids of the sequences in the order template, insert
     template, insert = [next((read_dsrecord_from_json(seq) for seq in sequences if seq.id == id), None) for id in source.input]
 
-    if template.circular or insert.circular:
-        # TODO: add support for the other cases
+    if template.circular:
         raise HTTPException(400, 'The template and the insert must be linear.')
 
     # If an assembly is provided, we ignore minimal_homology

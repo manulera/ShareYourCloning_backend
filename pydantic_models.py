@@ -113,9 +113,6 @@ class RepositoryIdSource(Source):
     type: SourceType = SourceType('repository_id')
 
 
-# TODO There is some abstract common thing between restriction and PCR, since
-# they select a subset of the molecule, perhaps they can be merged in some way.
-
 class SequenceCut(Source):
     """A class to represent a cut in a sequence"""
 

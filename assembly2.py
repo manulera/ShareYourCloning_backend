@@ -43,10 +43,16 @@ def restriction_ligation_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=R
             ends_from_cutsite(cut_y, seqy.seq)[1],
             partial
         )
-        if overlap:
-            left_x = cut_x[0][0] if cut_x[1].ovhg < 0 else cut_x[0][1]
-            left_y = cut_y[0][0] if cut_y[1].ovhg < 0 else cut_y[0][1]
-            matches.append((left_x, left_y, overlap))
+        if not overlap:
+            continue
+        # Positions where the overlap would start for full overlap
+        left_x = cut_x[0][0] if cut_x[1].ovhg < 0 else cut_x[0][1]
+        left_y = cut_y[0][0] if cut_y[1].ovhg < 0 else cut_y[0][1]
+
+        # Correct por partial overlaps
+        left_x += abs(cut_x[1].ovhg) - overlap
+
+        matches.append((left_x, left_y, overlap))
     return matches
 
 
