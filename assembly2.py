@@ -317,7 +317,6 @@ def get_assembly_subfragments(fragments: list[_Dseqrecord], subfragment_represen
         seq = fragments[node-1] if node > 0 else fragments[-node-1].reverse_complement()
         start = 0 if start_location is None else start_location.parts[0].start
         end = None if end_location is None else end_location.parts[-1].end
-
         # Special case, some of it could be handled by better Dseqrecord slicing in the future
         if seq.circular and start_location == end_location:
             # The overhang is different for origin-spanning features, for instance

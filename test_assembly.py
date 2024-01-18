@@ -1011,18 +1011,17 @@ def test_restriction_ligation_assembly():
     f1_0, f1_1 = f1.cut([EcoRI, SalI])
     f2_0, f2_1, f2_3 = f2.cut([EcoRI, SalI])
 
-    result_seqs = sorted([
+    result_cseguids = sorted([
             (f1_1 + f2_1).looped().cseguid(),
+            (f1_0 + f2_1.reverse_complement()).looped().cseguid(),
         ])
-    print((f1_1 + f2_1).looped().seq)
+
     algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [EcoRI, SalI])
     # We shift
     for shift in range(len(f1)):
         f1_shifted = f1.shifted(shift)
         f = assembly.Assembly([f1_shifted, f2], algorithm=algo, use_fragment_order=False, use_all_fragments=True)
         observed_cseguids = sorted(x.cseguid() for x in f.assemble_circular())
-        for seq in f.assemble_circular():
-            print(seq.seq)
         assert len(result_cseguids) == len(observed_cseguids)
         assert result_cseguids == observed_cseguids
 
