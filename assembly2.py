@@ -497,6 +497,7 @@ class Assembly:
 
         # TODO: fix _shift_location in pydna, should be if strand != -1
         # newparts.extend(parttuple if strand == 1 else parttuple[::-1]
+        # issue: https://github.com/BjornFJohansson/pydna/pull/179
 
         if len(locs[0].parts) == 2:
             locs[0].parts = locs[0].parts[::-1]

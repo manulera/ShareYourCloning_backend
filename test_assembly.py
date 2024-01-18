@@ -6,7 +6,7 @@ from pydna.amplify import pcr
 from pydna.dseq import Dseq
 from pydna.readers import read
 import assembly2 as assembly
-from Bio.SeqFeature import ExactPosition, FeatureLocation, SeqFeature
+from Bio.SeqFeature import ExactPosition, FeatureLocation, SeqFeature, SimpleLocation
 from importlib import reload
 from pydna.dseqrecord import Dseqrecord
 from pydna.parsers import parse
@@ -16,7 +16,6 @@ import pytest
 
 def test_built():
 
-    reload(assembly)
     asm = assembly.Assembly(assembly.example_fragments, limit=5)
     lin = sorted(asm.assemble_linear(), key=len)
     crc = asm.assemble_circular()
@@ -27,7 +26,6 @@ def test_built():
 
 def test_new_assembly():
 
-    reload(assembly)
 
     #                   0000000000111111111222222222233333333334444444444555555555566
     #                   0123456780123456789012345678901234567890123456789012345678901
@@ -246,7 +244,6 @@ def test_new_assembly():
 
 def test_assembly():
 
-    reload(assembly)
 
     text1 = """
     >A_AgTEFp_b_631 NP+geg/4Ykv2pIwEqiLylYKPYOE
@@ -477,7 +474,6 @@ algorithm..: common_sub_strings"""
 
 def test_MXblaster1():
 
-    reload(assembly)
 
     """ test MXblaster1"""
 
@@ -625,7 +621,6 @@ def test_MXblaster1():
 
 def test_assemble_pGUP1():
 
-    reload(assembly)
 
     GUP1rec1sens = read("test_files/GUP1rec1sens.txt")
     GUP1rec2AS = read("test_files/GUP1rec2AS.txt")
@@ -1186,3 +1181,91 @@ def circles_assembly():
     assert str(assembly.assemble([a, b], circular_assemblies[0], True)) == 'ACGTAyyyxxxACGTAbb'
 
 
+def test_assemble_function():
+    """A more granular test of the assemble function, independent of the experimental
+    setup to make sure it works for all topologies"""
+
+    f1 = Dseqrecord('aaaTTTctaGGGccc', circular=True)
+    f2 = Dseqrecord('ccccTTTatgGGGaaa')
+
+    # TTT features
+    f1_feat1 = SeqFeature(SimpleLocation(3, 6))
+    f2_feat1 = SeqFeature(SimpleLocation(4, 7))
+
+    # GGG features
+    f1_feat2 = SeqFeature(SimpleLocation(9, 12))
+    f2_feat2 = SeqFeature(SimpleLocation(10, 13))
+
+    f1.features = [f1_feat1, f1_feat2]
+    f2.features = [f2_feat1, f2_feat2]
+
+    # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
+    def modify_feat(feat):
+        if len(feat.location.parts) > 1:
+            feat.location.parts = feat.location.parts[::-1]
+        return feat
+
+    for shift in range(len(f1)):
+        f1_shifted = f1.shifted(shift)
+        # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
+        list(map(modify_feat, f1_shifted.features))
+
+        # Re-order the features so that TTT is first
+        if str(f1_shifted.features[0].location.extract(f1_shifted.seq)) != 'TTT':
+            f1_shifted.features = f1_shifted.features[::-1]
+
+        # Linear assembly 2 - 1 - 2 (ccccTTTctaGGGaaa)
+        assembly_plan = [
+            (2, 1, f2.features[0].location, f1_shifted.features[0].location),
+            (1, 2, f1_shifted.features[1].location, f2.features[1].location),
+        ]
+
+        result = assembly.assemble([f1_shifted, f2], assembly_plan, False)
+        assert str(result.seq) == 'ccccTTTctaGGGaaa'
+        assert len(result.features) == 4
+        assert set(str(f.location.extract(result.seq)) for f in result.features) == {'TTT', 'GGG'}
+
+        # Circular assembly 1 - 2 (ccccTTTctaGGGaaa)
+        assembly_plan = [
+            (1, 2, f1_shifted.features[0].location, f2.features[0].location),
+            (2, 1, f2.features[1].location, f1_shifted.features[1].location),
+        ]
+
+        result = assembly.assemble([f1_shifted, f2], assembly_plan, True)
+        assert str(result.seq) == 'GGGcccaaaTTTatg'
+        assert len(result.features) == 4
+        assert set(str(f.location.extract(result.seq)) for f in result.features) == {'TTT', 'GGG'}
+
+        # TODO: This type of assembly should maybe raise an error, no
+        # linear assembly should start or finish with a circular sequence
+        # assembly_plan = [
+        #     (2, 1, f2.features[1].location, f1_shifted.features[1].location),
+        # ]
+        # result = assembly.assemble([f1_shifted, f2], assembly_plan, False)
+
+    # Now both are circular, using a single insertion site
+    f1 = Dseqrecord('aaaTTTcta', circular=True)
+    f2 = Dseqrecord('ccccTTTatg', circular=True)
+    f1.features = [f1_feat1]
+    f2.features = [f2_feat1]
+
+    for shift_1 in range(len(f1)):
+        f1_shifted = f1.shifted(shift_1)
+        # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
+        list(map(modify_feat, f1_shifted.features))
+
+        for shift_2 in range(len(f2)):
+            f2_shifted = f2.shifted(shift_2)
+            # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
+            list(map(modify_feat, f2_shifted.features))
+
+            # Linear assembly 2 - 1 - 2 (ccccTTTctaGGGaaa)
+            assembly_plan = [
+                (1, 2, f1_shifted.features[0].location, f2_shifted.features[0].location),
+                (2, 1, f2_shifted.features[0].location, f1_shifted.features[0].location),
+            ]
+
+            result = assembly.assemble([f1_shifted, f2], assembly_plan, False)
+            assert str(result.seq) == 'aaaTTTatgccccTTTcta'
+            assert len(result.features) == 2
+            assert set(str(f.location.extract(result.seq)) for f in result.features) == {'TTT'}

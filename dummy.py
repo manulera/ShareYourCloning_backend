@@ -47,3 +47,8 @@ for shift in range(len(f1)):
     print(shift, str(result) == 'GGGcccaaaTTTatg')
 
 
+    assembly_plan = [
+            (2, 1, f2.features[1].location, f1_shifted.features[1].location),
+        ]
+    result = assembly.assemble([f1_shifted, f2], assembly_plan, False)
+    print(result.seq)
