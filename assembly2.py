@@ -16,15 +16,15 @@ from Bio.Restriction.Restriction import RestrictionBatch, AbstractCut
 def ends_from_cutsite(cutsite: tuple[tuple[int,int],AbstractCut], seq: _Dseq):
     if cutsite is None:
         raise ValueError('None is not supported')
-    cut_watson, cut_crick = cutsite[0]
-    enz = cutsite[1]
-    if enz.ovhg < 0:
+
+    cut_watson, cut_crick, ovhg = seq.get_cut_parameters(cutsite, is_left=None)
+    if ovhg < 0:
         # TODO check the edge in circular
         return (
             ("5'", str(seq[cut_watson:cut_crick].reverse_complement()).lower()),
             ("5'", str(seq[cut_watson:cut_crick]).lower()),
         )
-    elif enz.ovhg > 0:
+    elif ovhg > 0:
         return (
             ("3'", str(seq[cut_crick:cut_watson]).lower()),
             ("3'", str(seq[cut_crick:cut_watson].reverse_complement()).lower()),
@@ -45,12 +45,14 @@ def restriction_ligation_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=R
         )
         if not overlap:
             continue
+        x_watson, x_crick, x_ovhg = seqx.seq.get_cut_parameters(cut_x, is_left=False)
+        y_watson, y_crick, y_ovhg = seqy.seq.get_cut_parameters(cut_y, is_left=True)
         # Positions where the overlap would start for full overlap
-        left_x = cut_x[0][0] if cut_x[1].ovhg < 0 else cut_x[0][1]
-        left_y = cut_y[0][0] if cut_y[1].ovhg < 0 else cut_y[0][1]
+        left_x = x_watson if x_ovhg < 0 else x_crick
+        left_y = y_watson if y_ovhg < 0 else y_crick
 
         # Correct por partial overlaps
-        left_x += abs(cut_x[1].ovhg) - overlap
+        left_x += abs(x_ovhg) - overlap
 
         matches.append((left_x, left_y, overlap))
     return matches
@@ -323,8 +325,8 @@ def get_assembly_subfragments(fragments: list[_Dseqrecord], subfragment_represen
             # for a feature join{[12:13], [0:3]} in a sequence of length 13, the overhang
             # is -4, not 9
             ovhg = start-end if len(start_location.parts) == 1 else start - end - len(seq)
-            # TODO: If the cut model would include the ovhg, this hack would not be necessary:
-            dummy_cut = ((start, end), type('DynamicClass', (), {'ovhg': ovhg})())
+            dummy_cut = ((start, ovhg), None)
+            print(dummy_cut)
             open_seq = seq.apply_cut(dummy_cut, dummy_cut)
             subfragments.append(_Dseqrecord(fill_dseq(open_seq.seq), features=open_seq.features))
             continue

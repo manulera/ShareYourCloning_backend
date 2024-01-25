@@ -1180,7 +1180,6 @@ def circles_assembly():
     assert len(circular_assemblies) == 1
     assert str(assembly.assemble([a, b], circular_assemblies[0], True)) == 'ACGTAyyyxxxACGTAbb'
 
-
 def test_assemble_function():
     """A more granular test of the assemble function, independent of the experimental
     setup to make sure it works for all topologies"""
@@ -1246,8 +1245,8 @@ def test_assemble_function():
     # Now both are circular, using a single insertion site
     f1 = Dseqrecord('aaaTTTcta', circular=True)
     f2 = Dseqrecord('ccccTTTatg', circular=True)
-    f1.features = [f1_feat1]
-    f2.features = [f2_feat1]
+    f1.features = [SeqFeature(SimpleLocation(3, 6))]
+    f2.features = [SeqFeature(SimpleLocation(4, 7))]
 
     for shift_1 in range(len(f1)):
         f1_shifted = f1.shifted(shift_1)
@@ -1255,17 +1254,20 @@ def test_assemble_function():
         list(map(modify_feat, f1_shifted.features))
 
         for shift_2 in range(len(f2)):
+            print(shift_2)
             f2_shifted = f2.shifted(shift_2)
+            print(f1_shifted.seq, f2_shifted.seq)
             # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
             list(map(modify_feat, f2_shifted.features))
-
+            print(f2_shifted.features[0].location)
             # Linear assembly 2 - 1 - 2 (ccccTTTctaGGGaaa)
             assembly_plan = [
                 (1, 2, f1_shifted.features[0].location, f2_shifted.features[0].location),
                 (2, 1, f2_shifted.features[0].location, f1_shifted.features[0].location),
             ]
 
-            result = assembly.assemble([f1_shifted, f2], assembly_plan, False)
-            assert str(result.seq) == 'aaaTTTatgccccTTTcta'
-            assert len(result.features) == 2
+            result = assembly.assemble([f1_shifted, f2_shifted], assembly_plan, True)
+            print(result.seq)
+            assert result.seq.cseguid() == Dseq('aaaTTTatgccccTTTcta', circular=True).cseguid()
+            assert len(result.features) == 4
             assert set(str(f.location.extract(result.seq)) for f in result.features) == {'TTT'}
