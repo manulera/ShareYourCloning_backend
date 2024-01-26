@@ -333,6 +333,12 @@ def get_assembly_subfragments(fragments: list[_Dseqrecord], subfragment_represen
         subfragments.append(seq[start:end])
     return subfragments
 
+def extract_subfragment(seq: _Dseqrecord, start_location: Location, end_location: Location):
+    """Extract a subfragment from a sequence, given the start and end locations of the subfragment."""
+    start = 0 if start_location is None else start_location.parts[0].start
+    end = None if end_location is None else end_location.parts[-1].end
+    return seq[start:end]
+
 def is_sublist(sublist, my_list, my_list_is_cyclic=False):
     """Returns True if sublist is a sublist of my_list (can be treated as cyclic), False otherwise.
 
