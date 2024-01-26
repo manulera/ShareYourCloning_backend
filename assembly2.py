@@ -259,7 +259,8 @@ def assemble(fragments, assembly, is_circular):
         # Remove trailing overlap
         out_dseqrecord = _Dseqrecord(fill_dseq(out_dseqrecord.seq)[:-overlap], features=out_dseqrecord.features, circular=True)
         for feature in out_dseqrecord.features:
-            if feature.location.parts[0].start >= len(out_dseqrecord) or feature.location.parts[-1].end > len(out_dseqrecord):
+            start, end = _location_boundaries(feature.location)
+            if start >= len(out_dseqrecord) or end > len(out_dseqrecord):
                 # Wrap around the origin
                 feature.location = _shift_location(feature.location, 0, len(out_dseqrecord))
 
@@ -317,26 +318,30 @@ def get_assembly_subfragments(fragments: list[_Dseqrecord], subfragment_represen
     subfragments = list()
     for node, start_location, end_location in subfragment_representation:
         seq = fragments[node-1] if node > 0 else fragments[-node-1].reverse_complement()
-        start = 0 if start_location is None else start_location.parts[0].start
-        end = None if end_location is None else end_location.parts[-1].end
-        # Special case, some of it could be handled by better Dseqrecord slicing in the future
-        if seq.circular and start_location == end_location:
-            # The overhang is different for origin-spanning features, for instance
-            # for a feature join{[12:13], [0:3]} in a sequence of length 13, the overhang
-            # is -4, not 9
-            ovhg = start-end if len(start_location.parts) == 1 else start - end - len(seq)
-            dummy_cut = ((start, ovhg), None)
-            print(dummy_cut)
-            open_seq = seq.apply_cut(dummy_cut, dummy_cut)
-            subfragments.append(_Dseqrecord(fill_dseq(open_seq.seq), features=open_seq.features))
-            continue
-        subfragments.append(seq[start:end])
+        subfragments.append(extract_subfragment(seq, start_location, end_location))
     return subfragments
 
 def extract_subfragment(seq: _Dseqrecord, start_location: Location, end_location: Location):
     """Extract a subfragment from a sequence, given the start and end locations of the subfragment."""
-    start = 0 if start_location is None else start_location.parts[0].start
-    end = None if end_location is None else end_location.parts[-1].end
+    start = 0 if start_location is None else _location_boundaries(start_location)[0]
+    end = None if end_location is None else _location_boundaries(end_location)[1]
+
+    # Special case, some of it could be handled by better Dseqrecord slicing in the future
+    if seq.circular and start_location == end_location:
+        # The overhang is different for origin-spanning features, for instance
+        # for a feature join{[12:13], [0:3]} in a sequence of length 13, the overhang
+        # is -4, not 9
+        ovhg = start-end if end > start else start - end - len(seq)
+        dummy_cut = ((start, ovhg), None)
+        print(start, ovhg)
+        print(seq.seq)
+        open_seq = seq.apply_cut(dummy_cut, dummy_cut)
+        return _Dseqrecord(fill_dseq(open_seq.seq), features=open_seq.features)
+
+    # TODO: remove with https://github.com/BjornFJohansson/pydna/issues/161
+    if seq.circular and start == end:
+        return seq.shifted(start)
+
     return seq[start:end]
 
 def is_sublist(sublist, my_list, my_list_is_cyclic=False):

@@ -1198,16 +1198,8 @@ def test_assemble_function():
     f1.features = [f1_feat1, f1_feat2]
     f2.features = [f2_feat1, f2_feat2]
 
-    # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
-    def modify_feat(feat):
-        if len(feat.location.parts) > 1:
-            feat.location.parts = feat.location.parts[::-1]
-        return feat
-
     for shift in range(len(f1)):
         f1_shifted = f1.shifted(shift)
-        # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
-        list(map(modify_feat, f1_shifted.features))
 
         # Re-order the features so that TTT is first
         if str(f1_shifted.features[0].location.extract(f1_shifted.seq)) != 'TTT':
@@ -1250,16 +1242,9 @@ def test_assemble_function():
 
     for shift_1 in range(len(f1)):
         f1_shifted = f1.shifted(shift_1)
-        # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
-        list(map(modify_feat, f1_shifted.features))
 
         for shift_2 in range(len(f2)):
-            print(shift_2)
             f2_shifted = f2.shifted(shift_2)
-            print(f1_shifted.seq, f2_shifted.seq)
-            # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
-            list(map(modify_feat, f2_shifted.features))
-            print(f2_shifted.features[0].location)
             # Linear assembly 2 - 1 - 2 (ccccTTTctaGGGaaa)
             assembly_plan = [
                 (1, 2, f1_shifted.features[0].location, f2_shifted.features[0].location),
@@ -1267,7 +1252,6 @@ def test_assemble_function():
             ]
 
             result = assembly.assemble([f1_shifted, f2_shifted], assembly_plan, True)
-            print(result.seq)
             assert result.seq.cseguid() == Dseq('aaaTTTatgccccTTTcta', circular=True).cseguid()
             assert len(result.features) == 4
             assert set(str(f.location.extract(result.seq)) for f in result.features) == {'TTT'}
@@ -1337,10 +1321,10 @@ def test_assembly_is_valid():
     assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == False
 
     # Assembly plan including two fragments extracted from circular molecules:
-    f1 = Dseqrecord('xxTTTx')
+    f1 = Dseqrecord('ccTTTc')
     f2 = Dseqrecord('TTTAAA', circular=True)
     f3 = Dseqrecord('AAACCC', circular=True)
-    f4 = Dseqrecord('xxCCCx')
+    f4 = Dseqrecord('ggCCCg')
     f1.features = [SeqFeature(SimpleLocation(2, 5), id='f1_f2')]
     f2.features = [SeqFeature(SimpleLocation(0, 3), id='f1_f2'), SeqFeature(SimpleLocation(3, 6), id='f2_f3')]
     f3.features = [SeqFeature(SimpleLocation(0, 3), id='f2_f3'), SeqFeature(SimpleLocation(3, 6), id='f3_f4')]
@@ -1364,9 +1348,53 @@ def test_assembly_is_valid():
                 (2, 3, find_feature_by_id(f2_shifted, 'f2_f3').location, find_feature_by_id(f3_shifted, 'f2_f3').location),
                 (3, 4, find_feature_by_id(f3_shifted, 'f3_f4').location, f4.features[0].location),
             ]
-            print(assembly.assembly2str(assembly_plan))
-            print(shift_2, shift_3)
             assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == True
-            # assert str(assembly.assemble(fragments, assembly_plan, False).seq) == 'xxTTTAAACCCx'
+            # Does not really belong here, but 
+            assert str(assembly.assemble(fragments, assembly_plan, False).seq) == 'ccTTTAAACCCg'
 
-def test_get_assembly_subfragments():
+def test_extract_subfragment():
+    def find_feature_by_id(f: Dseqrecord, id: str) -> SeqFeature:
+        return next(f for f in f.features if f.id == id)
+
+    f1 = Dseqrecord('aaTTTcccTTTaa', circular=True)
+    f1.features = [SeqFeature(SimpleLocation(2, 5), id='left'), SeqFeature(SimpleLocation(8, 11), id='right')]
+
+    for shift in range(len(f1)):
+        f1_shifted = f1.shifted(shift)
+        left = find_feature_by_id(f1_shifted, 'left').location
+        right = find_feature_by_id(f1_shifted, 'right').location
+        subfragment = assembly.extract_subfragment(f1_shifted, left, right)
+        assert str(subfragment.seq) == 'TTTcccTTT'
+        assert len(subfragment.features) == 2
+
+    # Edge case, in circular molecules, if you extract the entire sequence this can cause problems,
+    # because it leads to a [0:0] getitem call, at least before issue
+    # TODO: remove with https://github.com/BjornFJohansson/pydna/issues/161
+    f1 = Dseqrecord('AAATTT', circular=True)
+    f1.features = [SeqFeature(SimpleLocation(0, 3), id='left'), SeqFeature(SimpleLocation(3, 6), id='right')]
+
+    for shift in range(len(f1)):
+        f1_shifted = f1.shifted(shift)
+        left = find_feature_by_id(f1_shifted, 'left').location
+        right = find_feature_by_id(f1_shifted, 'right').location
+        subfragment = assembly.extract_subfragment(f1_shifted, left, right)
+        assert str(subfragment.seq) == 'AAATTT'
+        assert len(subfragment.features) == 2
+
+    # In circular molecules, the same feature twice should extract the "opened up" sequence, as
+    # when you cut open a plasmid with a restriction enzyme. This is useful to represent an integration
+    # in which the integration seq is duplicated, or for digestion/ligation representing the opening up
+    # of the plasmid.
+    f1 = Dseqrecord('ATTTA', circular=True)
+    f1.features = [SeqFeature(SimpleLocation(1, 4))]
+
+    for shift in range(len(f1)):
+        print(shift)
+        f1_shifted = f1.shifted(shift)
+        loc = f1_shifted.features[0].location
+        subfragment = assembly.extract_subfragment(f1_shifted, loc, loc)
+        assert str(subfragment.seq) == 'TTTAATTT'
+        # The feature marking the overlap should be copied
+        assert len(subfragment.features) == 2
+
+    # TODO: test None case
