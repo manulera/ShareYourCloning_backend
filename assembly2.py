@@ -1,6 +1,6 @@
 """Slightly different assembly implementation"""
 
-from pydna.utils import shift_location as _shift_location, flatten
+from pydna.utils import shift_location as _shift_location, flatten, location_boundaries as _location_boundaries
 from pydna._pretty import pretty_str as _pretty_str
 from pydna.common_sub_strings import common_sub_strings as common_sub_strings_str
 from pydna.common_sub_strings import terminal_overlap as terminal_overlap_str
@@ -224,7 +224,7 @@ def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragm
     for (u1, v1, _, start_location), (u2, v2, end_location, _) in edge_pairs:
         # Incompatible as described in figure above
         fragment = fragments[abs(v1)-1]
-        if not fragment.circular and start_location.parts[-1].end >= end_location.parts[0].end:
+        if not fragment.circular and _location_boundaries(start_location)[1] >=  _location_boundaries(end_location)[1]:
             return False
 
     if fragments_only_once:

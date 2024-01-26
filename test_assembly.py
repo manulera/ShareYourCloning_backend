@@ -6,7 +6,7 @@ from pydna.amplify import pcr
 from pydna.dseq import Dseq
 from pydna.readers import read
 import assembly2 as assembly
-from Bio.SeqFeature import ExactPosition, FeatureLocation, SeqFeature, SimpleLocation
+from Bio.SeqFeature import ExactPosition, FeatureLocation, SeqFeature, SimpleLocation, Location
 from importlib import reload
 from pydna.dseqrecord import Dseqrecord
 from pydna.parsers import parse
@@ -1271,3 +1271,102 @@ def test_assemble_function():
             assert result.seq.cseguid() == Dseq('aaaTTTatgccccTTTcta', circular=True).cseguid()
             assert len(result.features) == 4
             assert set(str(f.location.extract(result.seq)) for f in result.features) == {'TTT'}
+
+
+def test_assembly_is_valid():
+
+    # fragments are only used for topology, their sequence is not used
+    fragments = [Dseqrecord(''), Dseqrecord(''), Dseqrecord('')]
+
+    # Normal assembly plan
+    #
+    # 1 ------
+    #      |||
+    # 2    ------
+    #         |||
+    # 3       ------
+    #
+    assembly_plan = [
+        (1, 2, SimpleLocation(3, 6), SimpleLocation(0, 3)),
+        (2, 3, SimpleLocation(3, 6), SimpleLocation(0, 3))
+    ]
+
+    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == True
+
+    # Partial overlap should be allowed, a fragment could act like a "bridge"
+    # 1 ------
+    #     ||||
+    # 2   ------
+    #        ||||
+    # 3      ------
+    # TODO: check meaning of this for non-homology assemblies like restriction ligation
+    assembly_plan = [
+        (1, 2, SimpleLocation(2, 6), SimpleLocation(0, 4)),
+        (2, 3, SimpleLocation(2, 6), SimpleLocation(0, 4))
+    ]
+
+    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == True
+
+    # Complete overlap in linear assemblies should be discarded as is redundant
+    # 1 ------
+    #     ||||
+    # 2   ------
+    #     ||||
+    # 3   ------
+    # TODO: check meaning of this when 2 is circular molecule
+
+    assembly_plan = [
+        (1, 2, SimpleLocation(2, 6), SimpleLocation(0, 4)),
+        (2, 3, SimpleLocation(0, 4), SimpleLocation(0, 4))
+    ]
+
+    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == False
+
+    # Invalid assembly
+    # 1   ------
+    #         ||
+    # 2   ------
+    #     ||
+    # 3   ------
+
+    assembly_plan = [
+        (1, 2, SimpleLocation(4, 6), SimpleLocation(4, 6)),
+        (2, 3, SimpleLocation(0, 2), SimpleLocation(0, 2))
+    ]
+
+    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == False
+
+    # Assembly plan including two fragments extracted from circular molecules:
+    f1 = Dseqrecord('xxTTTx')
+    f2 = Dseqrecord('TTTAAA', circular=True)
+    f3 = Dseqrecord('AAACCC', circular=True)
+    f4 = Dseqrecord('xxCCCx')
+    f1.features = [SeqFeature(SimpleLocation(2, 5), id='f1_f2')]
+    f2.features = [SeqFeature(SimpleLocation(0, 3), id='f1_f2'), SeqFeature(SimpleLocation(3, 6), id='f2_f3')]
+    f3.features = [SeqFeature(SimpleLocation(0, 3), id='f2_f3'), SeqFeature(SimpleLocation(3, 6), id='f3_f4')]
+    f4.features = [SeqFeature(SimpleLocation(2, 5), id='f3_f4')]
+
+    def find_feature_by_id(f: Dseqrecord, id: str) -> SeqFeature:
+        return next(f for f in f.features if f.id == id)
+
+    for shift_2 in range(len(f2)):
+        f2_shifted = f2.shifted(shift_2)
+        # # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
+        # list(map(modify_feat, f1_shifted.features))
+
+        for shift_3 in range(len(f3)):
+            f3_shifted = f3.shifted(shift_3)
+            # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
+            # list(map(modify_feat, f2_shifted.features))
+            fragments = [f1, f2_shifted, f3_shifted, f4]
+            assembly_plan = [
+                (1, 2, f1.features[0].location, find_feature_by_id(f2_shifted, 'f1_f2').location),
+                (2, 3, find_feature_by_id(f2_shifted, 'f2_f3').location, find_feature_by_id(f3_shifted, 'f2_f3').location),
+                (3, 4, find_feature_by_id(f3_shifted, 'f3_f4').location, f4.features[0].location),
+            ]
+            print(assembly.assembly2str(assembly_plan))
+            print(shift_2, shift_3)
+            assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == True
+            # assert str(assembly.assemble(fragments, assembly_plan, False).seq) == 'xxTTTAAACCCx'
+
+def test_get_assembly_subfragments():
