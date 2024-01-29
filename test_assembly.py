@@ -6,8 +6,7 @@ from pydna.amplify import pcr
 from pydna.dseq import Dseq
 from pydna.readers import read
 import assembly2 as assembly
-from Bio.SeqFeature import ExactPosition, FeatureLocation, SeqFeature, SimpleLocation, Location
-from importlib import reload
+from Bio.SeqFeature import ExactPosition, FeatureLocation, SeqFeature, SimpleLocation
 from pydna.dseqrecord import Dseqrecord
 from pydna.parsers import parse
 from pydna.utils import eq
@@ -645,16 +644,6 @@ def test_assemble_pGUP1():
     assert eq(pGUP1, pGUP1_correct)
     assert pGUP1_correct.useguid() == "42wIByERn2kSe_Exn405RYwhffU"
     assert pGUP1.useguid() == "42wIByERn2kSe_Exn405RYwhffU"
-
-
-# def test_35_36():
-#    import sys
-#    from pydna.assembly import _od
-#    if sys.version_info < (3, 6):
-#        from collections import OrderedDict
-#        assert _od==OrderedDict
-#    else:
-#        assert _od==dict
 
 
 def test_pYPK7_TDH3_GAL2_PGI1():
@@ -1398,3 +1387,55 @@ def test_extract_subfragment():
         assert len(subfragment.features) == 2
 
     # TODO: test None case
+
+
+def test_sticky_end_sub_strings():
+
+    # Full overlap, negative ovhg
+    a, b = Dseqrecord('AAAGAATTCAAA').cut(EcoRI)
+    assert assembly.sticky_end_sub_strings(a, b) == [(4, 0, 4)]
+    assert assembly.sticky_end_sub_strings(a.reverse_complement(), b.reverse_complement()) == []
+    assert assembly.sticky_end_sub_strings(b, a) == []
+
+    # Full overlap, positive ovhg
+    a, b = Dseqrecord('TTGCGATCGCTT').cut(RgaI)
+    assert assembly.sticky_end_sub_strings(a, b) == [(5, 0, 2)]
+    assert assembly.sticky_end_sub_strings(b, a) == []
+    assert assembly.sticky_end_sub_strings(a.reverse_complement(), b.reverse_complement()) == []
+
+    # Blunt ends do not work either
+    assert assembly.sticky_end_sub_strings(Dseqrecord('TT'), Dseqrecord('TT')) == []
+
+    # Partial overlaps
+    a = Dseqrecord(Dseq.from_full_sequence_and_overhangs('AAAGAA', 0, 3))
+    b = Dseqrecord(Dseq.from_full_sequence_and_overhangs('AAAGAA', 3, 0))
+
+    assert assembly.sticky_end_sub_strings(a, b) == []
+    # Only when limit == True -> TODO: change this to not be an assembly parameter, but
+    # functional instead.
+    assert assembly.sticky_end_sub_strings(a, b, True) == [(4, 0, 2)]
+
+
+def test_ligation_assembly():
+
+    fragments = Dseqrecord('AAAGAATTCAAA').cut(EcoRI)
+    asm = assembly.Assembly(fragments, algorithm=assembly.sticky_end_sub_strings, limit=False, use_all_fragments=True, use_fragment_order=False)
+    assert asm.assemble_linear() == [Dseqrecord('AAAGAATTCAAA')]
+
+    fragments = Dseqrecord('TTGCGATCGCTT').cut(RgaI)
+    asm = assembly.Assembly(fragments, algorithm=assembly.sticky_end_sub_strings, limit=False, use_all_fragments=True, use_fragment_order=False)
+    assert asm.assemble_linear() == [Dseqrecord('TTGCGATCGCTT')]
+
+    # Circular ligation
+    fragments = Dseqrecord('AAGAATTCTTGAATTCCC', circular=True).cut(EcoRI)
+    expected_result = [(fragments[0] + fragments[1]).looped(), (fragments[0] + fragments[1].reverse_complement()).looped()]
+    asm = assembly.Assembly(fragments, algorithm=assembly.sticky_end_sub_strings, limit=False, use_all_fragments=True, use_fragment_order=False)
+    assert sorted(asm.assemble_circular(), key= lambda x: str(x.seq)) == sorted(expected_result, key= lambda x: str(x.seq))
+
+    # Partial ligation
+    a = Dseqrecord(Dseq.from_full_sequence_and_overhangs('AAAGAA', 0, 3))
+    b = Dseqrecord(Dseq.from_full_sequence_and_overhangs('AAAGAA', 3, 0))
+    assert assembly.Assembly([a, b], algorithm=assembly.sticky_end_sub_strings, limit=False, use_all_fragments=True, use_fragment_order=False).assemble_linear() == []
+    # Only when limit == True -> TODO: change this to not be an assembly parameter, but
+    # functional instead.
+    assert len(assembly.Assembly([a, b], algorithm=assembly.sticky_end_sub_strings, limit=True, use_all_fragments=True, use_fragment_order=False).assemble_linear()) == 1
