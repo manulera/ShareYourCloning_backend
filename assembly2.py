@@ -508,27 +508,6 @@ class Assembly:
                 _shift_location(SimpleLocation(y_start, y_start + length), 0, len(secnd))]
         rc_locs = [locs[0]._flip(len(first)), locs[1]._flip(len(secnd))]
 
-        # TODO: fix _shift_location in pydna, should be if strand != -1
-        # newparts.extend(parttuple if strand == 1 else parttuple[::-1]
-        # issue: https://github.com/BjornFJohansson/pydna/pull/179
-
-        if len(locs[0].parts) == 2:
-            locs[0].parts = locs[0].parts[::-1]
-        if len(locs[1].parts) == 2:
-            locs[1].parts = locs[1].parts[::-1]
-
-        # TODO: this comment is a mistake I think -> remove
-        # In addition, the rc_locs inversion is needed because compound
-        # locations that represent origin-spanning features are flipped
-        # in a way where the meaning of start and end changes.
-        # For instance, a feature join{[12:13], [0:3]} in a molecule of
-        # length 13 is flipped into join{[0:1], [10:13]}. Then, f.parts[0].start
-        # and f.parts[1].end changes meaning.
-        # if len(rc_locs[0].parts) == 2:
-        #     rc_locs[0].parts = rc_locs[0].parts[::-1]
-        # if len(rc_locs[1].parts) == 2:
-        #     rc_locs[1].parts = rc_locs[1].parts[::-1]
-
         combinations = (
             (u, v, locs),
             (-v, -u, rc_locs[::-1]),
