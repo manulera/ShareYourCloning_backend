@@ -1331,13 +1331,9 @@ def test_assembly_is_valid():
 
     for shift_2 in range(len(f2)):
         f2_shifted = f2.shifted(shift_2)
-        # # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
-        # list(map(modify_feat, f1_shifted.features))
 
         for shift_3 in range(len(f3)):
             f3_shifted = f3.shifted(shift_3)
-            # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
-            # list(map(modify_feat, f2_shifted.features))
             fragments = [f1, f2_shifted, f3_shifted, f4]
             assembly_plan = [
                 (1, 2, f1.features[0].location, find_feature_by_id(f2_shifted, 'f1_f2').location),
