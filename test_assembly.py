@@ -7,7 +7,6 @@ from pydna.dseq import Dseq
 from pydna.readers import read
 import assembly2 as assembly
 from Bio.SeqFeature import ExactPosition, FeatureLocation, SeqFeature, SimpleLocation
-from importlib import reload
 from pydna.dseqrecord import Dseqrecord
 from pydna.parsers import parse
 from pydna.utils import eq
@@ -647,16 +646,6 @@ def test_assemble_pGUP1():
     assert pGUP1.useguid() == "42wIByERn2kSe_Exn405RYwhffU"
 
 
-# def test_35_36():
-#    import sys
-#    from pydna.assembly import _od
-#    if sys.version_info < (3, 6):
-#        from collections import OrderedDict
-#        assert _od==OrderedDict
-#    else:
-#        assert _od==dict
-
-
 def test_pYPK7_TDH3_GAL2_PGI1():
 
     pMEC1142 = read("test_files/pYPK0_TDH3_GAL2_PGI1.gb")
@@ -995,6 +984,13 @@ def test_restriction_ligation_assembly():
         f2_shifted = f2.shifted(shift)
         f = assembly.Assembly([f1, f2_shifted], algorithm=algo, use_fragment_order=False)
         observed_cseguids = sorted(x.cseguid() for x in f.assemble_circular())
+        print(shift, f2_shifted.seq)
+        print((b1.seq + a2.seq).looped())
+        print((b1.seq + a2.seq.reverse_complement()).looped())
+        print('===')
+        for ff in f.assemble_circular():
+            print(ff.seq)
+        print()
         assert len(result_cseguids) == len(observed_cseguids)
         assert result_cseguids == observed_cseguids
 
@@ -1180,7 +1176,6 @@ def circles_assembly():
     assert len(circular_assemblies) == 1
     assert str(assembly.assemble([a, b], circular_assemblies[0], True)) == 'ACGTAyyyxxxACGTAbb'
 
-
 def test_assemble_function():
     """A more granular test of the assemble function, independent of the experimental
     setup to make sure it works for all topologies"""
@@ -1199,16 +1194,8 @@ def test_assemble_function():
     f1.features = [f1_feat1, f1_feat2]
     f2.features = [f2_feat1, f2_feat2]
 
-    # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
-    def modify_feat(feat):
-        if len(feat.location.parts) > 1:
-            feat.location.parts = feat.location.parts[::-1]
-        return feat
-
     for shift in range(len(f1)):
         f1_shifted = f1.shifted(shift)
-        # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
-        list(map(modify_feat, f1_shifted.features))
 
         # Re-order the features so that TTT is first
         if str(f1_shifted.features[0].location.extract(f1_shifted.seq)) != 'TTT':
@@ -1246,26 +1233,212 @@ def test_assemble_function():
     # Now both are circular, using a single insertion site
     f1 = Dseqrecord('aaaTTTcta', circular=True)
     f2 = Dseqrecord('ccccTTTatg', circular=True)
-    f1.features = [f1_feat1]
-    f2.features = [f2_feat1]
+    f1.features = [SeqFeature(SimpleLocation(3, 6))]
+    f2.features = [SeqFeature(SimpleLocation(4, 7))]
 
     for shift_1 in range(len(f1)):
         f1_shifted = f1.shifted(shift_1)
-        # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
-        list(map(modify_feat, f1_shifted.features))
 
         for shift_2 in range(len(f2)):
             f2_shifted = f2.shifted(shift_2)
-            # TODO: remove with this when https://github.com/BjornFJohansson/pydna/pull/179 is solved
-            list(map(modify_feat, f2_shifted.features))
-
             # Linear assembly 2 - 1 - 2 (ccccTTTctaGGGaaa)
             assembly_plan = [
                 (1, 2, f1_shifted.features[0].location, f2_shifted.features[0].location),
                 (2, 1, f2_shifted.features[0].location, f1_shifted.features[0].location),
             ]
 
-            result = assembly.assemble([f1_shifted, f2], assembly_plan, False)
-            assert str(result.seq) == 'aaaTTTatgccccTTTcta'
-            assert len(result.features) == 2
+            result = assembly.assemble([f1_shifted, f2_shifted], assembly_plan, True)
+            assert result.seq.cseguid() == Dseq('aaaTTTatgccccTTTcta', circular=True).cseguid()
+            assert len(result.features) == 4
             assert set(str(f.location.extract(result.seq)) for f in result.features) == {'TTT'}
+
+
+def test_assembly_is_valid():
+
+    # fragments are only used for topology, their sequence is not used
+    fragments = [Dseqrecord(''), Dseqrecord(''), Dseqrecord('')]
+
+    # Normal assembly plan
+    #
+    # 1 ------
+    #      |||
+    # 2    ------
+    #         |||
+    # 3       ------
+    #
+    assembly_plan = [
+        (1, 2, SimpleLocation(3, 6), SimpleLocation(0, 3)),
+        (2, 3, SimpleLocation(3, 6), SimpleLocation(0, 3))
+    ]
+
+    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == True
+
+    # Partial overlap should be allowed, a fragment could act like a "bridge"
+    # 1 ------
+    #     ||||
+    # 2   ------
+    #        ||||
+    # 3      ------
+    # TODO: check meaning of this for non-homology assemblies like restriction ligation
+    assembly_plan = [
+        (1, 2, SimpleLocation(2, 6), SimpleLocation(0, 4)),
+        (2, 3, SimpleLocation(2, 6), SimpleLocation(0, 4))
+    ]
+
+    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == True
+
+    # Complete overlap in linear assemblies should be discarded as is redundant
+    # 1 ------
+    #     ||||
+    # 2   ------
+    #     ||||
+    # 3   ------
+    # TODO: check meaning of this when 2 is circular molecule
+
+    assembly_plan = [
+        (1, 2, SimpleLocation(2, 6), SimpleLocation(0, 4)),
+        (2, 3, SimpleLocation(0, 4), SimpleLocation(0, 4))
+    ]
+
+    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == False
+
+    # Invalid assembly
+    # 1   ------
+    #         ||
+    # 2   ------
+    #     ||
+    # 3   ------
+
+    assembly_plan = [
+        (1, 2, SimpleLocation(4, 6), SimpleLocation(4, 6)),
+        (2, 3, SimpleLocation(0, 2), SimpleLocation(0, 2))
+    ]
+
+    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == False
+
+    # Assembly plan including two fragments extracted from circular molecules:
+    f1 = Dseqrecord('ccTTTc')
+    f2 = Dseqrecord('TTTAAA', circular=True)
+    f3 = Dseqrecord('AAACCC', circular=True)
+    f4 = Dseqrecord('ggCCCg')
+    f1.features = [SeqFeature(SimpleLocation(2, 5), id='f1_f2')]
+    f2.features = [SeqFeature(SimpleLocation(0, 3), id='f1_f2'), SeqFeature(SimpleLocation(3, 6), id='f2_f3')]
+    f3.features = [SeqFeature(SimpleLocation(0, 3), id='f2_f3'), SeqFeature(SimpleLocation(3, 6), id='f3_f4')]
+    f4.features = [SeqFeature(SimpleLocation(2, 5), id='f3_f4')]
+
+    def find_feature_by_id(f: Dseqrecord, id: str) -> SeqFeature:
+        return next(f for f in f.features if f.id == id)
+
+    for shift_2 in range(len(f2)):
+        f2_shifted = f2.shifted(shift_2)
+
+        for shift_3 in range(len(f3)):
+            f3_shifted = f3.shifted(shift_3)
+            fragments = [f1, f2_shifted, f3_shifted, f4]
+            assembly_plan = [
+                (1, 2, f1.features[0].location, find_feature_by_id(f2_shifted, 'f1_f2').location),
+                (2, 3, find_feature_by_id(f2_shifted, 'f2_f3').location, find_feature_by_id(f3_shifted, 'f2_f3').location),
+                (3, 4, find_feature_by_id(f3_shifted, 'f3_f4').location, f4.features[0].location),
+            ]
+            assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == True
+            # Does not really belong here, but 
+            assert str(assembly.assemble(fragments, assembly_plan, False).seq) == 'ccTTTAAACCCg'
+
+def test_extract_subfragment():
+    def find_feature_by_id(f: Dseqrecord, id: str) -> SeqFeature:
+        return next(f for f in f.features if f.id == id)
+
+    f1 = Dseqrecord('aaTTTcccTTTaa', circular=True)
+    f1.features = [SeqFeature(SimpleLocation(2, 5), id='left'), SeqFeature(SimpleLocation(8, 11), id='right')]
+
+    for shift in range(len(f1)):
+        f1_shifted = f1.shifted(shift)
+        left = find_feature_by_id(f1_shifted, 'left').location
+        right = find_feature_by_id(f1_shifted, 'right').location
+        subfragment = assembly.extract_subfragment(f1_shifted, left, right)
+        assert str(subfragment.seq) == 'TTTcccTTT'
+        assert len(subfragment.features) == 2
+
+    # Edge case, in circular molecules, if you extract the entire sequence this can cause problems,
+    # because it leads to a [0:0] getitem call, at least before issue
+    # TODO: remove with https://github.com/BjornFJohansson/pydna/issues/161
+    f1 = Dseqrecord('AAATTT', circular=True)
+    f1.features = [SeqFeature(SimpleLocation(0, 3), id='left'), SeqFeature(SimpleLocation(3, 6), id='right')]
+
+    for shift in range(len(f1)):
+        f1_shifted = f1.shifted(shift)
+        left = find_feature_by_id(f1_shifted, 'left').location
+        right = find_feature_by_id(f1_shifted, 'right').location
+        subfragment = assembly.extract_subfragment(f1_shifted, left, right)
+        assert str(subfragment.seq) == 'AAATTT'
+        assert len(subfragment.features) == 2
+
+    # In circular molecules, the same feature twice should extract the "opened up" sequence, as
+    # when you cut open a plasmid with a restriction enzyme. This is useful to represent an integration
+    # in which the integration seq is duplicated, or for digestion/ligation representing the opening up
+    # of the plasmid.
+    f1 = Dseqrecord('ATTTA', circular=True)
+    f1.features = [SeqFeature(SimpleLocation(1, 4))]
+
+    for shift in range(len(f1)):
+        print(shift)
+        f1_shifted = f1.shifted(shift)
+        loc = f1_shifted.features[0].location
+        subfragment = assembly.extract_subfragment(f1_shifted, loc, loc)
+        assert str(subfragment.seq) == 'TTTAATTT'
+        # The feature marking the overlap should be copied
+        assert len(subfragment.features) == 2
+
+    # TODO: test None case
+
+
+def test_sticky_end_sub_strings():
+
+    # Full overlap, negative ovhg
+    a, b = Dseqrecord('AAAGAATTCAAA').cut(EcoRI)
+    assert assembly.sticky_end_sub_strings(a, b) == [(4, 0, 4)]
+    assert assembly.sticky_end_sub_strings(a.reverse_complement(), b.reverse_complement()) == []
+    assert assembly.sticky_end_sub_strings(b, a) == []
+
+    # Full overlap, positive ovhg
+    a, b = Dseqrecord('TTGCGATCGCTT').cut(RgaI)
+    assert assembly.sticky_end_sub_strings(a, b) == [(5, 0, 2)]
+    assert assembly.sticky_end_sub_strings(b, a) == []
+    assert assembly.sticky_end_sub_strings(a.reverse_complement(), b.reverse_complement()) == []
+
+    # Blunt ends do not work either
+    assert assembly.sticky_end_sub_strings(Dseqrecord('TT'), Dseqrecord('TT')) == []
+
+    # Partial overlaps
+    a = Dseqrecord(Dseq.from_full_sequence_and_overhangs('AAAGAA', 0, 3))
+    b = Dseqrecord(Dseq.from_full_sequence_and_overhangs('AAAGAA', 3, 0))
+
+    assert assembly.sticky_end_sub_strings(a, b) == []
+    # Only when limit == True -> TODO: change this to not be an assembly parameter, but
+    # functional instead.
+    assert assembly.sticky_end_sub_strings(a, b, True) == [(4, 0, 2)]
+
+
+def test_ligation_assembly():
+
+    fragments = Dseqrecord('AAAGAATTCAAA').cut(EcoRI)
+    asm = assembly.Assembly(fragments, algorithm=assembly.sticky_end_sub_strings, limit=False, use_all_fragments=True, use_fragment_order=False)
+    assert asm.assemble_linear() == [Dseqrecord('AAAGAATTCAAA')]
+
+    fragments = Dseqrecord('TTGCGATCGCTT').cut(RgaI)
+    asm = assembly.Assembly(fragments, algorithm=assembly.sticky_end_sub_strings, limit=False, use_all_fragments=True, use_fragment_order=False)
+    assert asm.assemble_linear() == [Dseqrecord('TTGCGATCGCTT')]
+
+    # Circular ligation
+    fragments = Dseqrecord('AAGAATTCTTGAATTCCC', circular=True).cut(EcoRI)
+    expected_result = [(fragments[0] + fragments[1]).looped(), (fragments[0] + fragments[1].reverse_complement()).looped()]
+    asm = assembly.Assembly(fragments, algorithm=assembly.sticky_end_sub_strings, limit=False, use_all_fragments=True, use_fragment_order=False)
+    assert sorted(asm.assemble_circular(), key= lambda x: str(x.seq)) == sorted(expected_result, key= lambda x: str(x.seq))
+
+    # Partial ligation
+    a = Dseqrecord(Dseq.from_full_sequence_and_overhangs('AAAGAA', 0, 3))
+    b = Dseqrecord(Dseq.from_full_sequence_and_overhangs('AAAGAA', 3, 0))
+    assert assembly.Assembly([a, b], algorithm=assembly.sticky_end_sub_strings, limit=False, use_all_fragments=True, use_fragment_order=False).assemble_linear() == []
+    # Only when limit == True -> TODO: change this to not be an assembly parameter, but
+    # functional instead.
+    assert len(assembly.Assembly([a, b], algorithm=assembly.sticky_end_sub_strings, limit=True, use_all_fragments=True, use_fragment_order=False).assemble_linear()) == 1
