@@ -396,9 +396,9 @@ class RestrictionTest(unittest.TestCase):
 
         # The edges of the fragments are correct:
         self.assertEqual(sources[0].left_edge, None)
-        self.assertEqual(sources[0].right_edge, (7, 11))
+        self.assertEqual(sources[0].right_edge, (7, -4))
 
-        self.assertEqual(sources[1].left_edge, (7, 11))
+        self.assertEqual(sources[1].left_edge, (7, -4))
         self.assertEqual(sources[1].right_edge, None)
 
         # The enzyme names are correctly returned:
@@ -410,7 +410,7 @@ class RestrictionTest(unittest.TestCase):
             input=[1],
             restriction_enzymes=[None, 'EcoRI'],
             left_edge=None,
-            right_edge=(7, 11)
+            right_edge=(7, -4)
         )
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data)
@@ -422,7 +422,7 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(len(sources), 1)
         self.assertEqual(sources[0].left_edge, None)
-        self.assertEqual(sources[0].right_edge, (7, 11))
+        self.assertEqual(sources[0].right_edge, (7, -4))
         self.assertEqual(sources[0].restriction_enzymes, [None, 'EcoRI'])
 
     def test_circular_single_restriction(self):
@@ -450,15 +450,15 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual(resulting_sequences[0].seq.watson.upper(), 'AATTCTTTTTTAAAAAAG')
 
         # The edges of the fragments are correct:
-        self.assertEqual(sources[0].left_edge, (7, 11))
-        self.assertEqual(sources[0].right_edge, (7, 11))
+        self.assertEqual(sources[0].left_edge, (7, -4))
+        self.assertEqual(sources[0].right_edge, (7, -4))
 
         # The enzyme names are correctly returned:
         self.assertEqual(sources[0].restriction_enzymes, ['EcoRI', 'EcoRI'])
 
         # When the cutting site spans the origin
         sequences = ['AATTCTTTTTTG', 'ATTCTTTTTTGA']
-        cut_positions = [(0, 4), (11, 3)]
+        cut_positions = [(0, -4), (11, -4)]
 
         for s, pos in zip(sequences, cut_positions):
             dseq = Dseqrecord(s, circular=True)
@@ -518,7 +518,7 @@ class RestrictionTest(unittest.TestCase):
 
         # The edges of the fragments are correct:
         # AAAG^GATC_CAAAAGAT^ATCAAAAA
-        edges = [(None, (4, 8)), ((4, 8), (16, 16)), ((16, 16), None)]
+        edges = [(None, (4, -4)), ((4, -4), (16, 0)), ((16, 0), None)]
         for i, e in enumerate(edges):
             self.assertEqual(sources[i].left_edge, e[0])
             self.assertEqual(sources[i].right_edge, e[1])
@@ -577,7 +577,7 @@ class RestrictionTest(unittest.TestCase):
         # The edges of the fragments are correct:
         # AAAG^GATC_CAAAAGAT^ATCAAAAA
         # We use 8 + len because it's an origin-spanning sequence
-        edges = [((4, 8), (16, 16)), ((16, 16), (4, 8))]
+        edges = [((4, -4), (16, 0)), ((16, 0), (4, -4))]
         for i, e in enumerate(edges):
             self.assertEqual(sources[i].left_edge, e[0])
             self.assertEqual(sources[i].right_edge, e[1])

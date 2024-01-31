@@ -326,6 +326,7 @@ def extract_subfragment(seq: _Dseqrecord, start_location: Location, end_location
     start = 0 if start_location is None else _location_boundaries(start_location)[0]
     end = None if end_location is None else _location_boundaries(end_location)[1]
 
+    print(start_location, end_location)
     # Special case, some of it could be handled by better Dseqrecord slicing in the future
     if seq.circular and start_location == end_location:
         # The overhang is different for origin-spanning features, for instance
@@ -333,8 +334,7 @@ def extract_subfragment(seq: _Dseqrecord, start_location: Location, end_location
         # is -4, not 9
         ovhg = start-end if end > start else start - end - len(seq)
         dummy_cut = ((start, ovhg), None)
-        print(start, ovhg)
-        print(seq.seq)
+        print( '*' ,start, ovhg, seq.seq)
         open_seq = seq.apply_cut(dummy_cut, dummy_cut)
         return _Dseqrecord(fill_dseq(open_seq.seq), features=open_seq.features)
 
@@ -507,6 +507,15 @@ class Assembly:
         locs = [_shift_location(SimpleLocation(x_start, x_start + length), 0, len(first)),
                 _shift_location(SimpleLocation(y_start, y_start + length), 0, len(secnd))]
         rc_locs = [locs[0]._flip(len(first)), locs[1]._flip(len(secnd))]
+
+        # the parts list of rc_locs that span the origin get inverted when flipped.
+        # For instance, join{[4:6], [0:1]} in a sequence with length 6 will become
+        # join{[0:2], [5:6]} when flipped. This removes the meaning of origin-spanning.
+        # We fix this by flipping the parts list again.
+        # TODO: Pending on https://github.com/biopython/biopython/issues/4611
+        for rc_loc in rc_locs:
+            if len(rc_loc.parts) > 1:
+                rc_loc.parts = rc_loc.parts[::-1]
 
         combinations = (
             (u, v, locs),
