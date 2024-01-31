@@ -1,6 +1,6 @@
 """Slightly different assembly implementation"""
 
-from pydna.utils import shift_location as _shift_location, flatten
+from pydna.utils import shift_location as _shift_location, flatten, location_boundaries as _location_boundaries
 from pydna._pretty import pretty_str as _pretty_str
 from pydna.common_sub_strings import common_sub_strings as common_sub_strings_str
 from pydna.common_sub_strings import terminal_overlap as terminal_overlap_str
@@ -16,15 +16,15 @@ from Bio.Restriction.Restriction import RestrictionBatch, AbstractCut
 def ends_from_cutsite(cutsite: tuple[tuple[int,int],AbstractCut], seq: _Dseq):
     if cutsite is None:
         raise ValueError('None is not supported')
-    cut_watson, cut_crick = cutsite[0]
-    enz = cutsite[1]
-    if enz.ovhg < 0:
+
+    cut_watson, cut_crick, ovhg = seq.get_cut_parameters(cutsite, is_left=None)
+    if ovhg < 0:
         # TODO check the edge in circular
         return (
             ("5'", str(seq[cut_watson:cut_crick].reverse_complement()).lower()),
             ("5'", str(seq[cut_watson:cut_crick]).lower()),
         )
-    elif enz.ovhg > 0:
+    elif ovhg > 0:
         return (
             ("3'", str(seq[cut_crick:cut_watson]).lower()),
             ("3'", str(seq[cut_crick:cut_watson].reverse_complement()).lower()),
@@ -32,7 +32,7 @@ def ends_from_cutsite(cutsite: tuple[tuple[int,int],AbstractCut], seq: _Dseq):
 
     return ('blunt', ''), ('blunt', '')
 
-def restriction_ligation_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=RestrictionBatch):
+def restriction_ligation_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=RestrictionBatch, partial=False):
     """Find overlaps. Like in stiky and gibson, the order matters"""
     cuts_x = seqx.seq.get_cutsites(*enzymes)
     cuts_y = seqy.seq.get_cutsites(*enzymes)
@@ -40,12 +40,21 @@ def restriction_ligation_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=R
     for cut_x, cut_y in _itertools.product(cuts_x, cuts_y):
         overlap = sum_is_sticky(
             ends_from_cutsite(cut_x, seqx.seq)[0],
-            ends_from_cutsite(cut_y, seqy.seq)[1]
+            ends_from_cutsite(cut_y, seqy.seq)[1],
+            partial
         )
-        if overlap:
-            left_x = cut_x[0][0] if cut_x[1].ovhg < 0 else cut_x[0][1]
-            left_y = cut_y[0][0] if cut_y[1].ovhg < 0 else cut_y[0][1]
-            matches.append((left_x, left_y, overlap))
+        if not overlap:
+            continue
+        x_watson, x_crick, x_ovhg = seqx.seq.get_cut_parameters(cut_x, is_left=False)
+        y_watson, y_crick, y_ovhg = seqy.seq.get_cut_parameters(cut_y, is_left=True)
+        # Positions where the overlap would start for full overlap
+        left_x = x_watson if x_ovhg < 0 else x_crick
+        left_y = y_watson if y_ovhg < 0 else y_crick
+
+        # Correct por partial overlaps
+        left_x += abs(x_ovhg) - overlap
+
+        matches.append((left_x, left_y, overlap))
     return matches
 
 
@@ -215,7 +224,7 @@ def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragm
     for (u1, v1, _, start_location), (u2, v2, end_location, _) in edge_pairs:
         # Incompatible as described in figure above
         fragment = fragments[abs(v1)-1]
-        if not fragment.circular and start_location.parts[-1].end >= end_location.parts[0].end:
+        if not fragment.circular and _location_boundaries(start_location)[1] >=  _location_boundaries(end_location)[1]:
             return False
 
     if fragments_only_once:
@@ -250,7 +259,8 @@ def assemble(fragments, assembly, is_circular):
         # Remove trailing overlap
         out_dseqrecord = _Dseqrecord(fill_dseq(out_dseqrecord.seq)[:-overlap], features=out_dseqrecord.features, circular=True)
         for feature in out_dseqrecord.features:
-            if feature.location.parts[0].start >= len(out_dseqrecord) or feature.location.parts[-1].end > len(out_dseqrecord):
+            start, end = _location_boundaries(feature.location)
+            if start >= len(out_dseqrecord) or end > len(out_dseqrecord):
                 # Wrap around the origin
                 feature.location = _shift_location(feature.location, 0, len(out_dseqrecord))
 
@@ -308,17 +318,29 @@ def get_assembly_subfragments(fragments: list[_Dseqrecord], subfragment_represen
     subfragments = list()
     for node, start_location, end_location in subfragment_representation:
         seq = fragments[node-1] if node > 0 else fragments[-node-1].reverse_complement()
-        start = 0 if start_location is None else start_location.parts[0].start
-        end = None if end_location is None else end_location.parts[-1].end
-        # Special case, some of it could be handled by better Dseqrecord slicing in the future
-        if seq.circular and start_location == end_location:
-            # This could be definitely be done better, but for now it works:
-            dummy_cut = ((start, end), type('DynamicClass', (), {'ovhg': start-end})())
-            open_seq = seq.apply_cut(dummy_cut, dummy_cut)
-            subfragments.append(_Dseqrecord(fill_dseq(open_seq.seq), features=open_seq.features))
-            continue
-        subfragments.append(seq[start:end])
+        subfragments.append(extract_subfragment(seq, start_location, end_location))
     return subfragments
+
+def extract_subfragment(seq: _Dseqrecord, start_location: Location, end_location: Location):
+    """Extract a subfragment from a sequence, given the start and end locations of the subfragment."""
+    start = 0 if start_location is None else _location_boundaries(start_location)[0]
+    end = None if end_location is None else _location_boundaries(end_location)[1]
+
+    # Special case, some of it could be handled by better Dseqrecord slicing in the future
+    if seq.circular and start_location == end_location:
+        # The overhang is different for origin-spanning features, for instance
+        # for a feature join{[12:13], [0:3]} in a sequence of length 13, the overhang
+        # is -4, not 9
+        ovhg = start-end if end > start else start - end - len(seq)
+        dummy_cut = ((start, ovhg), None)
+        open_seq = seq.apply_cut(dummy_cut, dummy_cut)
+        return _Dseqrecord(fill_dseq(open_seq.seq), features=open_seq.features)
+
+    # TODO: remove with https://github.com/BjornFJohansson/pydna/issues/161
+    if seq.circular and start == end:
+        return seq.shifted(start)
+
+    return seq[start:end]
 
 def is_sublist(sublist, my_list, my_list_is_cyclic=False):
     """Returns True if sublist is a sublist of my_list (can be treated as cyclic), False otherwise.
@@ -483,6 +505,15 @@ class Assembly:
         locs = [_shift_location(SimpleLocation(x_start, x_start + length), 0, len(first)),
                 _shift_location(SimpleLocation(y_start, y_start + length), 0, len(secnd))]
         rc_locs = [locs[0]._flip(len(first)), locs[1]._flip(len(secnd))]
+
+        # the parts list of rc_locs that span the origin get inverted when flipped.
+        # For instance, join{[4:6], [0:1]} in a sequence with length 6 will become
+        # join{[0:2], [5:6]} when flipped. This removes the meaning of origin-spanning.
+        # We fix this by flipping the parts list again.
+        # TODO: Pending on https://github.com/biopython/biopython/issues/4611
+        for rc_loc in rc_locs:
+            if len(rc_loc.parts) > 1:
+                rc_loc.parts = rc_loc.parts[::-1]
 
         combinations = (
             (u, v, locs),

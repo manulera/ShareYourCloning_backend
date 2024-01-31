@@ -9,13 +9,15 @@ from dna_functions import get_invalid_enzyme_names, format_sequence_genbank, \
     read_dsrecord_from_json, request_from_addgene
 from pydantic_models import PCRSource, PrimerModel, SequenceEntity, SequenceFileFormat, \
     RepositoryIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource, \
-    UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource
+    UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource, RestrictionAndLigationSource, \
+    AssemblySource
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
 from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
 from Bio.Restriction.Restriction_Dictionary import rest_dict
-from assembly2 import Assembly, assemble, sticky_end_sub_strings, assembly2str, PCRAssembly, gibson_overlap, filter_linear_subassemblies
+from assembly2 import Assembly, assemble, sticky_end_sub_strings, assembly2str, PCRAssembly, \
+    gibson_overlap, filter_linear_subassemblies, restriction_ligation_overlap
 # Instance of the API object
 app = FastAPI()
 
@@ -34,6 +36,16 @@ app.add_middleware(
 )
 
 # TODO limit the maximum size of submitted files
+
+
+def format_known_assembly_response(source: AssemblySource, out_sources: list[AssemblySource], fragments: list[Dseqrecord], possible_assemblies: list):
+    """Common function for assembly sources, when assembly is known"""
+    # If a specific assembly is requested
+    for i, s in enumerate(out_sources):
+        if s == source:
+            # TODO: remove enumeration by better parsing
+            return {'sequences': [format_sequence_genbank(assemble(fragments, possible_assemblies[i], s.circular))], 'sources': [s]}
+    raise HTTPException(400, 'The provided assembly is not valid.')
 
 
 @app.get('/')
@@ -179,11 +191,11 @@ async def restriction(source: RestrictionEnzymeDigestionSource,
     invalid_enzymes = get_invalid_enzyme_names(source.restriction_enzymes)
     if len(invalid_enzymes):
         raise HTTPException(404, 'These enzymes do not exist: ' + ', '.join(invalid_enzymes))
+    enzymes = RestrictionBatch(first=[e for e in source.restriction_enzymes if e is not None])
 
     seqr = read_dsrecord_from_json(sequences[0])
     # TODO: return error if the id of the sequence does not correspond
 
-    enzymes = RestrictionBatch(first=[e for e in source.restriction_enzymes if e is not None])
     cutsites = seqr.seq.get_cutsites(*enzymes)
     cutsite_pairs = seqr.seq.get_cutsite_pairs(cutsites)
     sources = [RestrictionEnzymeDigestionSource.from_cutsites(*p, source.input, source.id) for p in cutsite_pairs]
@@ -234,11 +246,7 @@ async def sticky_ligation(source: StickyLigationSource,
 
     # If a specific assembly is requested
     if source.assembly is not None:
-        for i, s in enumerate(out_sources):
-            if s == source:
-                # TODO: remove enumeration by better parsing
-                return {'sequences': [format_sequence_genbank(assemble(fragments, possible_assemblies[i], s.circular))], 'sources': [s]}
-        raise HTTPException(400, 'The provided assembly is not valid.')
+        return format_known_assembly_response(source, out_sources, fragments, possible_assemblies)
 
     if len(possible_assemblies) == 0:
         raise HTTPException(400, 'No ligations were found.')
@@ -280,11 +288,7 @@ async def pcr(source: PCRSource,
 
     # If a specific assembly is requested
     if source.assembly is not None:
-        for i, s in enumerate(out_sources):
-            if s == source:
-                # TODO: remove enumeration by better parsing
-                return {'sequences': [format_sequence_genbank(assemble(fragments, possible_assemblies[i], s.circular))], 'sources': [s]}
-        raise HTTPException(400, 'The provided assembly is not valid.')
+        return format_known_assembly_response(source, out_sources, fragments, possible_assemblies)
 
     if len(possible_assemblies) == 0:
         raise HTTPException(400, 'No pair of annealing primers was found. Try changing the annealing settings.')
@@ -307,8 +311,7 @@ async def homologous_recombination(
     # source.input contains the ids of the sequences in the order template, insert
     template, insert = [next((read_dsrecord_from_json(seq) for seq in sequences if seq.id == id), None) for id in source.input]
 
-    if template.circular or insert.circular:
-        # TODO: add support for the other cases
+    if template.circular:
         raise HTTPException(400, 'The template and the insert must be linear.')
 
     # If an assembly is provided, we ignore minimal_homology
@@ -323,10 +326,7 @@ async def homologous_recombination(
 
     # If a specific assembly is requested
     if source.assembly is not None:
-        for i, s in enumerate(out_sources):
-            if s == source:
-                return {'sequences': [format_sequence_genbank(assemble([template, insert], possible_assemblies[i], False))], 'sources': [s]}
-        raise HTTPException(400, 'The provided assembly is not valid.')
+        return format_known_assembly_response(source, out_sources, [template, insert], possible_assemblies)
 
     if len(possible_assemblies) == 0:
         raise HTTPException(400, 'No homologous recombination was found.')
@@ -342,23 +342,21 @@ async def homologous_recombination(
 ))
 async def gibson_assembly(source: GibsonAssemblySource,
                           sequences: conlist(SequenceEntity, min_length=1),
-                          minimal_homology: int = Query(40, description='The minimum homology between consecutive fragments in the assembly.'),):
+                          minimal_homology: int = Query(40, description='The minimum homology between consecutive fragments in the assembly.'),
+                          circular_only: bool = Query(False, description='Only return circular assemblies.')):
 
     fragments = [read_dsrecord_from_json(seq) for seq in sequences]
 
     asm = Assembly(fragments, algorithm=gibson_overlap, limit=minimal_homology, use_all_fragments=True, use_fragment_order=False)
-    circular_assemblies = asm.get_circular_assemblies()
-    linear_assemblies = filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
-    possible_assemblies = circular_assemblies + linear_assemblies
-    print(possible_assemblies)
+    possible_assemblies = asm.get_circular_assemblies()
+    if not circular_only:
+        possible_assemblies += filter_linear_subassemblies(asm.get_linear_assemblies(), possible_assemblies, fragments)
+
     out_sources = [GibsonAssemblySource.from_assembly(id= source.id, input=source.input, assembly=a, circular=(a[0][0] == a[-1][1])) for a in possible_assemblies]
 
     # If a specific assembly is requested
     if source.assembly is not None:
-        for i, s in enumerate(out_sources):
-            if s == source:
-                return {'sequences': [format_sequence_genbank(assemble(fragments, possible_assemblies[i], s.circular))], 'sources': [s]}
-        raise HTTPException(400, 'The provided assembly is not valid.')
+        return format_known_assembly_response(source, out_sources, fragments, possible_assemblies)
 
     if len(possible_assemblies) == 0:
         raise HTTPException(400, 'No terminal homology was found.')
@@ -367,3 +365,40 @@ async def gibson_assembly(source: GibsonAssemblySource,
 
     return {'sources': out_sources, 'sequences': out_sequences}
 
+@ app.post('/restriction_and_ligation', response_model=create_model(
+        'RestrictionAndLigationResponse',
+        sources=(list[RestrictionAndLigationSource], ...),
+        sequences=(list[SequenceEntity], ...),
+    ),
+    summary='Restriction and ligation in a single step. Can also be used for Golden Gate assembly.'
+)
+async def restriction_and_ligation(source: RestrictionAndLigationSource,
+                                   sequences: conlist(SequenceEntity, min_length=1),
+                                   allow_partial_overlap: bool = Query(False, description='Allow for partially overlapping sticky ends.'),
+                                   circular_only: bool = Query(False, description='Only return circular assemblies.')):
+
+    fragments = [read_dsrecord_from_json(seq) for seq in sequences]
+    invalid_enzymes = get_invalid_enzyme_names(source.restriction_enzymes)
+    if len(invalid_enzymes):
+        raise HTTPException(404, 'These enzymes do not exist: ' + ', '.join(invalid_enzymes))
+    enzymes = RestrictionBatch(first=[e for e in source.restriction_enzymes if e is not None])
+    algo = lambda x, y, l : restriction_ligation_overlap(x, y, enzymes, allow_partial_overlap)
+
+    asm = Assembly(fragments, algorithm=algo, use_fragment_order=False, use_all_fragments=True)
+
+    possible_assemblies = asm.get_circular_assemblies()
+    if not circular_only:
+        possible_assemblies += filter_linear_subassemblies(asm.get_linear_assemblies(), possible_assemblies, fragments)
+
+    out_sources = [RestrictionAndLigationSource.from_assembly(id= source.id, input=source.input, assembly=a, circular=(a[0][0] == a[-1][1]), restriction_enzymes=source.restriction_enzymes) for a in possible_assemblies]
+
+    # If a specific assembly is requested
+    if source.assembly is not None:
+        return format_known_assembly_response(source, out_sources, fragments, possible_assemblies)
+
+    if len(possible_assemblies) == 0:
+        raise HTTPException(400, 'No terminal homology was found.')
+
+    out_sequences = [format_sequence_genbank(assemble(fragments, a, s.circular)) for s, a in zip(out_sources, possible_assemblies)]
+
+    return {'sources': out_sources, 'sequences': out_sequences}

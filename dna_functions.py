@@ -34,7 +34,8 @@ def sum_is_sticky(three_prime_end: tuple[str,str], five_prime_end: tuple[str,str
         sticky_seq2 = str(reverse_complement(sticky_seq2))
 
     ovhg_len = min(len(sticky_seq1), len(sticky_seq2))
-    for i in range(1, ovhg_len+1):
+    # [::-1] to try the longest overhangs first
+    for i in range(1, ovhg_len+1)[::-1]:
         if sticky_seq1[-i:] == sticky_seq2[:i]:
             return i
     else:

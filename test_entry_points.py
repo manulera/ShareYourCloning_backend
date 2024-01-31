@@ -5,7 +5,9 @@ from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
 from pydantic_models import RepositoryIdSource, PCRSource, PrimerModel, \
-    RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource, UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource
+    RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource, \
+    UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource, \
+    RestrictionAndLigationSource
 from pydna.dseqrecord import Dseqrecord
 import unittest
 from pydna.dseq import Dseq
@@ -294,7 +296,6 @@ class StickyLigationTest(unittest.TestCase):
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post("/sticky_ligation", json=data)
         payload = response.json()
-        print(payload)
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
         sources = [StickyLigationSource.model_validate(s) for s in payload['sources']]
 
@@ -395,9 +396,9 @@ class RestrictionTest(unittest.TestCase):
 
         # The edges of the fragments are correct:
         self.assertEqual(sources[0].left_edge, None)
-        self.assertEqual(sources[0].right_edge, (7, 11))
+        self.assertEqual(sources[0].right_edge, (7, -4))
 
-        self.assertEqual(sources[1].left_edge, (7, 11))
+        self.assertEqual(sources[1].left_edge, (7, -4))
         self.assertEqual(sources[1].right_edge, None)
 
         # The enzyme names are correctly returned:
@@ -409,7 +410,7 @@ class RestrictionTest(unittest.TestCase):
             input=[1],
             restriction_enzymes=[None, 'EcoRI'],
             left_edge=None,
-            right_edge=(7, 11)
+            right_edge=(7, -4)
         )
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data)
@@ -421,7 +422,7 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(len(sources), 1)
         self.assertEqual(sources[0].left_edge, None)
-        self.assertEqual(sources[0].right_edge, (7, 11))
+        self.assertEqual(sources[0].right_edge, (7, -4))
         self.assertEqual(sources[0].restriction_enzymes, [None, 'EcoRI'])
 
     def test_circular_single_restriction(self):
@@ -449,15 +450,15 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual(resulting_sequences[0].seq.watson.upper(), 'AATTCTTTTTTAAAAAAG')
 
         # The edges of the fragments are correct:
-        self.assertEqual(sources[0].left_edge, (7, 11))
-        self.assertEqual(sources[0].right_edge, (7, 11))
+        self.assertEqual(sources[0].left_edge, (7, -4))
+        self.assertEqual(sources[0].right_edge, (7, -4))
 
         # The enzyme names are correctly returned:
         self.assertEqual(sources[0].restriction_enzymes, ['EcoRI', 'EcoRI'])
 
         # When the cutting site spans the origin
         sequences = ['AATTCTTTTTTG', 'ATTCTTTTTTGA']
-        cut_positions = [(0, 4), (11, 3)]
+        cut_positions = [(0, -4), (11, -4)]
 
         for s, pos in zip(sequences, cut_positions):
             dseq = Dseqrecord(s, circular=True)
@@ -517,7 +518,7 @@ class RestrictionTest(unittest.TestCase):
 
         # The edges of the fragments are correct:
         # AAAG^GATC_CAAAAGAT^ATCAAAAA
-        edges = [(None, (4, 8)), ((4, 8), (16, 16)), ((16, 16), None)]
+        edges = [(None, (4, -4)), ((4, -4), (16, 0)), ((16, 0), None)]
         for i, e in enumerate(edges):
             self.assertEqual(sources[i].left_edge, e[0])
             self.assertEqual(sources[i].right_edge, e[1])
@@ -576,7 +577,7 @@ class RestrictionTest(unittest.TestCase):
         # The edges of the fragments are correct:
         # AAAG^GATC_CAAAAGAT^ATCAAAAA
         # We use 8 + len because it's an origin-spanning sequence
-        edges = [((4, 8), (16, 16)), ((16, 16), (4, 8))]
+        edges = [((4, -4), (16, 0)), ((16, 0), (4, -4))]
         for i, e in enumerate(edges):
             self.assertEqual(sources[i].left_edge, e[0])
             self.assertEqual(sources[i].right_edge, e[1])
@@ -814,6 +815,54 @@ class GibsonAssemblyTest(unittest.TestCase):
         self.assertEqual(len(sequences), 2)
         self.assertEqual(str(sequences[0].seq), 'TTTTacgatAAtgctccCCCCtcatGGGGatata'.upper())
         self.assertEqual(str(sequences[1].seq), 'TTTTacgatAAtgctccCCCCatgaGGGGatata'.upper())
+
+
+class RestrictionAndLigationTest(unittest.TestCase):
+
+    def test_restriction_and_ligation(self):
+        fragments = [Dseqrecord('AAAGAATTCAAA'), Dseqrecord('CCCCGAATTCCCC')]
+        [format_sequence_genbank(f) for f in fragments]
+        json_fragments = [format_sequence_genbank(f) for f in fragments]
+        for i, f in enumerate(json_fragments):
+            f.id = i + 1
+
+        source = RestrictionAndLigationSource(
+            input=[1, 2, 3],
+            restriction_enzymes=['EcoRI'],
+        )
+
+        data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
+        response = client.post('/restriction_and_ligation', json=data, params={'minimal_homology': 4})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sequences']), 4)
+        self.assertEqual(len(payload['sources']), 4)
+
+    def test_golden_gate(self):
+        fragments =[ Dseqrecord('GGTCTCAattaAAAAAttaaAGAGACC'),
+            Dseqrecord('GGTCTCAttaaCCCCCatatAGAGACC'),
+            Dseqrecord('GGTCTCAatatGGGGGccggAGAGACC'),
+            Dseqrecord('TTTTattaAGAGACCTTTTTGGTCTCAccggTTTT', circular=True),
+        ]
+
+        json_fragments = [format_sequence_genbank(f) for f in fragments]
+        for i, f in enumerate(json_fragments):
+            f.id = i + 1
+
+        source = RestrictionAndLigationSource(
+            input=[1, 2, 3, 4],
+            restriction_enzymes=['BsaI'],
+        )
+
+        data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
+        response = client.post('/restriction_and_ligation', json=data, params={'circular_only': True})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sequences']), 1)
+        self.assertEqual(len(payload['sources']), 1)
+
 
 
 if __name__ == "__main__":
