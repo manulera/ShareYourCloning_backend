@@ -326,7 +326,6 @@ def extract_subfragment(seq: _Dseqrecord, start_location: Location, end_location
     start = 0 if start_location is None else _location_boundaries(start_location)[0]
     end = None if end_location is None else _location_boundaries(end_location)[1]
 
-    print(start_location, end_location)
     # Special case, some of it could be handled by better Dseqrecord slicing in the future
     if seq.circular and start_location == end_location:
         # The overhang is different for origin-spanning features, for instance
@@ -334,7 +333,6 @@ def extract_subfragment(seq: _Dseqrecord, start_location: Location, end_location
         # is -4, not 9
         ovhg = start-end if end > start else start - end - len(seq)
         dummy_cut = ((start, ovhg), None)
-        print( '*' ,start, ovhg, seq.seq)
         open_seq = seq.apply_cut(dummy_cut, dummy_cut)
         return _Dseqrecord(fill_dseq(open_seq.seq), features=open_seq.features)
 
