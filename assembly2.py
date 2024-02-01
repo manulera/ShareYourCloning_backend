@@ -57,6 +57,12 @@ def restriction_ligation_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=R
         matches.append((left_x, left_y, overlap))
     return matches
 
+def blunt_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=None):
+    """Find blunt overlaps"""
+    if seqx.seq.three_prime_end()[0] == 'blunt' and seqy.seq.five_prime_end()[0] == 'blunt':
+        return [(len(seqx), 0, 0)]
+    return []
+
 
 def common_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
     return common_sub_strings_str(str(seqx.seq).upper(), str(seqy.seq).upper(), limit)
@@ -256,6 +262,11 @@ def assemble(fragments, assembly, is_circular):
     # For circular assemblies, close the loop and wrap origin-spanning features
     if is_circular:
         overlap = fragment_overlaps[-1]
+
+        # Special case for blunt circularisation
+        if overlap == 0:
+            return out_dseqrecord.looped()
+
         # Remove trailing overlap
         out_dseqrecord = _Dseqrecord(fill_dseq(out_dseqrecord.seq)[:-overlap], features=out_dseqrecord.features, circular=True)
         for feature in out_dseqrecord.features:
@@ -335,10 +346,6 @@ def extract_subfragment(seq: _Dseqrecord, start_location: Location, end_location
         dummy_cut = ((start, ovhg), None)
         open_seq = seq.apply_cut(dummy_cut, dummy_cut)
         return _Dseqrecord(fill_dseq(open_seq.seq), features=open_seq.features)
-
-    # TODO: remove with https://github.com/BjornFJohansson/pydna/issues/161
-    if seq.circular and start == end:
-        return seq.shifted(start)
 
     return seq[start:end]
 
@@ -501,11 +508,15 @@ class Assembly:
 
         """
         x_start, y_start, length = match
-        # We use shift_location with 0 to wrap origin-spanning features
-        locs = [_shift_location(SimpleLocation(x_start, x_start + length), 0, len(first)),
-                _shift_location(SimpleLocation(y_start, y_start + length), 0, len(secnd))]
-        rc_locs = [locs[0]._flip(len(first)), locs[1]._flip(len(secnd))]
+        if length == 0:
+            # Edge case, blunt ligation
+            locs = [SimpleLocation(x_start, x_start), SimpleLocation(y_start, y_start)]
+        else:
+            # We use shift_location with 0 to wrap origin-spanning features
+            locs = [_shift_location(SimpleLocation(x_start, x_start + length), 0, len(first)),
+                    _shift_location(SimpleLocation(y_start, y_start + length), 0, len(secnd))]
 
+        rc_locs = [locs[0]._flip(len(first)), locs[1]._flip(len(secnd))]
         # the parts list of rc_locs that span the origin get inverted when flipped.
         # For instance, join{[4:6], [0:1]} in a sequence with length 6 will become
         # join{[0:2], [5:6]} when flipped. This removes the meaning of origin-spanning.

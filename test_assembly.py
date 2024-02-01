@@ -984,13 +984,6 @@ def test_restriction_ligation_assembly():
         f2_shifted = f2.shifted(shift)
         f = assembly.Assembly([f1, f2_shifted], algorithm=algo, use_fragment_order=False)
         observed_cseguids = sorted(x.cseguid() for x in f.assemble_circular())
-        print(shift, f2_shifted.seq)
-        print((b1.seq + a2.seq).looped())
-        print((b1.seq + a2.seq.reverse_complement()).looped())
-        print('===')
-        for ff in f.assemble_circular():
-            print(ff.seq)
-        print()
         assert len(result_cseguids) == len(observed_cseguids)
         assert result_cseguids == observed_cseguids
 
@@ -1252,6 +1245,27 @@ def test_assemble_function():
             assert len(result.features) == 4
             assert set(str(f.location.extract(result.seq)) for f in result.features) == {'TTT'}
 
+    # Blunt assemblies
+    fragments = [
+        Dseqrecord('aaaTTTctaGGGccc'),
+        Dseqrecord('ccccTTTatgGGGaa')
+    ]
+    loc_end = SimpleLocation(15, 15)
+    loc_start = SimpleLocation(0, 0)
+
+    # A linear assembly
+    assembly_plan = [
+        (1, 2, loc_end, loc_start),
+    ]
+    assert fragments[0] + fragments[1] == assembly.assemble(fragments, assembly_plan, False)
+
+    # A circular assembly
+    assembly_plan = [
+        (1, 2, loc_end, loc_start),
+        (2, 1, loc_end, loc_start),
+    ]
+    assert (fragments[0] + fragments[1]).looped() == assembly.assemble(fragments, assembly_plan, True)
+
 
 def test_assembly_is_valid():
 
@@ -1359,9 +1373,8 @@ def test_extract_subfragment():
         assert str(subfragment.seq) == 'TTTcccTTT'
         assert len(subfragment.features) == 2
 
-    # Edge case, in circular molecules, if you extract the entire sequence this can cause problems,
-    # because it leads to a [0:0] getitem call, at least before issue
-    # TODO: remove with https://github.com/BjornFJohansson/pydna/issues/161
+    # Old edge case, in circular molecules, if you extract the entire sequence
+    # it leads to a [0:0] getitem call, before it gave an empty sequence, see https://github.com/BjornFJohansson/pydna/issues/161
     f1 = Dseqrecord('AAATTT', circular=True)
     f1.features = [SeqFeature(SimpleLocation(0, 3), id='left'), SeqFeature(SimpleLocation(3, 6), id='right')]
 
@@ -1381,7 +1394,6 @@ def test_extract_subfragment():
     f1.features = [SeqFeature(SimpleLocation(1, 4))]
 
     for shift in range(len(f1)):
-        print(shift)
         f1_shifted = f1.shifted(shift)
         loc = f1_shifted.features[0].location
         subfragment = assembly.extract_subfragment(f1_shifted, loc, loc)
@@ -1389,7 +1401,13 @@ def test_extract_subfragment():
         # The feature marking the overlap should be copied
         assert len(subfragment.features) == 2
 
-    # TODO: test None case
+    # Blunt ends assembly
+    f1 = Dseqrecord('ATTTA')
+    loc_start = SimpleLocation(0, 0)
+    loc_end = SimpleLocation(5, 5)
+    # Here we compare the seq because getitem changes the id of the sequence
+    assert f1.seq == assembly.extract_subfragment(f1, loc_start, loc_end).seq
+
 
 
 def test_sticky_end_sub_strings():
@@ -1419,6 +1437,18 @@ def test_sticky_end_sub_strings():
     assert assembly.sticky_end_sub_strings(a, b, True) == [(4, 0, 2)]
 
 
+def test_blunt_overlap():
+    a = Dseqrecord(Dseq.from_full_sequence_and_overhangs('AAAAA', crick_ovhg=0, watson_ovhg=1))
+    b = Dseqrecord(Dseq.from_full_sequence_and_overhangs('CCCC', crick_ovhg=1, watson_ovhg=0))
+
+    assert assembly.blunt_overlap(a, b) == []
+    assert assembly.blunt_overlap(a, b.reverse_complement()) == []
+    assert assembly.blunt_overlap(a.reverse_complement(), b) == []
+    assert assembly.blunt_overlap(b, a) == [(4, 0, 0)]
+    assert assembly.blunt_overlap(a.reverse_complement(), b.reverse_complement()) == [(5, 0, 0)]
+    assert assembly.blunt_overlap(b.reverse_complement(), a.reverse_complement()) == []
+
+
 def test_ligation_assembly():
 
     fragments = Dseqrecord('AAAGAATTCAAA').cut(EcoRI)
@@ -1442,3 +1472,22 @@ def test_ligation_assembly():
     # Only when limit == True -> TODO: change this to not be an assembly parameter, but
     # functional instead.
     assert len(assembly.Assembly([a, b], algorithm=assembly.sticky_end_sub_strings, limit=True, use_all_fragments=True, use_fragment_order=False).assemble_linear()) == 1
+
+
+def test_blunt_assembly():
+    # Linear assembly
+    a = Dseqrecord(Dseq.from_full_sequence_and_overhangs('AAAAA', crick_ovhg=0, watson_ovhg=1))
+    b = Dseqrecord(Dseq.from_full_sequence_and_overhangs('CCCC', crick_ovhg=1, watson_ovhg=0))
+
+    asm = assembly.Assembly([a, b], algorithm=assembly.blunt_overlap, use_all_fragments=True, use_fragment_order=False)
+    assert asm.assemble_linear() == [b + a]
+    assert asm.assemble_circular() == []
+
+    # Circular assembly
+    a = Dseqrecord('ATT')
+    b = Dseqrecord('CCCC')
+
+    asm = assembly.Assembly([a, b], algorithm=assembly.blunt_overlap, use_all_fragments=True, use_fragment_order=False)
+
+    assert asm.assemble_linear() == [a + b, a + b.reverse_complement(), b + a.reverse_complement(), b + a]
+    assert asm.assemble_circular() == [(a + b).looped(), (a + b.reverse_complement()).looped()]
