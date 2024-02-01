@@ -945,7 +945,6 @@ def test_ends_from_cutsite():
 
 
 def test_restriction_ligation_assembly():
-    # TODO circular examples
 
     seq_pairs = (
         (Dseqrecord('AAAGAATTCAAA'), Dseqrecord('CCCCGAATTCCCC')),
@@ -1048,6 +1047,27 @@ def test_restriction_ligation_assembly():
     assert str(products[0].seq) == 'GACACCACGGGTC'
     assert str(products[1].seq) == 'GACTAACAGAGTC'
 
+    # Single fragment assemblies
+    f1 = Dseqrecord('aaGAATTCtttGAATTCaa', circular=True)
+    algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [EcoRI], False)
+    f = assembly.SingleFragmentAssembly([f1], algorithm=algo)
+    products = f.assemble_circular()
+    assert len(products) == 2
+    assert str(products[0].seq) == 'AATTCaaaaG'
+    assert str(products[1].seq) == 'AATTCtttG'
+
+    f1 = Dseqrecord('aaGAATTCtttGAATTCaa', circular=False)
+    f = assembly.SingleFragmentAssembly([f1], algorithm=algo)
+    products = f.assemble_circular()
+    assert len(products) == 1
+    assert str(products[0].seq) == 'AATTCtttG'
+
+    f1 = Dseqrecord('aaGAATTCtttGAATTCaa', circular=False)
+    f = assembly.SingleFragmentAssembly([f1], algorithm=algo)
+    products = f.assemble_insertion()
+    assert len(products) == 1
+    assert str(products[0].seq) == 'aaGAATTCaa'
+
 def test_golden_gate():
 
     # Circular assembly
@@ -1083,6 +1103,16 @@ def test_golden_gate():
 
     for result, product in zip(results, asm.assemble_linear()):
         assert result.seq == product.seq
+
+
+def test_gibson_assembly():
+    """There are many others that test this above, this is just the edge case"""
+    # Circularisation assemblies
+    f1 = Dseqrecord('AGAGACCaaaAGAGACC')
+    f = assembly.SingleFragmentAssembly([f1], limit=7)
+    products = f.assemble_circular()
+    assert len(products) == 1
+    assert str(products[0].seq) == 'AGAGACCaaa'
 
 
 def test_insertion_assembly():
@@ -1473,6 +1503,17 @@ def test_ligation_assembly():
     # functional instead.
     assert len(assembly.Assembly([a, b], algorithm=assembly.sticky_end_sub_strings, limit=True, use_all_fragments=True, use_fragment_order=False).assemble_linear()) == 1
 
+    # Single fragment assemblies
+    fragments = Dseqrecord('AAGAATTCTTGAATTCCC').cut(EcoRI)
+    asm = assembly.SingleFragmentAssembly([fragments[1]], algorithm=assembly.sticky_end_sub_strings, limit=False)
+    result = asm.assemble_circular()
+    assert len(result) == 1
+    assert result[0].seq == fragments[1].looped().seq
+
+    result = asm.assemble_insertion()
+    assert len(result) == 1
+    assert result[0].seq == (fragments[0] + fragments[2]).seq
+
 
 def test_blunt_assembly():
     # Linear assembly
@@ -1491,3 +1532,10 @@ def test_blunt_assembly():
 
     assert asm.assemble_linear() == [a + b, a + b.reverse_complement(), b + a.reverse_complement(), b + a]
     assert asm.assemble_circular() == [(a + b).looped(), (a + b.reverse_complement()).looped()]
+
+    # Circularisation
+    asm = assembly.SingleFragmentAssembly([Dseqrecord('AATT')], algorithm=assembly.blunt_overlap)
+    result = asm.assemble_circular()
+    assert len(result) == 1
+    assert result[0].seq == Dseq('AATT', circular=True)
+

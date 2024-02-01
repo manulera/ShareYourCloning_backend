@@ -606,11 +606,13 @@ class Assembly:
     def get_insertion_assemblies(self):
         # We find cycles first
         assemblies = sum(map(self.cycle2circular_assemblies, _nx.cycles.simple_cycles(self.G)),[])
+        print(assemblies)
         # We select those that contain exactly only one suitable edge
         assemblies = [b for a in assemblies if (b := self.format_insertion_assembly(a)) is not None]
+        print(assemblies)
         # First fragment should be in the + orientation
         assemblies = list(filter(lambda x: x[0][0] > 0, assemblies))
-        return [a for a in assemblies if assembly_is_valid(self.fragments, a, False, self.use_all_fragments, False)]
+        return [a for a in assemblies if assembly_is_valid(self.fragments, a, False, self.use_all_fragments, fragments_only_once=False)]
 
     def assemble_linear(self):
         """Assemble linear constructs, from assemblies returned by self.get_linear_assemblies."""
@@ -694,10 +696,74 @@ class PCRAssembly(Assembly):
             edge_pairs = zip(a, a[1:])
             for (u1, v1, _, start_location), (u2, v2, end_location, _) in edge_pairs:
                 # Incompatible as described in figure above
-                if start_location.parts[-1].end > end_location.parts[0].start:
+                if _location_boundaries(start_location)[1] > _location_boundaries(end_location)[0]:
                     raise ValueError('Clashing primers in assembly ' + assembly2str(a))
 
         return assemblies
+
+    def get_circular_assemblies(self):
+        raise NotImplementedError('Circular PCR assembly not implemented')
+
+    def get_insertion_assemblies(self):
+        raise NotImplementedError('Insertion PCR assembly not implemented')
+
+class SingleFragmentAssembly(Assembly):
+    """
+    An assembly that represents the circularisation or splicing of a single fragment.
+    """
+
+    def __init__(self, frags: [_Dseqrecord], limit=25, algorithm=common_sub_strings):
+
+        if len(frags) != 1:
+            raise ValueError('SingleFragmentAssembly assembly must be initialised with a single fragment')
+        # TODO: allow for the same fragment to be included more than once?
+        self.G = _nx.MultiDiGraph()
+        frag = frags[0]
+        # Add positive and negative nodes for forward and reverse fragments
+        self.G.add_node(1, seq=frag)
+
+        matches = algorithm(frag, frag, limit)
+        for match in matches:
+            self.add_edges_from_match(match, 1, 1, frag, frag)
+
+        # To avoid duplicated outputs
+        self.G.remove_edges_from([(-1, -1)])
+
+        # These two are constrained
+        self.use_fragment_order=True
+        self.use_all_fragments=True
+
+        self.fragments = frags
+        self.limit = limit
+        self.algorithm = algorithm
+
+        return
+
+    def get_circular_assemblies(self):
+        # We don't want the same location twice
+        assemblies = filter(lambda x: x[0][2] != x[0][3], super().get_circular_assemblies())
+        return [a for a in assemblies if assembly_is_valid(self.fragments, a, True, self.use_all_fragments)]
+
+    def get_insertion_assemblies(self):
+        """This could be renamed splicing assembly, but the essence is similar"""
+        def splicing_assembly_filter(x):
+            # We don't want the same location twice
+            if x[0][2] == x[0][3]:
+                return False
+            # We don't want to get the same fragment again
+            left_start, _ = _location_boundaries(x[0][2])
+            _, right_end = _location_boundaries(x[0][3])
+            if left_start == 0 and right_end == len(self.fragments[0]):
+                return False
+            return True
+
+        # We don't want the same location twice
+        assemblies = filter(splicing_assembly_filter, super().get_insertion_assemblies())
+        return [a for a in assemblies if assembly_is_valid(self.fragments, a, False, self.use_all_fragments, fragments_only_once=False)]
+
+    def get_linear_assemblies(self):
+        raise NotImplementedError('Linear assembly does not make sense')
+
 
 
 example_fragments = (
