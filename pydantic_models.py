@@ -151,6 +151,13 @@ class AssemblySource(Source):
                 all_overlaps.append(len(Location.fromstring(f[3])))
         return min(all_overlaps)
 
+    def get_assembly_plan(self):
+        """Returns the assembly plan"""
+        out = list()
+        for p in self.assembly:
+            out.append((p[0], p[1], Location.fromstring(p[2]), Location.fromstring(p[3])))
+        return tuple(out)
+
 class PCRSource(AssemblySource):
     """Documents a PCR, and the selection of one of the products."""
 

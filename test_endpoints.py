@@ -67,17 +67,17 @@ class ReadFileTest(unittest.TestCase):
 
         examples = [
             {
-                'file': './test_entry_points.py',
+                'file': './test_endpoints.py',
                 'format': None,
                 'error_message': 'could not guess',
             },
             {
-                'file': './test_entry_points.py',
+                'file': './test_endpoints.py',
                 'format': 'snapgene',
                 'error_message': 'snapgene reader cannot',
             },
             {
-                'file': './test_entry_points.py',
+                'file': './test_endpoints.py',
                 'format': 'genbank',
                 'error_message': 'Pydna parser',
             }

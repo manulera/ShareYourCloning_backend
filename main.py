@@ -38,13 +38,13 @@ app.add_middleware(
 # TODO limit the maximum size of submitted files
 
 
-def format_known_assembly_response(source: AssemblySource, out_sources: list[AssemblySource], fragments: list[Dseqrecord], possible_assemblies: list):
+def format_known_assembly_response(source: AssemblySource, out_sources: list[AssemblySource], fragments: list[Dseqrecord]):
     """Common function for assembly sources, when assembly is known"""
     # If a specific assembly is requested
-    for i, s in enumerate(out_sources):
+    assembly_plan = source.get_assembly_plan()
+    for s in out_sources:
         if s == source:
-            # TODO: remove enumeration by better parsing
-            return {'sequences': [format_sequence_genbank(assemble(fragments, possible_assemblies[i], s.circular))], 'sources': [s]}
+            return {'sequences': [format_sequence_genbank(assemble(fragments, assembly_plan, s.circular))], 'sources': [s]}
     raise HTTPException(400, 'The provided assembly is not valid.')
 
 
@@ -246,7 +246,7 @@ async def sticky_ligation(source: StickyLigationSource,
 
     # If a specific assembly is requested
     if source.assembly is not None:
-        return format_known_assembly_response(source, out_sources, fragments, possible_assemblies)
+        return format_known_assembly_response(source, out_sources, fragments)
 
     if len(possible_assemblies) == 0:
         raise HTTPException(400, 'No ligations were found.')
@@ -288,7 +288,7 @@ async def pcr(source: PCRSource,
 
     # If a specific assembly is requested
     if source.assembly is not None:
-        return format_known_assembly_response(source, out_sources, fragments, possible_assemblies)
+        return format_known_assembly_response(source, out_sources, fragments)
 
     if len(possible_assemblies) == 0:
         raise HTTPException(400, 'No pair of annealing primers was found. Try changing the annealing settings.')
@@ -326,7 +326,7 @@ async def homologous_recombination(
 
     # If a specific assembly is requested
     if source.assembly is not None:
-        return format_known_assembly_response(source, out_sources, [template, insert], possible_assemblies)
+        return format_known_assembly_response(source, out_sources, [template, insert])
 
     if len(possible_assemblies) == 0:
         raise HTTPException(400, 'No homologous recombination was found.')
@@ -356,7 +356,7 @@ async def gibson_assembly(source: GibsonAssemblySource,
 
     # If a specific assembly is requested
     if source.assembly is not None:
-        return format_known_assembly_response(source, out_sources, fragments, possible_assemblies)
+        return format_known_assembly_response(source, out_sources, fragments)
 
     if len(possible_assemblies) == 0:
         raise HTTPException(400, 'No terminal homology was found.')
@@ -384,33 +384,30 @@ async def restriction_and_ligation(source: RestrictionAndLigationSource,
     enzymes = RestrictionBatch(first=[e for e in source.restriction_enzymes if e is not None])
     algo = lambda x, y, l : restriction_ligation_overlap(x, y, enzymes, allow_partial_overlap)
 
+    # Arguments that are common when instantiating an Assembly pydantic object
+    common_args = { 'id': source.id, 'input': source.input, 'restriction_enzymes': source.restriction_enzymes }
+    # Lambda function for code clarity
+    create_source = lambda a, is_circular : RestrictionAndLigationSource.from_assembly(assembly=a, circular=is_circular, **common_args)
+
+    out_sources = []
     if len(fragments) > 1:
         asm = Assembly(fragments, algorithm=algo, use_fragment_order=False, use_all_fragments=True)
-
-        possible_assemblies = asm.get_circular_assemblies()
-        assemblies_are_circular = [True for i in possible_assemblies]
+        out_sources += [create_source(a, True) for a in asm.get_circular_assemblies()]
         if not circular_only:
-            linear_assemblies = filter_linear_subassemblies(asm.get_linear_assemblies(), possible_assemblies, fragments)
-            possible_assemblies += linear_assemblies
-            assemblies_are_circular += [False for i in linear_assemblies]
+            out_sources += [create_source(a, False) for a in filter_linear_subassemblies(asm.get_linear_assemblies(), out_sources, fragments)]
     else:
         asm = SingleFragmentAssembly(fragments, algorithm=algo)
-        possible_assemblies = asm.get_circular_assemblies()
-        assemblies_are_circular = [True for i in possible_assemblies]
+        out_sources += [create_source(a, True) for a in asm.get_circular_assemblies()]
         if not circular_only:
-            linear_assemblies = asm.get_insertion_assemblies()
-            possible_assemblies += linear_assemblies
-            assemblies_are_circular += [False for i in linear_assemblies]
-
-    out_sources = [RestrictionAndLigationSource.from_assembly(id= source.id, input=source.input, assembly=a, circular=is_circular, restriction_enzymes=source.restriction_enzymes) for a, is_circular in zip(possible_assemblies, assemblies_are_circular)]
+            out_sources += [create_source(a, False) for a in asm.get_insertion_assemblies()]
 
     # If a specific assembly is requested
     if source.assembly is not None:
-        return format_known_assembly_response(source, out_sources, fragments, possible_assemblies)
+        return format_known_assembly_response(source, out_sources, fragments)
 
-    if len(possible_assemblies) == 0:
+    if len(out_sources) == 0:
         raise HTTPException(400, 'No terminal homology was found.')
 
-    out_sequences = [format_sequence_genbank(assemble(fragments, a, s.circular)) for s, a in zip(out_sources, possible_assemblies)]
+    out_sequences = [format_sequence_genbank(assemble(fragments, s.get_assembly_plan(), s.circular)) for s in out_sources]
 
     return {'sources': out_sources, 'sequences': out_sequences}
