@@ -1165,6 +1165,19 @@ def test_insertion_assembly():
     b = Dseqrecord('3CGTACGCACAyyyyT4', circular=True)
     assert assembly.Assembly([a, b],  use_fragment_order=False, limit=10).get_insertion_assemblies() == []
 
+    # Only the right order is returned
+    a = Dseqrecord('ttACGTTCGTccccTTAATTAAcc', circular=False)
+    b = Dseqrecord('ttACGTTCGTttttCGGGCGCGaa', circular=True)
+    c = Dseqrecord('aaCGGGCGCGggggTTAATTAAaa', circular=True)
+    fragments = [a, b, c]
+    for i in range(3):
+        asm = assembly.Assembly(fragments[i:] + fragments[:i], use_fragment_order=False, limit=8, use_all_fragments=True)
+        for a in asm.get_insertion_assemblies():
+            print(assembly.assembly2str(a))
+        prods = asm.assemble_insertion()
+
+        assert len(prods) == 1
+        assert str(prods[0].seq) == 'ttACGTTCGTttttCGGGCGCGggggTTAATTAAcc'
 
 def circles_assembly():
     a = Dseqrecord('xxxACGTAyyy', circular=True)
@@ -1510,10 +1523,6 @@ def test_ligation_assembly():
     assert len(result) == 1
     assert result[0].seq == fragments[1].looped().seq
 
-    result = asm.assemble_insertion()
-    assert len(result) == 1
-    assert result[0].seq == (fragments[0] + fragments[2]).seq
-
 
 def test_blunt_assembly():
     # Linear assembly
@@ -1529,7 +1538,6 @@ def test_blunt_assembly():
     b = Dseqrecord('CCCC')
 
     asm = assembly.Assembly([a, b], algorithm=assembly.blunt_overlap, use_all_fragments=True, use_fragment_order=False)
-
     assert asm.assemble_linear() == [a + b, a + b.reverse_complement(), b + a.reverse_complement(), b + a]
     assert asm.assemble_circular() == [(a + b).looped(), (a + b.reverse_complement()).looped()]
 
@@ -1539,3 +1547,33 @@ def test_blunt_assembly():
     assert len(result) == 1
     assert result[0].seq == Dseq('AATT', circular=True)
 
+
+def test_format_insertion_assembly():
+
+    loc1_a = SimpleLocation(2, 6)
+    loc1_b = SimpleLocation(8, 12)
+    loc2_a = SimpleLocation(0, 4)
+    loc2_b = SimpleLocation(6, 10)
+
+    seq1 = Dseqrecord('aaTTTTccTTTTaa')
+    seq2 = Dseqrecord('TTTTccTTTT')
+
+    fragments = [seq1, seq2]
+
+    # This is just a dummy assembly planner, we only care for it containing 'fragments', which is used
+    # by the class method
+    assembly_planner = assembly.Assembly(fragments)
+    asm_correct = [(1, 2, loc1_a, loc2_a), (2, 1, loc2_b, loc1_b)]
+    assert asm_correct == assembly_planner.format_insertion_assembly(asm_correct)
+    assert asm_correct == assembly_planner.format_insertion_assembly(asm_correct[::-1])
+
+    # More fragments
+    fragments = [seq1, seq2, seq2]
+    assembly_planner = assembly.Assembly(fragments)
+    asm_correct = [(1, 2, loc1_a, loc2_a), (2, 3, loc2_b, loc2_a), (3, 1, loc2_b, loc1_b)]
+    assert asm_correct == assembly_planner.format_insertion_assembly(asm_correct)
+    assert asm_correct == assembly_planner.format_insertion_assembly(asm_correct[1:] + asm_correct[:1])
+    assert asm_correct == assembly_planner.format_insertion_assembly(asm_correct[2:] + asm_correct[:2])
+
+    asm_wrong = [(1, 2, loc1_b, loc2_a), (2, 3, loc2_b, loc2_a), (3, 1, loc2_b, loc1_a)]
+    assert None == assembly_planner.format_insertion_assembly(asm_wrong)
