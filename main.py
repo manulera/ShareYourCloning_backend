@@ -230,28 +230,35 @@ async def restriction(source: RestrictionEnzymeDigestionSource,
 ))
 async def sticky_ligation(source: StickyLigationSource,
                           sequences: conlist(SequenceEntity, min_length=1),
-                          allow_partial_overlap: bool = Query(True, description='Allow for partially overlapping sticky ends.')):
+                          allow_partial_overlap: bool = Query(True, description='Allow for partially overlapping sticky ends.'),
+                          circular_only: bool = Query(False, description='Only return circular assemblies.')):
 
     # Fragments in the same order as in source.input
     fragments = [next((read_dsrecord_from_json(seq) for seq in sequences if seq.id == id), None) for id in source.input]
     if any(f is None for f in fragments):
         raise HTTPException(400, f'Invalid fragment id in input')
 
-    asm = Assembly(fragments, algorithm=sticky_end_sub_strings, limit=allow_partial_overlap, use_all_fragments=True, use_fragment_order=False)
-    circular_assemblies = asm.get_circular_assemblies()
-    linear_assemblies = filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
-    possible_assemblies = circular_assemblies + linear_assemblies
-
-    out_sources = [StickyLigationSource.from_assembly(id= source.id, input=source.input, assembly=a, circular=(a[0][0] == a[-1][1])) for a in possible_assemblies]
+    create_source = lambda a, is_circular : StickyLigationSource.from_assembly(assembly=a, circular=is_circular, id=source.id, input=source.input)
+    out_sources = []
+    if len(fragments) > 1:
+        asm = Assembly(fragments, algorithm=sticky_end_sub_strings, limit=allow_partial_overlap, use_all_fragments=True, use_fragment_order=False)
+        circular_assemblies = asm.get_circular_assemblies()
+        out_sources += [create_source(a, True) for a in circular_assemblies]
+        if not circular_only:
+            out_sources += [create_source(a, False) for a in filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)]
+    else:
+        asm = SingleFragmentAssembly(fragments, algorithm=sticky_end_sub_strings, limit=allow_partial_overlap)
+        out_sources += [create_source(a, True) for a in asm.get_circular_assemblies()]
+        # Not possible to have insertion assemblies in this case
 
     # If a specific assembly is requested
     if source.assembly is not None:
         return format_known_assembly_response(source, out_sources, fragments)
 
-    if len(possible_assemblies) == 0:
+    if len(out_sources) == 0:
         raise HTTPException(400, 'No ligations were found.')
 
-    out_sequences = [format_sequence_genbank(assemble(fragments, a, s.circular)) for s, a in zip(out_sources, possible_assemblies)]
+    out_sequences = [format_sequence_genbank(assemble(fragments, s.get_assembly_plan(), s.circular)) for s in out_sources]
 
     return {'sources': out_sources, 'sequences': out_sequences}
 
@@ -347,21 +354,29 @@ async def gibson_assembly(source: GibsonAssemblySource,
 
     fragments = [read_dsrecord_from_json(seq) for seq in sequences]
 
-    asm = Assembly(fragments, algorithm=gibson_overlap, limit=minimal_homology, use_all_fragments=True, use_fragment_order=False)
-    possible_assemblies = asm.get_circular_assemblies()
-    if not circular_only:
-        possible_assemblies += filter_linear_subassemblies(asm.get_linear_assemblies(), possible_assemblies, fragments)
+    # Lambda function for code clarity
+    create_source = lambda a, is_circular : GibsonAssemblySource.from_assembly(assembly=a, circular=is_circular, id=source.id, input=source.input)
 
-    out_sources = [GibsonAssemblySource.from_assembly(id= source.id, input=source.input, assembly=a, circular=(a[0][0] == a[-1][1])) for a in possible_assemblies]
+    out_sources = []
+    if len(fragments) > 1:
+        asm = Assembly(fragments, algorithm=gibson_overlap, use_fragment_order=False, use_all_fragments=True, limit=minimal_homology)
+        circular_assemblies = asm.get_circular_assemblies()
+        out_sources += [create_source(a, True) for a in circular_assemblies]
+        if not circular_only:
+            out_sources += [create_source(a, False) for a in filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)]
+    else:
+        asm = SingleFragmentAssembly(fragments, algorithm=gibson_overlap, limit=minimal_homology)
+        out_sources += [create_source(a, True) for a in asm.get_circular_assemblies()]
+        # Not possible to have insertion assemblies with gibson
 
     # If a specific assembly is requested
     if source.assembly is not None:
         return format_known_assembly_response(source, out_sources, fragments)
 
-    if len(possible_assemblies) == 0:
+    if len(out_sources) == 0:
         raise HTTPException(400, 'No terminal homology was found.')
 
-    out_sequences = [format_sequence_genbank(assemble(fragments, a, s.circular)) for s, a in zip(out_sources, possible_assemblies)]
+    out_sequences = [format_sequence_genbank(assemble(fragments, s.get_assembly_plan(), s.circular)) for s in out_sources]
 
     return {'sources': out_sources, 'sequences': out_sequences}
 
@@ -392,12 +407,14 @@ async def restriction_and_ligation(source: RestrictionAndLigationSource,
     out_sources = []
     if len(fragments) > 1:
         asm = Assembly(fragments, algorithm=algo, use_fragment_order=False, use_all_fragments=True)
-        out_sources += [create_source(a, True) for a in asm.get_circular_assemblies()]
+        circular_assemblies = asm.get_circular_assemblies()
+        out_sources += [create_source(a, True) for a in circular_assemblies]
         if not circular_only:
-            out_sources += [create_source(a, False) for a in filter_linear_subassemblies(asm.get_linear_assemblies(), out_sources, fragments)]
+            out_sources += [create_source(a, False) for a in filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)]
     else:
         asm = SingleFragmentAssembly(fragments, algorithm=algo)
-        out_sources += [create_source(a, True) for a in asm.get_circular_assemblies()]
+        circular_assemblies = asm.get_circular_assemblies()
+        out_sources += [create_source(a, True) for a in circular_assemblies]
         if not circular_only:
             out_sources += [create_source(a, False) for a in asm.get_insertion_assemblies()]
 

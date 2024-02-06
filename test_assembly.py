@@ -1398,7 +1398,7 @@ def test_assembly_is_valid():
                 (3, 4, find_feature_by_id(f3_shifted, 'f3_f4').location, f4.features[0].location),
             ]
             assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == True
-            # Does not really belong here, but 
+            # Does not really belong here, but
             assert str(assembly.assemble(fragments, assembly_plan, False).seq) == 'ccTTTAAACCCg'
 
 def test_extract_subfragment():
