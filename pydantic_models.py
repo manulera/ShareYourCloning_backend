@@ -151,6 +151,13 @@ class AssemblySource(Source):
                 all_overlaps.append(len(Location.fromstring(f[3])))
         return min(all_overlaps)
 
+    def get_assembly_plan(self):
+        """Returns the assembly plan"""
+        out = list()
+        for p in self.assembly:
+            out.append((p[0], p[1], Location.fromstring(p[2]), Location.fromstring(p[3])))
+        return tuple(out)
+
 class PCRSource(AssemblySource):
     """Documents a PCR, and the selection of one of the products."""
 
@@ -203,7 +210,7 @@ class HomologousRecombinationSource(AssemblySource):
 class GibsonAssemblySource(AssemblySource):
 
     type: SourceType = SourceType('gibson_assembly')
-    input: conlist(int, min_length=2)
+    input: conlist(int, min_length=1)
 
     def from_assembly(assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int) -> 'GibsonAssemblySource':
         return GibsonAssemblySource(
@@ -215,7 +222,7 @@ class GibsonAssemblySource(AssemblySource):
 
 class RestrictionAndLigationSource(AssemblySource):
     type: SourceType = SourceType('restriction_and_ligation')
-    input: conlist(int, min_length=2)
+    input: conlist(int, min_length=1)
     restriction_enzymes: conlist(str, min_length=1)
 
     def from_assembly(assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int, restriction_enzymes=list['str']) -> 'RestrictionAndLigationSource':

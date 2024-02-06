@@ -67,17 +67,17 @@ class ReadFileTest(unittest.TestCase):
 
         examples = [
             {
-                'file': './test_entry_points.py',
+                'file': './test_endpoints.py',
                 'format': None,
                 'error_message': 'could not guess',
             },
             {
-                'file': './test_entry_points.py',
+                'file': './test_endpoints.py',
                 'format': 'snapgene',
                 'error_message': 'snapgene reader cannot',
             },
             {
-                'file': './test_entry_points.py',
+                'file': './test_endpoints.py',
                 'format': 'genbank',
                 'error_message': 'Pydna parser',
             }
@@ -307,6 +307,21 @@ class StickyLigationTest(unittest.TestCase):
 
         self.assertEqual(len(resulting_sequences[0]), len(initial_sequence))
 
+    def test_circularisation(self):
+        enzyme = CommOnly.format('EcoRI')
+        fragment = Dseqrecord('AGAATTC', circular=True).cut(enzyme)[0]
+        json_seqs = [format_sequence_genbank(fragment)]
+        json_seqs[0].id = 1
+        json_seqs = [seq.model_dump() for seq in json_seqs]
+        source = StickyLigationSource(
+            input=[1],
+        )
+        data = {'source': source.model_dump(), 'sequences': json_seqs}
+        response = client.post("/sticky_ligation", json=data)
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        self.assertEqual(resulting_sequences[0].seq, fragment.looped().seq)
 
 class RestrictionTest(unittest.TestCase):
 
@@ -816,6 +831,25 @@ class GibsonAssemblyTest(unittest.TestCase):
         self.assertEqual(str(sequences[0].seq), 'TTTTacgatAAtgctccCCCCtcatGGGGatata'.upper())
         self.assertEqual(str(sequences[1].seq), 'TTTTacgatAAtgctccCCCCatgaGGGGatata'.upper())
 
+        # Circularisation works
+        f1 = Dseqrecord('AGAGACCaaaAGAGACC')
+        json_fragments = [format_sequence_genbank(f1)]
+        for i, f in enumerate(json_fragments):
+            f.id = i + 1
+
+        source = GibsonAssemblySource(
+            input=[1],
+        )
+        data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
+        response = client.post('/gibson_assembly', json=data, params={'minimal_homology': 7})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+        self.assertEqual(len(sequences), 1)
+        self.assertEqual(str(sequences[0].seq), 'AGAGACCaaa'.upper())
+
 
 class RestrictionAndLigationTest(unittest.TestCase):
 
@@ -862,6 +896,30 @@ class RestrictionAndLigationTest(unittest.TestCase):
         payload = response.json()
         self.assertEqual(len(payload['sequences']), 1)
         self.assertEqual(len(payload['sources']), 1)
+
+    def test_single_input(self):
+        fragments = [Dseqrecord('AAAGAATTCAAAGAATTCAAAA')]
+        json_fragments = [format_sequence_genbank(f) for f in fragments]
+        for i, f in enumerate(json_fragments):
+            f.id = i + 1
+
+        source = RestrictionAndLigationSource(
+            input=[1],
+            restriction_enzymes=['EcoRI'],
+        )
+
+        data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
+        response = client.post('/restriction_and_ligation', json=data)
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sequences']), 2)
+        self.assertEqual(len(payload['sources']), 2)
+
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+        self.assertEqual(str(sequences[0].seq), 'AATTCAAAG')
+        self.assertEqual(str(sequences[1].seq), 'AAAGAATTCAAAA')
 
 
 

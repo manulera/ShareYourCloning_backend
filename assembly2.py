@@ -186,7 +186,7 @@ def assembly2str_tuple(assembly):
     """
     return str(tuple((u, v, str(lu), str(lv)) for u, v, lu, lv in assembly))
 
-def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragments_only_once=True):
+def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, is_insertion=False):
     """Function used to filter paths returned from the graph, see conditions tested below.
     """
     if is_circular is None:
@@ -233,10 +233,10 @@ def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, fragm
         if not fragment.circular and _location_boundaries(start_location)[1] >=  _location_boundaries(end_location)[1]:
             return False
 
-    if fragments_only_once:
-        nodes_used = [f[0] for f in edge_representation2subfragment_representation(assembly, is_circular)]
-        if len(nodes_used) != len(set(map(abs,nodes_used))):
-            return False
+    # Fragments are used only once
+    nodes_used = [f[0] for f in edge_representation2subfragment_representation(assembly, is_circular or is_insertion)]
+    if len(nodes_used) != len(set(map(abs,nodes_used))):
+        return False
 
     return True
 
@@ -590,27 +590,56 @@ class Assembly:
         return [a for a in assemblies if assembly_is_valid(self.fragments, a, True, self.use_all_fragments)]
 
     def format_insertion_assembly(self, assembly):
+        """Sorts the fragment representing a cycle so that they represent an insertion assembly if possible,
+        else returns None.
+
+        Here we check if one of the joins between fragments represents the edges of an insertion assembly
+        The fragment must be linear, and the join must be as indicated below
+
+        ```
+        --------         -------           Fragment 1
+            ||            ||
+            xxxxxxxx      ||               Fragment 2
+                  ||      ||
+                  oooooooooo               Fragment 3
+        ```
+        The above example will be [(1, 2, [4:6], [0:2]), (2, 3, [6:8], [0:2]), (3, 1, [8:10], [9:11)])]
+
+        These could be returned in any order by simple_cycles, so we sort the edges so that the first
+        and last `u` and `v` match the fragment that gets the insertion (1 in the example above).
+        """
         edge_pair_index = list()
 
+        # Pair edges with one another
         for i, ((u1, v1, _, start_location), (u2, v2, end_location, _)) in enumerate(zip(assembly, assembly[1:] + assembly[:1])):
             fragment = self.fragments[abs(v1)-1]
-            if not fragment.circular and (start_location.parts[-1].start > end_location.parts[0].end or start_location == end_location):
+            # Find the pair of edges that should be last and first  ((3, 1, [8:10], [9:11)]), (1, 2, [4:6], [0:2]) in
+            # the example above. Only one of the pairs of edges should satisfy this condition for the topology to make sense.
+            end_of_insertion = _location_boundaries(start_location)[1]
+            start_of_insertion = _location_boundaries(end_location)[0]
+            if not fragment.circular and (end_of_insertion > start_of_insertion or start_location == end_location):
                 edge_pair_index.append(i)
 
         if len(edge_pair_index) != 1:
             return None
 
-        shift_by = len(assembly) - edge_pair_index[0] - 1
+        shift_by = (edge_pair_index[0] + 1) % len(assembly)
         return assembly[shift_by:] + assembly[:shift_by]
 
     def get_insertion_assemblies(self):
+        """Assemblies that represent the insertion of a fragment or series of fragment inside a linear construct. For instance,
+        digesting CCCCGAATTCCCCGAATTC with EcoRI and inserting the fragment with two overhangs into the EcoRI site of AAAGAATTCAAA.
+        This is not so much meant for the use-case of linear fragments that represent actual linear fragments, but for linear
+        fragments that represent a genome region. This can then be used to simulate homologous recombination.
+        """
+
         # We find cycles first
         assemblies = sum(map(self.cycle2circular_assemblies, _nx.cycles.simple_cycles(self.G)),[])
         # We select those that contain exactly only one suitable edge
         assemblies = [b for a in assemblies if (b := self.format_insertion_assembly(a)) is not None]
         # First fragment should be in the + orientation
         assemblies = list(filter(lambda x: x[0][0] > 0, assemblies))
-        return [a for a in assemblies if assembly_is_valid(self.fragments, a, False, self.use_all_fragments, False)]
+        return [a for a in assemblies if assembly_is_valid(self.fragments, a, False, self.use_all_fragments, is_insertion=True)]
 
     def assemble_linear(self):
         """Assemble linear constructs, from assemblies returned by self.get_linear_assemblies."""
@@ -694,10 +723,74 @@ class PCRAssembly(Assembly):
             edge_pairs = zip(a, a[1:])
             for (u1, v1, _, start_location), (u2, v2, end_location, _) in edge_pairs:
                 # Incompatible as described in figure above
-                if start_location.parts[-1].end > end_location.parts[0].start:
+                if _location_boundaries(start_location)[1] > _location_boundaries(end_location)[0]:
                     raise ValueError('Clashing primers in assembly ' + assembly2str(a))
 
         return assemblies
+
+    def get_circular_assemblies(self):
+        raise NotImplementedError('Circular PCR assembly not implemented')
+
+    def get_insertion_assemblies(self):
+        raise NotImplementedError('Insertion PCR assembly not implemented')
+
+class SingleFragmentAssembly(Assembly):
+    """
+    An assembly that represents the circularisation or splicing of a single fragment.
+    """
+
+    def __init__(self, frags: [_Dseqrecord], limit=25, algorithm=common_sub_strings):
+
+        if len(frags) != 1:
+            raise ValueError('SingleFragmentAssembly assembly must be initialised with a single fragment')
+        # TODO: allow for the same fragment to be included more than once?
+        self.G = _nx.MultiDiGraph()
+        frag = frags[0]
+        # Add positive and negative nodes for forward and reverse fragments
+        self.G.add_node(1, seq=frag)
+
+        matches = algorithm(frag, frag, limit)
+        for match in matches:
+            self.add_edges_from_match(match, 1, 1, frag, frag)
+
+        # To avoid duplicated outputs
+        self.G.remove_edges_from([(-1, -1)])
+
+        # These two are constrained
+        self.use_fragment_order=True
+        self.use_all_fragments=True
+
+        self.fragments = frags
+        self.limit = limit
+        self.algorithm = algorithm
+
+        return
+
+    def get_circular_assemblies(self):
+        # We don't want the same location twice
+        assemblies = filter(lambda x: x[0][2] != x[0][3], super().get_circular_assemblies())
+        return [a for a in assemblies if assembly_is_valid(self.fragments, a, True, self.use_all_fragments)]
+
+    def get_insertion_assemblies(self):
+        """This could be renamed splicing assembly, but the essence is similar"""
+        def splicing_assembly_filter(x):
+            # We don't want the same location twice
+            if x[0][2] == x[0][3]:
+                return False
+            # We don't want to get the same fragment again
+            left_start, _ = _location_boundaries(x[0][2])
+            _, right_end = _location_boundaries(x[0][3])
+            if left_start == 0 and right_end == len(self.fragments[0]):
+                return False
+            return True
+
+        # We don't want the same location twice
+        assemblies = filter(splicing_assembly_filter, super().get_insertion_assemblies())
+        return [a for a in assemblies if assembly_is_valid(self.fragments, a, False, self.use_all_fragments, is_insertion=True)]
+
+    def get_linear_assemblies(self):
+        raise NotImplementedError('Linear assembly does not make sense')
+
 
 
 example_fragments = (

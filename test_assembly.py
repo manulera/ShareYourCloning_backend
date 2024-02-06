@@ -20,7 +20,7 @@ def test_built():
     crc = asm.assemble_circular()
 
     assert [l.seq for l in lin] == [l.seq for l in sorted(assembly.linear_results, key=len)]
-    assert [c.seq.cseguid() for c in crc] == [c.seq.cseguid() for c in assembly.circular_results]
+    assert [c.seq.seguid() for c in crc] == [c.seq.seguid() for c in assembly.circular_results]
 
 
 def test_new_assembly():
@@ -153,7 +153,7 @@ def test_new_assembly():
     ]
     c1 = assembly.Assembly((a, b, c), limit=14)
     result = c1.assemble_circular()[0]
-    assert result.cseguid() == "t3mIjxv3Q5GK9SWpXD-UfyefANc"
+    assert result.seguid() == "cdseguid-qj3q-0rsUxj8xLIxKuhVEIQ8kIw"
     assert str(result.seq) == "acgatgctatactggCCCCCtgtgctgtgctctaTTTTTtattctggctgtatctGGGGGT"
     # acgatgctatactggCCCCCtgtgctgtgctctaGG
     feature_seqs = (
@@ -185,10 +185,10 @@ def test_new_assembly():
     circprods = c2.assemble_circular()
 
     # Changed
-    assert circprods[0].cseguid() == "t3mIjxv3Q5GK9SWpXD-UfyefANc"
-    # assert circprods[1].cseguid() == "t3mIjxv3Q5GK9SWpXD-UfyefANc"
-    assert circprods[1].cseguid() == "k9ztaDj9HsQYZvxzvkUWn6SY5Ks"
-    # assert circprods[1].cseguid() == "k9ztaDj9HsQYZvxzvkUWn6SY5Ks"
+    assert circprods[0].seguid() == "cdseguid-qj3q-0rsUxj8xLIxKuhVEIQ8kIw"
+    # assert circprods[1].seguid() == "cdseguid-qj3q-0rsUxj8xLIxKuhVEIQ8kIw"
+    assert circprods[1].seguid() == "cdseguid-qCuwUw63xkh58WM-ADaT7uX_-oQ"
+    # assert circprods[1].seguid() == "cdseguid-qCuwUw63xkh58WM-ADaT7uX_-oQ"
     assert str(circprods[0].seq) == "acgatgctatactggCCCCCtgtgctgtgctctaTTTTTtattctggctgtatctGGGGGT"
     assert str(circprods[1].seq) == "acgatgctatactggCCCCCtgtgctgtgctctaCCtattctggctgtatctGGGGGT"
 
@@ -372,15 +372,15 @@ algorithm..: common_sub_strings"""
     # text4
     x, y = parse(text4)
     a = assembly.Assembly((x, y), limit=557)
-    assert a.assemble_linear()[1].lseguid() == "EC5pU87OEIjuNpG7jiARzFwLabc"
+    assert a.assemble_linear()[1].seguid() == "ldseguid-4p-1ecqJRcsQrJogHIX1Axux75I"
     a = assembly.Assembly((y, x), limit=557)
-    assert a.assemble_linear()[1].lseguid() == "EC5pU87OEIjuNpG7jiARzFwLabc"
+    assert a.assemble_linear()[1].seguid() == "ldseguid-4p-1ecqJRcsQrJogHIX1Axux75I"
     a = assembly.Assembly((x.rc(), y), limit=557)
-    assert a.assemble_linear()[0].lseguid() == "EC5pU87OEIjuNpG7jiARzFwLabc"
+    assert a.assemble_linear()[0].seguid() == "ldseguid-4p-1ecqJRcsQrJogHIX1Axux75I"
     a = assembly.Assembly((x, y.rc()), limit=557)
-    assert a.assemble_linear()[1].lseguid() == "EC5pU87OEIjuNpG7jiARzFwLabc"
+    assert a.assemble_linear()[1].seguid() == "ldseguid-4p-1ecqJRcsQrJogHIX1Axux75I"
     a = assembly.Assembly((x.rc(), y.rc()), limit=557)
-    assert a.assemble_linear()[0].lseguid() == "EC5pU87OEIjuNpG7jiARzFwLabc"
+    assert a.assemble_linear()[0].seguid() == "ldseguid-4p-1ecqJRcsQrJogHIX1Axux75I"
 
     candidate = a.assemble_linear()[0]
     correct = "tcctgacgggtaattttgatttgcatgccgtccgggtgagtcatagcgtctggttgttttgccagattcagcagagtctgtgcaatgcggccgctgaccacatacgatttaggtgacactatagaacgcggccgccagctgaagcttcgtacgctgcaggtcgacggatccccgggttaattaaggcgcgccagatctgtttagcttgccttgtccccgccgggtcacccggccagcgacatggaggcccagaataccctccttgacagtcttgacgtgcgcagctcaggggcatgatgtgactgtcgcccgtacatttagcccatacatccccatgtataatcatttgcatccatacattttgatggccgcacggcgcgaagcaaaaattacggctcctcgctgcagacctgcgagcagggaaacgctcccctcacagacgcgttgaattgtccccacgccgcgcccctgtagagaaatataaaaggttaggatttgccactgaggttcttctttcatatacttccttttaaaatcttgctaggatacagttctcacatcacatccgaacataaacaaccgtcgaggaacgccaggttgcccactttctcactagtgacctgcagccgacccaatcacatcacatccgaacataaacaaccatgggtaaaaagcctgaactcaccgcgacgtctgtcgagaagtttctgatcgaaaagttcgacagcgtctccgacctgatgcagctctcggagggcgaagaatctcgtgctttcagcttcgatgtaggagggcgtggatatgtcctgcgggtaaatagctgcgccgatggtttctacaaagatcgttatgtttatcggcactttgcatcggccgcgctcccgattccggaagtgcttgacattggggaattcagcgagagcctgacctattgcatctcccgccgtgcacagggtgtcacgttgcaagacctgcctgaaaccgaactgcccgctgttctgcagccggtcgcggaggccatggatgcgatcgctgcggccgatcttagccagacgagcgggttcggcccattcggaccgcaaggaatcggtcaatacactacatggcgtgatttcatatgcgcgattgctgatccccatgtgtatcactggcaaactgtgatggacgacaccgtcagtgcgtccgtcgcgcaggctctcgatgagctgatgctttgggccgaggactgccccgaagtccggcacctcgtgcacgcggatttcggctccaacaatgtcctgacggacaatggccgcataacagcggtcattgactggagcgaggcgatgttcggggattcccaatacgaggtcgccaacatcttcttctggaggccgtggttggcttgtatggagcagcagacgcgctacttcgagcggaggcatccggagcttgcaggatcgccgcggctccgggcgtatatgctccgcattggtcttgaccaactctatcagagcttggttgacggcaatttcgatgatgcagcttgggcgcagggtcgatgcgacgcaatcgtccgatccggagccgggactgtcgggcgtacacaaatcgcccgcagaagcgcggccgtctggaccgatggctgtgtagaagtactcgccgatagtggaaaccgacgccccagcactcgtccgagggcaaaggaataatcagtactgacaataaaaagattcttgtagggataacagggtaatcggagtgccatctgtgcagacaaacgcatcaggatagagtcttttgtaacgaccccgtctccaccaacttggtatgcttgaaatctcaaggccattacacattcagttatgtgaacgaaaggtctttatttaacgtagcataaactaaataatacaggttccggttagcctgcaatgtgttaaatctaaaggagcatacccaaaatgaactgaagacaaggaaatttgcttgtccagatgtgattgagcatttgaacgttaataacataacatttttatacttaactatagaaagacttgtataaaaactggcaaacgagatattctgaatattggtgcatatttcaggtagaaaagcttacaaaacaatctaatcataatattgagatgaagagaaagataaaagaaaaaacgataagtcagatgagattatgattgtactttgaaatcgaggaacaaagtatatacggtagtagttccccgagttataacgggagatcatgtaaattgagaaaccagataaagatttggtatgcactctagcaagaaaataaaatgatgaatctatgatatagatcacttttgttccagcgtcgaggaacgccaggttgcccactttctcactagtgacctgcagccgacgatcagatctttcaggaaagtttcggaggagatagtgttcggcagtttgtacatcatctgcgggatcaggtacggtttgatcaggttgtagaagatcaggtaagacatagaatcgatgtagatgatcggtttgtttttgttgatttttacgtaacagttcagttggaatttgttacgcagacccttaaccaggtattctacttcttcgaaagtgaaagactgggtgttcagtacgatcgatttgttggtagagtttttgttgtaatcccatttaccaccatcatccatgaaccagtatgccagagacatcggggtcaggtagttttcaaccaggttgttcgggatggtttttttgttgttaacgatgaacaggttagccagtttgttgaaagcttggtgtttgaaagtctgggcgccccaggtgattaccaggttacccaggtggttaacacgttcttttttgtgcggcggggacagtacccactgatcgtacagcagacatacgtggtccatgtatgctttgtttttccactcgaactgcatacagtaggttttaccttcatcacgagaacggatgtaagcatcacccaggatcagaccgatacctgcttcgaactgttcgatgttcagttcgatcagctgggatttgtattctttcagcagtttagagttcggacccaggttcattacctggttttttttgatgtttttcatatgcatggatccggggttttttctccttgacgttaaagtatagaggtatattaacaattttttgttgatacttttattacatttgaataagaagtaatacaaaccgaaaatgttgaaagtattagttaaagtggttatgcagtttttgcatttatatatctgttaatagatcaaaaatcatcgcttcgctgattaattaccccagaaataaggctaaaaaactaatcgcattatcatcctatggttgttaatttgattcgttcatttgaaggtttgtggggccaggttactgccaatttttcctcttcataaccataaaagctagtattgtagaatctttattgttcggagcagtgcggcgcgaggcacatctgcgtttcaggaacgcgaccggtgaagacgaggacgcacggaggagagtcttccttcggagggctgtcacccgctcggcggcttctaatccgtacttcaatatagcaatgagcagttaagcgtattactgaaagttccaaagagaaggtttttttaggctaagataatggggctctttacatttccacaacatataagtaagattagatatggatatgtatatggatatgtatatggtggtaatgccatgtaatatgattattaaacttctttgcgtccatccaacgagatctggcgcgccttaattaacccaacctgcattaatgaatcggccaacgcgcggattaccctgttatccctacatattgttgtgccatctgtgcagacaaacgcatcaggattcagtactgacaataaaaagattcttgttttcaagaacttgtcatttgtatagtttttttatattgtagttgttctattttaatcaaatgttagcgtgatttatattttttttcgcctcgacatcatctgcccagatgcgaagttaagtgcgcagaaagtaatatcatgcgtcaatcgtatgtgaatgctggtcgctatactgctgtcgattcgatactaacgccgccatccagtgtcgaaaacgagctcgaattcatcgatgatatcagatccactagtggcctatgcggccgcggatctgccggtctccctatagtgagtcgatccggatttacctgaatcaattggcgaaattttttgtacgaaatttcagccacttcacag"
@@ -394,7 +394,7 @@ algorithm..: common_sub_strings"""
     correct = "tcgcgcgtttcggtgatgacggtgaaaacctctgacacatgcagctcccggagacggtcacagcttgtctgtaagcggatgccgggagcagacaagcccgtcagggcgcgtcagcgggtgttggcgggtgtcggggctggcttaactatgcggcatcagagcagattgtactgagagtgcaccatagatcctgaggatcggggtgataaatcagtctgcgccacatcgggggaaacaaaatggcgcgagatctaaaaaaaaaggctccaaaaggagcctttcgcgctaccaggtaacgcgccactccgacgggattaacgagtgccgtaaacgacgatggttttaccgtgtgcggagatcaggttctgatcctcgagcatcttaagaattcgtcccacggtttgtctagagcagccgacaatctggccaatttcctgacgggtaattttgatttgcatgccgtccgggtgagtcatagcgtctggttgttttgccagattcagcagagtctgtgcaatgcggccgctgaccacatacgatttaggtgacactatagaacgcggccgccagctgaagcttcgtacgctgcaggtcgacggatccccgggttaattaaggcgcgccagatctgtttagcttgccttgtccccgccgggtcacccggccagcgacatggaggcccagaataccctccttgacagtcttgacgtgcgcagctcaggggcatgatgtgactgtcgcccgtacatttagcccatacatccccatgtataatcatttgcatccatacattttgatggccgcacggcgcgaagcaaaaattacggctcctcgctgcagacctgcgagcagggaaacgctcccctcacagacgcgttgaattgtccccacgccgcgcccctgtagagaaatataaaaggttaggatttgccactgaggttcttctttcatatacttccttttaaaatcttgctaggatacagttctcacatcacatccgaacataaacaaccgtcgaggaacgccaggttgcccactttctcactagtgacctgcagccgacccaatcacatcacatccgaacataaacaaccatgggtaaaaagcctgaactcaccgcgacgtctgtcgagaagtttctgatcgaaaagttcgacagcgtctccgacctgatgcagctctcggagggcgaagaatctcgtgctttcagcttcgatgtaggagggcgtggatatgtcctgcgggtaaatagctgcgccgatggtttctacaaagatcgttatgtttatcggcactttgcatcggccgcgctcccgattccggaagtgcttgacattggggaattcagcgagagcctgacctattgcatctcccgccgtgcacagggtgtcacgttgcaagacctgcctgaaaccgaactgcccgctgttctgcagccggtcgcggaggccatggatgcgatcgctgcggccgatcttagccagacgagcgggttcggcccattcggaccgcaaggaatcggtcaatacactacatggcgtgatttcatatgcgcgattgctgatccccatgtgtatcactggcaaactgtgatggacgacaccgtcagtgcgtccgtcgcgcaggctctcgatgagctgatgctttgggccgaggactgccccgaagtccggcacctcgtgcacgcggatttcggctccaacaatgtcctgacggacaatggccgcataacagcggtcattgactggagcgaggcgatgttcggggattcccaatacgaggtcgccaacatcttcttctggaggccgtggttggcttgtatggagcagcagacgcgctacttcgagcggaggcatccggagcttgcaggatcgccgcggctccgggcgtatatgctccgcattggtcttgaccaactctatcagagcttggttgacggcaatttcgatgatgcagcttgggcgcagggtcgatgcgacgcaatcgtccgatccggagccgggactgtcgggcgtacacaaatcgcccgcagaagcgcggccgtctggaccgatggctgtgtagaagtactcgccgatagtggaaaccgacgccccagcactcgtccgagggcaaaggaataatcagtactgacaataaaaagattcttgtagggataacagggtaatcggagtgccatctgtgcagacaaacgcatcaggatagagtcttttgtaacgaccccgtctccaccaacttggtatgcttgaaatctcaaggccattacacattcagttatgtgaacgaaaggtctttatttaacgtagcataaactaaataatacaggttccggttagcctgcaatgtgttaaatctaaaggagcatacccaaaatgaactgaagacaaggaaatttgcttgtccagatgtgattgagcatttgaacgttaataacataacatttttatacttaactatagaaagacttgtataaaaactggcaaacgagatattctgaatattggtgcatatttcaggtagaaaagcttacaaaacaatctaatcataatattgagatgaagagaaagataaaagaaaaaacgataagtcagatgagattatgattgtactttgaaatcgaggaacaaagtatatacggtagtagttccccgagttataacgggagatcatgtaaattgagaaaccagataaagatttggtatgcactctagcaagaaaataaaatgatgaatctatgatatagatcacttttgttccagcgtcgaggaacgccaggttgcccactttctcactagtgacctgcagccgacgatcagatctttcaggaaagtttcggaggagatagtgttcggcagtttgtacatcatctgcgggatcaggtacggtttgatcaggttgtagaagatcaggtaagacatagaatcgatgtagatgatcggtttgtttttgttgatttttacgtaacagttcagttggaatttgttacgcagacccttaaccaggtattctacttcttcgaaagtgaaagactgggtgttcagtacgatcgatttgttggtagagtttttgttgtaatcccatttaccaccatcatccatgaaccagtatgccagagacatcggggtcaggtagttttcaaccaggttgttcgggatggtttttttgttgttaacgatgaacaggttagccagtttgttgaaagcttggtgtttgaaagtctgggcgccccaggtgattaccaggttacccaggtggttaacacgttcttttttgtgcggcggggacagtacccactgatcgtacagcagacatacgtggtccatgtatgctttgtttttccactcgaactgcatacagtaggttttaccttcatcacgagaacggatgtaagcatcacccaggatcagaccgatacctgcttcgaactgttcgatgttcagttcgatcagctgggatttgtattctttcagcagtttagagttcggacccaggttcattacctggttttttttgatgtttttcatatgcatggatccggggttttttctccttgacgttaaagtatagaggtatattaacaattttttgttgatacttttattacatttgaataagaagtaatacaaaccgaaaatgttgaaagtattagttaaagtggttatgcagtttttgcatttatatatctgttaatagatcaaaaatcatcgcttcgctgattaattaccccagaaataaggctaaaaaactaatcgcattatcatcctatggttgttaatttgattcgttcatttgaaggtttgtggggccaggttactgccaatttttcctcttcataaccataaaagctagtattgtagaatctttattgttcggagcagtgcggcgcgaggcacatctgcgtttcaggaacgcgaccggtgaagacgaggacgcacggaggagagtcttccttcggagggctgtcacccgctcggcggcttctaatccgtacttcaatatagcaatgagcagttaagcgtattactgaaagttccaaagagaaggtttttttaggctaagataatggggctctttacatttccacaacatataagtaagattagatatggatatgtatatggatatgtatatggtggtaatgccatgtaatatgattattaaacttctttgcgtccatccaacgagatctggcgcgccttaattaacccaacctgcattaatgaatcggccaacgcgcggattaccctgttatccctacatattgttgtgccatctgtgcagacaaacgcatcaggattcagtactgacaataaaaagattcttgttttcaagaacttgtcatttgtatagtttttttatattgtagttgttctattttaatcaaatgttagcgtgatttatattttttttcgcctcgacatcatctgcccagatgcgaagttaagtgcgcagaaagtaatatcatgcgtcaatcgtatgtgaatgctggtcgctatactgctgtcgattcgatactaacgccgccatccagtgtcgaaaacgagctcgaattcatcgatgatatcagatccactagtggcctatgcggccgcggatctgccggtctccctatagtgagtcgatccggatttacctgaatcaattggcgaaattttttgtacgaaatttcagccacttcacaggcggttttcgcacgtacccatgcgctacgttcctggccctcttcaaacaggcccagttcgccaataaaatcaccctgattcagataggagaggatcatttctttaccctcttcgtctttgatcagcactgccacagagcctttaacgatgtagtacagcgtttccgctttttcaccctggtgaataagcgtgctcttggatgggtacttatgaatgtggcaatgagacaagaaccattcgagagtaggatccgtttgaggtttaccaagtaccataagatccttaaatttttattatctagctagatgataatattatatcaagaattgtacctgaaagcaaataaattttttatctggcttaactatgcggcatcagagcagattgtactgagagtgcaccatatgcggtgtgaaataccgcacagatgcgtaaggagaaaataccgcatcaggcgctcttccgcttcctcgctcactgactcgctgcgctcggtcgttcggctgcggcgagcggtatcagctcactcaaaggcggtaatacggttatccacagaatcaggggataacgcaggaaagaacatgtgagcaaaaggccagcaaaagcccaggaaccgtaaaaaggccgcgttgctggcgtttttccataggctccgcccccctgacgagcatcacaaaaatcgacgctcaagtcagaggtggcgaaacccgacaggactataaagataccaggcgtttccccctggaagctccctcgtgcgctctcctgttccgaccctgccgcttaccggatacctgtccgcctttctcccttcgggaagcgtggcgctttctcatagctcacgctgtaggtatctcagttcggtgtaggtcgttcgctccaagctgggctgtgtgcacgaaccccccgttcagcccgaccgctgcgccttatccggtaactatcgtcttgagtccaacccggtaagacacgacttatcgccactggcagcagccactggtaacaggattagcagagcgaggtatgtaggcggtgctacagagttcttgaagtggtggcctaactacggctacactagaaggacagtatttggtatctgcgctctgctgaagccagttaccttcggaaaaagagttggtagctcttgatccggcaaacaaaccaccgctggtagcggtggtttttttgtttgcaagcagcagattacgcgcagaaaaaaaggatctcaagaagatcctttgatcttttctacggggtctgacgctcagtggaacgaaaactcacgttaagggattttggtcatgaggggtaataactgatataattaaattgaagctctaatttgtgagtttagtatacatgcatttacttataatacagttttttagttttgctggccgcatcttctcaaatatgcttcccagcctgcttttctgtaacgttcaccctctaccttagcatcccttccctttgcaaatagtcctcttccaacaataataatgtcagatcctgtagagaccacatcatccacggttctatactgttgacccaatgcgtctcccttgtcatctaaacccacaccgggtgtcataatcaaccaatcgtaaccttcatctcttccacccatgtctctttgagcaataaagccgataacaaaatctttgtcgctcttcgcaatgtcaacagtacccttagtatattctccagtagatagggagcccttgcatgacaattctgctaacatcaaaaggcctctaggttcctttgttacttcttctgccgcctgcttcaaaccgctaacaatacctgggcccaccacaccgtgtgcattcgtaatgtctgcccattctgctattctgtatacacccgcagagtactgcaatttgactgtattaccaatgtcagcaaattttctgtcttcgaagagtaaaaaattgtacttggcggataatgcctttagcggcttaactgtgccctccatggaaaaatcagtcaaaatatccacatgtgtttttagtaaacaaattttgggacctaatgcttcaactaactccagtaattccttggtggtacgaacatccaatgaagcacacaagtttgtttgcttttcgtgcatgatattaaatagcttggcagcaacaggactaggatgagtagcagcacgttccttatatgtagctttcgacatgatttatcttcgtttcctgcaggtttttgttctgtgcagttgggttaagaatactgggcaatttcatgtttcttcaacactacatatgcgtatatataccaatctaagtctgtgctccttccttcgttcttccttctgttcggagattaccgaatcaaaaaaatttcaaagaaaccgaaatcaaaaaaaagaataaaaaaaaaatgatgaattgaattgaaaagctagcttatcgatgataagctgtcaaagatgagaattaattccacggactatagactatactagatactccgtctactgtacgatacacttccgctcaggtccttgtcctttaacgaggccttaccactcttttgttactctattgatccagctcagcaaaggcagtgtgatctaagattctatcttcgcgatgtagtaaaactagctagaccgagaaagagactagaaatgcaaaaggcacttctacaatggctgccatcattattatccgatgtgacgctgcagcttctcaatgatattcgaatacgctttgaggagatacagcctaatatccgacaaactgttttacagatttacgatcgtacttgttacccatcattgaattttgaacatccgaacctgggagttttccctgaaacagatagtatatttgaacctgtataataatatatagtctagcgctttacggaagacaatgtatgtatttcggttcctggagaaactattgcatctattgcataggtaatcttgcacgtcgcatccccggttcattttctgcgtttccatcttgcacttcaatagcatatctttgttaacgaagcatctgtgcttcattttgtagaacaaaaatgcaacgcgagagcgctaatttttcaaacaaagaatctgagctgcatttttacagaacagaaatgcaacgcgaaagcgctattttaccaacgaagaatctgtgcttcatttttgtaaaacaaaaatgcaacgcgacgagagcgctaatttttcaaacaaagaatctgagctgcatttttacagaacagaaatgcaacgcgagagcgctattttaccaacaaagaatctatacttcttttttgttctacaaaaatgcatcccgagagcgctatttttctaacaaagcatcttagattactttttttctcctttgtgcgctctataatgcagtctcttgataactttttgcactgtaggtccgttaaggttagaagaaggctactttggtgtctattttctcttccataaaaaaagcctgactccacttcccgcgtttactgattactagcgaagctgcgggtgcattttttcaagataaaggcatccccgattatattctataccgatgtggattgcgcatactttgtgaacagaaagtgatagcgttgatgattcttcattggtcagaaaattatgaacggtttcttctattttgtctctatatactacgtataggaaatgtttacattttcgtattgttttcgattcactctatgaatagttcttactacaatttttttgtctaaagagtaatactagagataaacataaaaaatgtagaggtcgagtttagatgcaagttcaaggagcgaaaggtggatgggtaggttatatagggatatagcacagagatatatagcaaagagatacttttgagcaatgtttgtggaagcggtattcgcaatgggaagctccaccccggttgataatcagaaaagccccaaaaacaggaagattattatcaaaaaggatcttcacctagatccttttaaattaaaaatgaagttttaaatcaatctaaagtatatatgagtaaacttggtctgacagttaccaatgcttaatcagtgaggcacctatctcagcgatctgtctatttcgttcatccatagttgcctgactccccgtcgtgtagataactacgatacgggagcgcttaccatctggccccagtgctgcaatgataccgcgagacccacgctcaccggctccagatttatcagcaataaaccagccagccggaagggccgagcgcagaagtggtcctgcaactttatccgcctccatccagtctattaattgttgccgggaagctagagtaagtagttcgccagttaatagtttgcgcaacgttgttggcattgctacaggcatcgtggtgtcactctcgtcgtttggtatggcttcattcagctccggttcccaacgatcaaggcgagttacatgatcccccatgttgtgcaaaaaagcggttagctccttcggtcctccgatcgttgtcagaagtaagttggccgcagtgttatcactcatggttatggcagcactgcataattctcttactgtcatgccatccgtaagatgcttttctgtgactggtgagtactcaaccaagtcattctgagaatagtgtatgcggcgaccgagttgctcttgcccggcgtcaatacgggataatagtgtatcacatagcagaactttaaaagtgctcatcattggaaaacgttcttcggggcgaaaactctcaaggatcttaccgctgttgagatccagttcgatgtaacccactcgtgcacccaactgatcttcagcatcttttactttcaccagcgtttctgggtgagcaaaaacaggaaggcaaaatgccgcaaaaaagggaataagggcgacacggaaatgttgaatactcatactcttcctttttcaatattattgaagcatttatcagggttattgtctcatgagcggatacatatttgaatgtatttagaaaaataaacaaataggggttccgcgcacatttccccgaaaagtgccacctgctaagaaaccattattatcatgacattaacctataaaaataggcgtatcacgaggccctttcgtc"
 
     assert len(correct) == 9772
-    assert eq(Dseqrecord(correct, circular=True).cseguid(), candidate.seq.cseguid(), circular=True)
+    assert eq(Dseqrecord(correct, circular=True).seguid(), candidate.seq.seguid(), circular=True)
 
     # text6
 
@@ -405,7 +405,7 @@ algorithm..: common_sub_strings"""
     assert len(correct) == 3587
     assert eq(correct, candidate, circular=False)
 
-    # text7 cSEGUID G2drVQAIaRfFXBfqEc5Kddac36A
+    # text7 seguid G2drVQAIaRfFXBfqEc5Kddac36A
     list_of_formatted_seq_records = parse(text7)
     a = assembly.Assembly(list_of_formatted_seq_records, limit=28)
 
@@ -413,7 +413,7 @@ algorithm..: common_sub_strings"""
 
     correct = "aattggccagattgtcggctgctctagacaaaccgtgggacgaattcttaagatgctcgaggatcagaacctgatctccgcacacggtaaaaccatcgtcgtttacggcactcgttaatcccgtcggagtggcgcgttacctggtagcgcgaaaggctccttttggagcctttttttttagatctcgcgccattttgtttcccccgatgtggcgcagactgatttatcaccccgatcctcaggatctatggtgcactctcagtacaatctgctctgatgccgcatagttaagccagccccgacacccgccaacacccgctgacgcgccctgacgggcttgtctgctcccggcatccgcttacagacaagctgtgaccgtctccgggagctgcatgtgtcagaggttttcaccgtcatcaccgaaacgcgcgagacgaaagggcctcgtgatacgcctatttttataggttaatgtcatgataataatggtttcttagcaggtggcacttttcggggaaatgtgcgcggaacccctatttgtttatttttctaaatacattcaaatatgtatccgctcatgagacaataaccctgataaatgcttcaataatattgaaaaaggaagagtatgagtattcaacatttccgtgtcgcccttattcccttttttgcggcattttgccttcctgtttttgctcacccagaaacgctggtgaaagtaaaagatgctgaagatcagttgggtgcacgagtgggttacatcgaactggatctcaacagcggtaagatccttgagagttttcgccccgaagaacgttttccaatgatgagcacttttaaagttctgctatgtgatacactattatcccgtattgacgccgggcaagagcaactcggtcgccgcatacactattctcagaatgacttggttgagtactcaccagtcacagaaaagcatcttacggatggcatgacagtaagagaattatgcagtgctgccataaccatgagtgataacactgcggccaacttacttctgacaacgatcggaggaccgaaggagctaaccgcttttttgcacaacatgggggatcatgtaactcgccttgatcgttgggaaccggagctgaatgaagccataccaaacgacgagagtgacaccacgatgcctgtagcaatgccaacaacgttgcgcaaactattaactggcgaactacttactctagcttcccggcaacaattaatagactggatggaggcggataaagttgcaggaccacttctgcgctcggcccttccggctggctggtttattgctgataaatctggagccggtgagcgtgggtctcgcggtatcattgcagcactggggccagatggtaagcgctcccgtatcgtagttatctacacgacggggagtcaggcaactatggatgaacgaaatagacagatcgctgagataggtgcctcactgattaagcattggtaactgtcagaccaagtttactcatatatactttagattgatttaaaacttcatttttaatttaaaaggatctaggtgaagatcctttttgataataatcttcctgtttttggggcttttctgattatcaaccggggtggagcttcccattgcgaataccgcttccacaaacattgctcaaaagtatctctttgctatatatctctgtgctatatccctatataacctacccatccacctttcgctccttgaacttgcatctaaactcgacctctacattttttatgtttatctctagtattactctttagacaaaaaaattgtagtaagaactattcatagagtgaatcgaaaacaatacgaaaatgtaaacatttcctatacgtagtatatagagacaaaatagaagaaaccgttcataattttctgaccaatgaagaatcatcaacgctatcactttctgttcacaaagtatgcgcaatccacatcggtatagaatataatcggggatgcctttatcttgaaaaaatgcacccgcagcttcgctagtaatcagtaaacgcgggaagtggagtcaggctttttttatggaagagaaaatagacaccaaagtagccttcttctaaccttaacggacctacagtgcaaaaagttatcaagagactgcattatagagcgcacaaaggagaaaaaaagtaatctaagatgctttgttagaaaaatagcgctctcgggatgcatttttgtagaacaaaaaagaagtatagattctttgttggtaaaatagcgctctcgcgttgcatttctgttctgtaaaaatgcagctcagattctttgtttgaaaaattagcgctctcgtcgcgttgcatttttgttttacaaaaatgaagcacagattcttcgttggtaaaatagcgctttcgcgttgcatttctgttctgtaaaaatgcagctcagattctttgtttgaaaaattagcgctctcgcgttgcatttttgttctacaaaatgaagcacagatgcttcgttaacaaagatatgctattgaagtgcaagatggaaacgcagaaaatgaaccggggatgcgacgtgcaagattacctatgcaatagatgcaatagtttctccaggaaccgaaatacatacattgtcttccgtaaagcgctagactatatattattatacaggttcaaatatactatctgtttcagggaaaactcccaggttcggatgttcaaaattcaatgatgggtaacaagtacgatcgtaaatctgtaaaacagtttgtcggatattaggctgtatctcctcaaagcgtattcgaatatcattgagaagctgcagcgtcacatcggataataatgatggcagccattgtagaagtgccttttgcatttctagtctctttctcggtctagctagttttactacatcgcgaagatagaatcttagatcacactgcctttgctgagctggatcaatagagtaacaaaagagtggtaaggcctcgttaaaggacaaggacctgagcggaagtgtatcgtacagtagacggagtatctagtatagtctatagtccgtggaattaattctcatctttgacagcttatcatcgataagctagcttttcaattcaattcatcattttttttttattcttttttttgatttcggtttctttgaaatttttttgattcggtaatctccgaacagaaggaagaacgaaggaaggagcacagacttagattggtatatatacgcatatgtagtgttgaagaaacatgaaattgcccagtattcttaacccaactgcacagaacaaaaacctgcaggaaacgaagataaatcatgtcgaaagctacatataaggaacgtgctgctactcatcctagtcctgttgctgccaagctatttaatatcatgcacgaaaagcaaacaaacttgtgtgcttcattggatgttcgtaccaccaaggaattactggagttagttgaagcattaggtcccaaaatttgtttactaaaaacacatgtggatattttgactgatttttccatggagggcacagttaagccgctaaaggcattatccgccaagtacaattttttactcttcgaagacagaaaatttgctgacattggtaatacagtcaaattgcagtactctgcgggtgtatacagaatagcagaatgggcagacattacgaatgcacacggtgtggtgggcccaggtattgttagcggtttgaagcaggcggcagaagaagtaacaaaggaacctagaggccttttgatgttagcagaattgtcatgcaagggctccctatctactggagaatatactaagggtactgttgacattgcgaagagcgacaaagattttgttatcggctttattgctcaaagagacatgggtggaagagatgaaggttacgattggttgattatgacacccggtgtgggtttagatgacaagggagacgcattgggtcaacagtatagaaccgtggatgatgtggtctctacaggatctgacattattattgttggaagaggactatttgcaaagggaagggatgctaaggtagagggtgaacgttacagaaaagcaggctgggaagcatatttgagaagatgcggccagcaaaactaaaaaactgtattataagtaaatgcatgtatactaaactcacaaattagagcttcaatttaattatatcagttattacccctcatgaccaaaatcccttaacgtgagttttcgttccactgagcgtcagaccccgtagaaaagatcaaaggatcttcttgagatcctttttttctgcgcgtaatctgctgcttgcaaacaaaaaaaccaccgctaccagcggtggtttgtttgccggatcaagagctaccaactctttttccgaaggtaactggcttcagcagagcgcagataccaaatactgtccttctagtgtagccgtagttaggccaccacttcaagaactctgtagcaccgcctacatacctcgctctgctaatcctgttaccagtggctgctgccagtggcgataagtcgtgtcttaccgggttggactcaagacgatagttaccggataaggcgcagcggtcgggctgaacggggggttcgtgcacacagcccagcttggagcgaacgacctacaccgaactgagatacctacagcgtgagctatgagaaagcgccacgcttcccgaagggagaaaggcggacaggtatccggtaagcggcagggtcggaacaggagagcgcacgagggagcttccagggggaaacgcctggtatctttatagtcctgtcgggtttcgccacctctgacttgagcgtcgatttttgtgatgctcgtcaggggggcggagcctatggaaaaacgccagcaacgcggcctttttacggttcctggccttttgctggccttttgctcacatgttctttcctgcgttatcccctgattctgtggataaccgtattaccgcctttgagtgagctgataccgctcgccgcagccgaacgaccgagcgcagcgagtcagtgagcgaggaagcggaagagcgcctgatgcggtattttctccttacgcatctgtgcggtatttcacaccgcatatggtgcactctcagtacaatctgctctgatgccgcatagttaagccagataaaaaatttatttgctttcaggtacaattcttgatataatattatcatctagctagataataaaaatttaaggatcttatggtacttggtaaacctcaaacggatcctactctcgaatggttcttgtctcattgccacattcataagtacccatccaagagcacgcttattcaccagggtgaaaaagcggaaacgctgtactacatcgttaaaggctctgtggcagtgctgatcaaagacgaagagggtaaagaaatgatcctctcctatctgaatcagggtgattttattggcgaactgggcctgtttgaagagggccaggaacgtagcgcatgggtacgtgcgaaaaccgcctgtgaagtggctgaaatttcgtacaaaaaatttcgccaattgattcaggtaaatccggatgctggaacaaaagtgatctatatcatagattcatcattttattttcttgctagagtgcataccaaatctttatctggtttctcaatttacatgatctcccgttataactcggggaactactaccgtatatactttgttcctcgatttcaaagtacaatcataatctcatctgacttatcgttttttcttttatctttctcttcatctcaatattatgattagattgttttgtaagcttttctacctgaaatatgcaccaatattcagaatatctcgtttgccagtttttatacaagtctttctatagttaagtataaaaatgttatgttattaacgttcaaatgctcaatcacatctggacaagcaaatttccttgtcttcagttcattttgggtatgctcctttagatttaacacattgcaggctaaccggaacctgtattatttagtttatgctacgttaaataaagacctttcgttcacataactgaatgtgtaatggccttgagatttcaagcataccaagttggtggagacggggtcgttacaaaagactctatcctgatgcgtttgtctgcacagatggcgcgtccgattaccctgttatccctacaagaatctttttattgtcagtactgattattcctttgccctcggacgagtgctggggcgtcggtttccactatcggcgagtacttctacacagccatcggtccagacggccgcgcttctgcgggcgatttgtgtacgcccgacagtcccggctccggatcggacgattgcgtcgcatcgaccctgcgcccaagctgcatcatcgaaattgccgtcaaccaagctctgatagagttggtcaagaccaatgcggagcatatacgcccggagccgcggcgatcctgcaagctccggatgcctccgctcgaagtagcgcgtctgctgctccatacaagccaaccacggcctccagaagaagatgttggcgacctcgtattgggaatccccgaacatcgcctcgctccagtcaatgaccgctgttatgcggccattgtccgtcaggacattgttggagccgaaatccgcgtgcacgaggtgccggacttcggggcagtcctcggcccaaagcatcagctcatcgagagcctgcgcgacggacgcactgacggtgtcgtccatcacagtttgccagtgatacacatggggatcagcaatcgcgcatatgaaatcacgccatgtagtgtattgaccgattccttgcggtccgaatgggccgaacccgctcgtctggctaagatcggccgcagcgatcgcatccatggcctccgcgaccggctgcagaacagcgggcagttcggtttcaggcaggtcttgcaacgtgacaccctgtgcacggcgggagatgcaataggtcaggctctcgctgaattccccaatgtcaagcacttccggaatcgggagcgcggccgatgcaaagtgccgataaacataacgatctttgtagaaaccatcggcgcagctatttacccgcaggacatatccacgccctcctacatcgaagctgaaagcacgagattcttcgccctccgagagctgcatcaggtcggagacgctgtcgaacttttcgatcagaaacttctcgacagacgtcgcggtgagttcaggctttttacccatggttgtttatgttcggatgtgatgtgattggccggctgcaggtcactagtgagaaagtgggcaacctggcgttcctcgacatctaggtgaagatcctttttgataatctcatgaccaaaatcccttaacgtgagttttcgttccactgagcgtcagaccccgtagaaaagatcaaaggatcttcttgagatcctttttttctgcgcgtaatctgctgcttgcaaacaaaaaaaccaccgctaccagcggtggtttgtttgccggatcaagagctaccaactctttttccgaaggtaactggcttcagcagagcgcagataccaaatactgtccttctagtgtagccgtagttaggccaccacttcaagaactctgtagcaccgcctacatacctcgctctgctaatcctgttaccagtggctgctgccagtggcgataagtcgtgtcttaccgggttggactcaagacgatagttaccggataaggcgcagcggtcgggctgaacggggggttcgtgcacacagcccagcttggagcgaacgacctacaccgaactgagatacgtcagcggccgcattgcacagactctgctgaatctggcaaaacaaccagacgctatgactcacccggacggcatgcaaatcaaaattacccgtcagga"
     assert len(correct) == 7911
-    assert eq(Dseqrecord(correct, circular=True).cseguid(), candidate.seq.cseguid(), circular=True)
+    assert eq(Dseqrecord(correct, circular=True).seguid(), candidate.seq.seguid(), circular=True)
 
     # Contig not implemented
     # assert repr(candidate) == "Contig(o7911)"
@@ -464,11 +464,11 @@ algorithm..: common_sub_strings"""
     #                                        "                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        atccggatttacctgaatcaattggcgaaattttttgtacgaaatttcagccacttcacaggcggttttcgcacgtacccatgcgctacgttcctggccctcttcaaacaggcccagttcgccaataaaatcaccctgattcagataggagaggatcatttctttaccctcttcgtctttgatcagcactgccacagagcctttaacgatgtagtacagcgtttccgctttttcaccctggtgaataagcgtgctcttggatgggtacttatgaatgtggcaatgagacaagaaccattcgagagtaggatccgtttgaggtttaccaagtaccataagatccttaaatttttattatctagctagatgataatattatatcaagaattgtacctgaaagcaaataaattttttatctggcttaactatgcggcatcagagcagattgtactgagagtgcaccatatgcggtgtgaaataccgcacagatgcgtaaggagaaaataccgcatcaggcgctcttccgcttcctcgctcactgactcgctgcgctcggtcgttcggctgcggcgagcggtatcagctcactcaaaggcggtaatacggttatccacagaatcaggggataacgcaggaaagaacatgtgagcaaaaggccagcaaaaggccaggaaccgtaaaaaggccgcgttgctggcgtttttccataggctccgcccccctgacgagcatcacaaaaatcgacgctcaagtcagaggtggcgaaacccgacaggactataaagataccaggcgtttccccctggaagctccctcgtgcgctctcctgttccgaccctgccgcttaccggatacctgtccgcctttctcccttcgggaagcgtggcgctttctcatagctcacgctgtaggtatctcagttcggtgtaggtcgttcgctccaagctgggctgtgtgcacgaaccccccgttcagcccgaccgctgcgccttatccggtaactatcgtcttgagtccaacccggtaagacacgacttatcgccactggcagcagccactggtaacaggattagcagagcgaggtatgtaggcggtgctacagagttcttgaagtggtggcctaactacggctacactagaaggacagtatttggtatctgcgctctgctgaagccagttaccttcggaaaaagagttggtagctcttgatccggcaaacaaaccaccgctggtagcggtggtttttttgtttgcaagcagcagattacgcgcagaaaaaaaggatctcaagaagatcctttgatcttttctacggggtctgacgctcagtggaacgaaaactcacgttaagggattttggtcatgaggggtaataactgatataattaaattgaagctctaatttgtgagtttagtatacatgcatttacttataatacagttttttagttttgctggccgcatcttctcaaatatgcttcccagcctgcttttctgtaacgttcaccctctaccttagcatcccttccctttgcaaatagtcctcttccaacaataataatgtcagatcctgtagagaccacatcatccacggttctatactgttgacccaatgcgtctcccttgtcatctaaacccacaccgggtgtcataatcaaccaatcgtaaccttcatctcttccacccatgtctctttgagcaataaagccgataacaaaatctttgtcgctcttcgcaatgtcaacagtacccttagtatattctccagtagatagggagcccttgcatgacaattctgctaacatcaaaaggcctctaggttcctttgttacttcttctgccgcctgcttcaaaccgctaacaatacctgggcccaccacaccgtgtgcattcgtaatgtctgcccattctgctattctgtatacacccgcagagtactgcaatttgactgtattaccaatgtcagcaaattttctgtcttcgaagagtaaaaaattgtacttggcggataatgcctttagcggcttaactgtgccctccatggaaaaatcagtcaaaatatccacatgtgtttttagtaaacaaattttgggacctaatgcttcaactaactccagtaattccttggtggtacgaacatccaatgaagcacacaagtttgtttgcttttcgtgcatgatattaaatagcttggcagcaacaggactaggatgagtagcagcacgttccttatatgtagctttcgacatgatttatcttcgtttcctgcaggtttttgttctgtgcagttgggttaagaatactgggcaatttcatgtttcttcaacactacatatgcgtatatataccaatctaagtctgtgctccttccttcgttcttccttctgttcggagattaccgaatcaaaaaaatttcaaagaaaccgaaatcaaaaaaaagaataaaaaaaaaatgatgaattgaattgaaaagctagcttatcgatgataagctgtcaaagatgagaattaattccacggactatagactatactagatactccgtctactgtacgatacacttccgctcaggtccttgtcctttaacgaggccttaccactcttttgttactctattgatccagctcagcaaaggcagtgtgatctaagattctatcttcgcgatgtagtaaaactagctagaccgagaaagagactagaaatgcaaaaggcacttctacaatggctgccatcattattatccgatgtgacgctgcagcttctcaatgatattcgaatacgctttgaggagatacagcctaatatccgacaaactgttttacagatttacgatcgtacttgttacccatcattgaattttgaacatccgaacctgggagttttccctgaaacagatagtatatttgaacctgtataataatatatagtctagcgctttacggaagacaatgtatgtatttcggttcctggagaaactattgcatctattgcataggtaatcttgcacgtcgcatccccggttcattttctgcgtttccatcttgcacttcaatagcatatctttgttaacgaagcatctgtgcttcattttgtagaacaaaaatgcaacgcgagagcgctaatttttcaaacaaagaatctgagctgcatttttacagaacagaaatgcaacgcgaaagcgctattttaccaacgaagaatctgtgcttcatttttgtaaaacaaaaatgcaacgcgacgagagcgctaatttttcaaacaaagaatctgagctgcatttttacagaacagaaatgcaacgcgagagcgctattttaccaacaaagaatctatacttcttttttgttctacaaaaatgcatcccgagagcgctatttttctaacaaagcatcttagattactttttttctcctttgtgcgctctataatgcagtctcttgataactttttgcactgtaggtccgttaaggttagaagaaggctactttggtgtctattttctcttccataaaaaaagcctgactccacttcccgcgtttactgattactagcgaagctgcgggtgcattttttcaagataaaggcatccccgattatattctataccgatgtggattgcgcatactttgtgaacagaaagtgatagcgttgatgattcttcattggtcagaaaattatgaacggtttcttctattttgtctctatatactacgtataggaaatgtttacattttcgtattgttttcgattcactctatgaatagttcttactacaatttttttgtctaaagagtaatactagagataaacataaaaaatgtagaggtcgagtttagatgcaagttcaaggagcgaaaggtggatgggtaggttatatagggatatagcacagagatatatagcaaagagatacttttgagcaatgtttgtggaagcggtattcgcaatgggaagctccaccccggttgataatcagaaaagccccaaaaacaggaagattattatcaaaaaggatcttcacctagatccttttaaattaaaaatgaagttttaaatcaatctaaagtatatatgagtaaacttggtctgacagttaccaatgcttaatcagtgaggcacctatctcagcgatctgtctatttcgttcatccatagttgcctgactccccgtcgtgtagataactacgatacgggagcgcttaccatctggccccagtgctgcaatgataccgcgagacccacgctcaccggctccagatttatcagcaataaaccagccagccggaagggccgagcgcagaagtggtcctgcaactttatccgcctccatccagtctattaattgttgccgggaagctagagtaagtagttcgccagttaatagtttgcgcaacgttgttggcattgctacaggcatcgtggtgtcactctcgtcgtttggtatggcttcattcagctccggttcccaacgatcaaggcgagttacatgatcccccatgttgtgcaaaaaagcggttagctccttcggtcctccgatcgttgtcagaagtaagttggccgcagtgttatcactcatggttatggcagcactgcataattctcttactgtcatgccatccgtaagatgcttttctgtgactggtgagtactcaaccaagtcattctgagaatagtgtatgcggcgaccgagttgctcttgcccggcgtcaatacgggataatagtgtatcacatagcagaactttaaaagtgctcatcattggaaaacgttcttcggggcgaaaactctcaaggatcttaccgctgttgagatccagttcgatgtaacccactcgtgcacccaactgatcttcagcatcttttactttcaccagcgtttctgggtgagcaaaaacaggaaggcaaaatgccgcaaaaaagggaataagggcgacacggaaatgttgaatactcatactcttcctttttcaatattattgaagcatttatcagggttattgtctcatgagcggatacatatttgaatgtatttagaaaaataaacaaataggggttccgcgcacatttccccgaaaagtgccacctgctaagaaaccattattatcatgacattaacctataaaaataggcgtatcacgaggccctttcgtctcgcgcgtttcggtgatgacggtgaaaacctctgacacatgcagctcccggagacggtcacagcttgtctgtaagcggatgccgggagcagacaagcccgtcagggcgcgtcagcgggtgttggcgggtgtcggggctggcttaactatgcggcatcagagcagattgtactgagagtgcaccatagatcctgaggatcggggtgataaatcagtctgcgccacatcgggggaaacaaaatggcgcgagatctaaaaaaaaaggctccaaaaggagcctttcgcgctaccaggtaacgcgccactccgacgggattaacgagtgccgtaaacgacgatggttttaccgtgtgcggagatcaggttctgatcctcgagcatcttaagaattcgtcccacggtttgtctagagcagccgacaatctggccaatttcctgacgggtaattttgatttgcatgccgtccgggtgagtcatagcgtctggttgttttgccagattcagcagagtctgtgcaatgcggccgctgac\n"
     #                                        "                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       TCCTGACGGGTAATTTTGATTTGCATGCCGTCCGGGTGAGTCATAGCGTCTGGTTGTTTTGCCAGATTCAGCAGAGTCTGTGCAATGCGGCCGCTGAC\n")
 
-    # text8 cSEGUID wM7nM6oJer3bB6RV81IH78e02j4 7911bp
+    # text8 seguid wM7nM6oJer3bB6RV81IH78e02j4 7911bp
     list_of_formatted_seq_records = parse(text8)
     a = assembly.Assembly(list_of_formatted_seq_records, limit=28)
     candidate = a.assemble_circular()[0]
-    assert candidate.cseguid() == "wM7nM6oJer3bB6RV81IH78e02j4"
+    assert candidate.seguid() == "cdseguid-shtCglCTM_qST6oYZ7_iz80jZ6s"
 
 
 def test_MXblaster1():
@@ -524,7 +524,7 @@ def test_MXblaster1():
 
     a = assembly.Assembly((pCAPs_pSU0_E_Z, A_AgTEFp_b, B_hph_c, C_KlLEU2tt_d), limit=28)
     candidate = a.assemble_circular()[0]
-    assert candidate.cseguid() == "wM7nM6oJer3bB6RV81IH78e02j4"
+    assert candidate.seguid() == "cdseguid-shtCglCTM_qST6oYZ7_iz80jZ6s"
     assert len(candidate) == 7911
     YPK0_AgTEFp_hph_KlLEU2tt = candidate
 
@@ -538,7 +538,7 @@ def test_MXblaster1():
 
     a = assembly.Assembly((pCAPs_pSU0_E_Z, A_KlLEU2tt_b, B_gal1_ISceI_c, C_AgTEFt_d), limit=25)
     candidate = a.assemble_circular()[0]
-    assert candidate.cseguid() == "ZHJqzSnqRxJsdKN5Pu5KP6coR6o"
+    assert candidate.seguid() == "cdseguid-SBr-IeJRj68Wyjq1yth3Y35pH_c"
     assert len(candidate) == 8099
     YPK0_KlLEU2tt_gal1_ISceI_AgTEFt = candidate
 
@@ -558,12 +558,12 @@ def test_MXblaster1():
     a = assembly.Assembly((AgTEFp_hph_KlLEU2tt_2, KlLEU2tt_gal1_ISceI_AgTEFt_2, pCAPs_pSU0_E_Z), limit=61)
     candidate = a.assemble_circular()[0]
     assert len(candidate) == 9772
-    assert candidate.cseguid() == "QnsJ7ATZXSy2QuN4hy51SZw_aU0"
+    assert candidate.seguid() == "cdseguid-CF4kR78Kt_gRWaVRagRqI0dotyE"
     pCAPs_MX4blaster1 = candidate
 
     pCAPs_MX4blaster1 = pCAPs_MX4blaster1.synced("tcgcgcgtttcggtgatgacggtgaaaacc")
 
-    assert pCAPs_MX4blaster1.useguid() == "X9WqaNk2lw6FbZlJr995MaDfn-M"
+    assert pCAPs_MX4blaster1.seguid() == "cdseguid-CF4kR78Kt_gRWaVRagRqI0dotyE"
 
     AX023560 = read("test_files/AX023560.gb")
 
@@ -577,19 +577,19 @@ def test_MXblaster1():
 
     GAL_GIN = pcr(primer[592], primer[593], GAL10prom + GIN11M86)
 
-    assert GAL_GIN.useguid() == "7Lkfw8dsz9_kkBU3XXnz4KAON3A"
+    assert GAL_GIN.seguid() == "ldseguid-dJ_VblJ0kbzEJpEy1RmzQsa9Z1w"
 
-    assert pCAPs.useguid() == "-XHU8OxITyHGTl9XtMrJ4NvEv3o"
+    assert pCAPs.seguid() == "cdseguid-Z8mrStkBQUOs3VcINmizy1WfzNM"
 
     pCAPs_GAL_GIN = (pCAPs.cut(AjiI)[0] + GAL_GIN).looped()
 
-    assert pCAPs_GAL_GIN.useguid() == "T1eWCPIXPlq2HriSfpFSNnGwmd4"
+    assert pCAPs_GAL_GIN.seguid() == "cdseguid-c_9naB_WFu9MAknrtwG55Ux_KUM"
 
     GAL_GIN2 = pcr(primer[592], primer[467], pCAPs_GAL_GIN)
 
-    assert GAL_GIN2.useguid() == "zdIU4vjdfOxLkTTnKzIxhphnewg"
+    assert GAL_GIN2.seguid() == "ldseguid-onGqkKmNR25g94SUElmhUPMOCXE"
 
-    assert pCAPs_MX4blaster1.useguid() == "X9WqaNk2lw6FbZlJr995MaDfn-M"  # 9772bp__a
+    assert pCAPs_MX4blaster1.seguid() == "cdseguid-CF4kR78Kt_gRWaVRagRqI0dotyE"  # 9772bp__a
 
     pCAPs_MX4blaster1_AgeI = pCAPs_MX4blaster1.cut(AgeI)[0]
 
@@ -603,7 +603,7 @@ def test_MXblaster1():
 
     assert len(candidate) == 10566
 
-    assert candidate.cseguid() == "LK6idufxMXFHL5shXakwO3lciMU"
+    assert candidate.seguid() == "cdseguid-Bhuxi6G1Zo6v2ub34XrTsG7VHjA"
 
     pCAPs_MX4blaster2 = candidate
 
@@ -613,9 +613,9 @@ def test_MXblaster1():
     pCAPs_MX4blaster2_old = read("test_files/pMX4blaster2_old.gb")
 
     assert len(pCAPs_MX4blaster2_old) == 10566
-    assert pCAPs_MX4blaster2_old.useguid() == "7B4KKAeM2x8npjkp5U942rtMbB8"
+    assert pCAPs_MX4blaster2_old.seguid() == "cdseguid-Bhuxi6G1Zo6v2ub34XrTsG7VHjA"
     assert eq(pCAPs_MX4blaster2, pCAPs_MX4blaster2_old)
-    assert pCAPs_MX4blaster2.useguid() == "7B4KKAeM2x8npjkp5U942rtMbB8"
+    assert pCAPs_MX4blaster2.seguid() == "cdseguid-Bhuxi6G1Zo6v2ub34XrTsG7VHjA"
 
 
 def test_assemble_pGUP1():
@@ -642,8 +642,8 @@ def test_assemble_pGUP1():
     assert len(pGUP1_correct) == 9981
     assert len(pGUP1) == 9981
     assert eq(pGUP1, pGUP1_correct)
-    assert pGUP1_correct.useguid() == "42wIByERn2kSe_Exn405RYwhffU"
-    assert pGUP1.useguid() == "42wIByERn2kSe_Exn405RYwhffU"
+    assert pGUP1_correct.seguid() == "cdseguid-5aiMDLWXOfvl0PBCQV-96q9UKqY"
+    assert pGUP1.seguid() == "cdseguid-5aiMDLWXOfvl0PBCQV-96q9UKqY"
 
 
 def test_pYPK7_TDH3_GAL2_PGI1():
@@ -656,7 +656,7 @@ def test_pYPK7_TDH3_GAL2_PGI1():
 
     z = assembly.Assembly((pYPKp7_AatII, pMEC1142), limit=300)
 
-    assert "eDYovOVEKFIbc7REPlTsnScycQY" in map(lambda x: x.cseguid(), z.assemble_circular())
+    assert "cdseguid-N2gMOgsUuGgBKnikyuy-dXNDztM" in map(lambda x: x.seguid(), z.assemble_circular())
 
 
 def test_marker_replacement_on_plasmid():
@@ -945,7 +945,6 @@ def test_ends_from_cutsite():
 
 
 def test_restriction_ligation_assembly():
-    # TODO circular examples
 
     seq_pairs = (
         (Dseqrecord('AAAGAATTCAAA'), Dseqrecord('CCCCGAATTCCCC')),
@@ -973,9 +972,9 @@ def test_restriction_ligation_assembly():
 
     _, a2, a3 = f1.cut([EcoRI])
     b1, = f2.cut([EcoRI])
-    result_cseguids = sorted([
-            (b1.seq + a2.seq).looped().cseguid(),
-            (b1.seq + a2.seq.reverse_complement()).looped().cseguid(),
+    result_seguids = sorted([
+            (b1.seq + a2.seq).looped().seguid(),
+            (b1.seq + a2.seq.reverse_complement()).looped().seguid(),
         ])
 
     algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [EcoRI])
@@ -983,9 +982,9 @@ def test_restriction_ligation_assembly():
     for shift in range(len(f2)):
         f2_shifted = f2.shifted(shift)
         f = assembly.Assembly([f1, f2_shifted], algorithm=algo, use_fragment_order=False)
-        observed_cseguids = sorted(x.cseguid() for x in f.assemble_circular())
-        assert len(result_cseguids) == len(observed_cseguids)
-        assert result_cseguids == observed_cseguids
+        observed_seguids = sorted(x.seguid() for x in f.assemble_circular())
+        assert len(result_seguids) == len(observed_seguids)
+        assert result_seguids == observed_seguids
 
     # Cutting from plasmid
     f1 = Dseqrecord('aaGAATTCaaaGTCGACaa', circular=True)
@@ -995,9 +994,9 @@ def test_restriction_ligation_assembly():
     f1_0, f1_1 = f1.cut([EcoRI, SalI])
     f2_0, f2_1, f2_3 = f2.cut([EcoRI, SalI])
 
-    result_cseguids = sorted([
-            (f1_1 + f2_1).looped().cseguid(),
-            (f1_0 + f2_1.reverse_complement()).looped().cseguid(),
+    result_seguids = sorted([
+            (f1_1 + f2_1).looped().seguid(),
+            (f1_0 + f2_1.reverse_complement()).looped().seguid(),
         ])
 
     algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [EcoRI, SalI])
@@ -1005,9 +1004,9 @@ def test_restriction_ligation_assembly():
     for shift in range(len(f1)):
         f1_shifted = f1.shifted(shift)
         f = assembly.Assembly([f1_shifted, f2], algorithm=algo, use_fragment_order=False, use_all_fragments=True)
-        observed_cseguids = sorted(x.cseguid() for x in f.assemble_circular())
-        assert len(result_cseguids) == len(observed_cseguids)
-        assert result_cseguids == observed_cseguids
+        observed_seguids = sorted(x.seguid() for x in f.assemble_circular())
+        assert len(result_seguids) == len(observed_seguids)
+        assert result_seguids == observed_seguids
 
     # TODO: Check if features are transferred properly
 
@@ -1048,6 +1047,27 @@ def test_restriction_ligation_assembly():
     assert str(products[0].seq) == 'GACACCACGGGTC'
     assert str(products[1].seq) == 'GACTAACAGAGTC'
 
+    # Single fragment assemblies
+    f1 = Dseqrecord('aaGAATTCtttGAATTCaa', circular=True)
+    algo = lambda x, y, l : assembly.restriction_ligation_overlap(x, y, [EcoRI], False)
+    f = assembly.SingleFragmentAssembly([f1], algorithm=algo)
+    products = f.assemble_circular()
+    assert len(products) == 2
+    assert str(products[0].seq) == 'AATTCaaaaG'
+    assert str(products[1].seq) == 'AATTCtttG'
+
+    f1 = Dseqrecord('aaGAATTCtttGAATTCaa', circular=False)
+    f = assembly.SingleFragmentAssembly([f1], algorithm=algo)
+    products = f.assemble_circular()
+    assert len(products) == 1
+    assert str(products[0].seq) == 'AATTCtttG'
+
+    f1 = Dseqrecord('aaGAATTCtttGAATTCaa', circular=False)
+    f = assembly.SingleFragmentAssembly([f1], algorithm=algo)
+    products = f.assemble_insertion()
+    assert len(products) == 1
+    assert str(products[0].seq) == 'aaGAATTCaa'
+
 def test_golden_gate():
 
     # Circular assembly
@@ -1068,7 +1088,7 @@ def test_golden_gate():
 
     assembly_output = asm.assemble_circular()
     assert len(assembly_output) == 1
-    assert assembly_output[0].cseguid() == sum_output.cseguid()
+    assert assembly_output[0].seguid() == sum_output.seguid()
 
     # Linear assembly (all four possibilities)
     sum_output = (i1 + i2 + i3)
@@ -1083,6 +1103,16 @@ def test_golden_gate():
 
     for result, product in zip(results, asm.assemble_linear()):
         assert result.seq == product.seq
+
+
+def test_gibson_assembly():
+    """There are many others that test this above, this is just the edge case"""
+    # Circularisation assemblies
+    f1 = Dseqrecord('AGAGACCaaaAGAGACC')
+    f = assembly.SingleFragmentAssembly([f1], limit=7)
+    products = f.assemble_circular()
+    assert len(products) == 1
+    assert str(products[0].seq) == 'AGAGACCaaa'
 
 
 def test_insertion_assembly():
@@ -1135,6 +1165,19 @@ def test_insertion_assembly():
     b = Dseqrecord('3CGTACGCACAyyyyT4', circular=True)
     assert assembly.Assembly([a, b],  use_fragment_order=False, limit=10).get_insertion_assemblies() == []
 
+    # Only the right order is returned
+    a = Dseqrecord('ttACGTTCGTccccTTAATTAAcc', circular=False)
+    b = Dseqrecord('ttACGTTCGTttttCGGGCGCGaa', circular=True)
+    c = Dseqrecord('aaCGGGCGCGggggTTAATTAAaa', circular=True)
+    fragments = [a, b, c]
+    for i in range(3):
+        asm = assembly.Assembly(fragments[i:] + fragments[:i], use_fragment_order=False, limit=8, use_all_fragments=True)
+        for a in asm.get_insertion_assemblies():
+            print(assembly.assembly2str(a))
+        prods = asm.assemble_insertion()
+
+        assert len(prods) == 1
+        assert str(prods[0].seq) == 'ttACGTTCGTttttCGGGCGCGggggTTAATTAAcc'
 
 def circles_assembly():
     a = Dseqrecord('xxxACGTAyyy', circular=True)
@@ -1241,7 +1284,7 @@ def test_assemble_function():
             ]
 
             result = assembly.assemble([f1_shifted, f2_shifted], assembly_plan, True)
-            assert result.seq.cseguid() == Dseq('aaaTTTatgccccTTTcta', circular=True).cseguid()
+            assert result.seq.seguid() == Dseq('aaaTTTatgccccTTTcta', circular=True).seguid()
             assert len(result.features) == 4
             assert set(str(f.location.extract(result.seq)) for f in result.features) == {'TTT'}
 
@@ -1355,7 +1398,7 @@ def test_assembly_is_valid():
                 (3, 4, find_feature_by_id(f3_shifted, 'f3_f4').location, f4.features[0].location),
             ]
             assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == True
-            # Does not really belong here, but 
+            # Does not really belong here, but
             assert str(assembly.assemble(fragments, assembly_plan, False).seq) == 'ccTTTAAACCCg'
 
 def test_extract_subfragment():
@@ -1473,6 +1516,13 @@ def test_ligation_assembly():
     # functional instead.
     assert len(assembly.Assembly([a, b], algorithm=assembly.sticky_end_sub_strings, limit=True, use_all_fragments=True, use_fragment_order=False).assemble_linear()) == 1
 
+    # Single fragment assemblies
+    fragments = Dseqrecord('AAGAATTCTTGAATTCCC').cut(EcoRI)
+    asm = assembly.SingleFragmentAssembly([fragments[1]], algorithm=assembly.sticky_end_sub_strings, limit=False)
+    result = asm.assemble_circular()
+    assert len(result) == 1
+    assert result[0].seq == fragments[1].looped().seq
+
 
 def test_blunt_assembly():
     # Linear assembly
@@ -1488,6 +1538,42 @@ def test_blunt_assembly():
     b = Dseqrecord('CCCC')
 
     asm = assembly.Assembly([a, b], algorithm=assembly.blunt_overlap, use_all_fragments=True, use_fragment_order=False)
-
     assert asm.assemble_linear() == [a + b, a + b.reverse_complement(), b + a.reverse_complement(), b + a]
     assert asm.assemble_circular() == [(a + b).looped(), (a + b.reverse_complement()).looped()]
+
+    # Circularisation
+    asm = assembly.SingleFragmentAssembly([Dseqrecord('AATT')], algorithm=assembly.blunt_overlap)
+    result = asm.assemble_circular()
+    assert len(result) == 1
+    assert result[0].seq == Dseq('AATT', circular=True)
+
+
+def test_format_insertion_assembly():
+
+    loc1_a = SimpleLocation(2, 6)
+    loc1_b = SimpleLocation(8, 12)
+    loc2_a = SimpleLocation(0, 4)
+    loc2_b = SimpleLocation(6, 10)
+
+    seq1 = Dseqrecord('aaTTTTccTTTTaa')
+    seq2 = Dseqrecord('TTTTccTTTT')
+
+    fragments = [seq1, seq2]
+
+    # This is just a dummy assembly planner, we only care for it containing 'fragments', which is used
+    # by the class method
+    assembly_planner = assembly.Assembly(fragments)
+    asm_correct = [(1, 2, loc1_a, loc2_a), (2, 1, loc2_b, loc1_b)]
+    assert asm_correct == assembly_planner.format_insertion_assembly(asm_correct)
+    assert asm_correct == assembly_planner.format_insertion_assembly(asm_correct[::-1])
+
+    # More fragments
+    fragments = [seq1, seq2, seq2]
+    assembly_planner = assembly.Assembly(fragments)
+    asm_correct = [(1, 2, loc1_a, loc2_a), (2, 3, loc2_b, loc2_a), (3, 1, loc2_b, loc1_b)]
+    assert asm_correct == assembly_planner.format_insertion_assembly(asm_correct)
+    assert asm_correct == assembly_planner.format_insertion_assembly(asm_correct[1:] + asm_correct[:1])
+    assert asm_correct == assembly_planner.format_insertion_assembly(asm_correct[2:] + asm_correct[:2])
+
+    asm_wrong = [(1, 2, loc1_b, loc2_a), (2, 3, loc2_b, loc2_a), (3, 1, loc2_b, loc1_a)]
+    assert None == assembly_planner.format_insertion_assembly(asm_wrong)
