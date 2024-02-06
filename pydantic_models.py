@@ -203,7 +203,7 @@ class HomologousRecombinationSource(AssemblySource):
 class GibsonAssemblySource(AssemblySource):
 
     type: SourceType = SourceType('gibson_assembly')
-    input: conlist(int, min_length=2)
+    input: conlist(int, min_length=1)
 
     def from_assembly(assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int) -> 'GibsonAssemblySource':
         return GibsonAssemblySource(
@@ -215,7 +215,7 @@ class GibsonAssemblySource(AssemblySource):
 
 class RestrictionAndLigationSource(AssemblySource):
     type: SourceType = SourceType('restriction_and_ligation')
-    input: conlist(int, min_length=2)
+    input: conlist(int, min_length=1)
     restriction_enzymes: conlist(str, min_length=1)
 
     def from_assembly(assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int, restriction_enzymes=list['str']) -> 'RestrictionAndLigationSource':
