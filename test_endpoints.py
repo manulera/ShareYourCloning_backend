@@ -863,6 +863,30 @@ class RestrictionAndLigationTest(unittest.TestCase):
         self.assertEqual(len(payload['sequences']), 1)
         self.assertEqual(len(payload['sources']), 1)
 
+    def test_single_input(self):
+        fragments = [Dseqrecord('AAAGAATTCAAAGAATTCAAAA')]
+        json_fragments = [format_sequence_genbank(f) for f in fragments]
+        for i, f in enumerate(json_fragments):
+            f.id = i + 1
+
+        source = RestrictionAndLigationSource(
+            input=[1],
+            restriction_enzymes=['EcoRI'],
+        )
+
+        data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
+        response = client.post('/restriction_and_ligation', json=data)
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sequences']), 2)
+        self.assertEqual(len(payload['sources']), 2)
+
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+        self.assertEqual(str(sequences[0].seq), 'AATTCAAAG')
+        self.assertEqual(str(sequences[1].seq), 'AAAGAATTCAAAA')
+
 
 
 if __name__ == "__main__":

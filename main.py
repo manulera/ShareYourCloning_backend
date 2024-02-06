@@ -17,7 +17,7 @@ from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
 from Bio.Restriction.Restriction_Dictionary import rest_dict
 from assembly2 import Assembly, assemble, sticky_end_sub_strings, assembly2str, PCRAssembly, \
-    gibson_overlap, filter_linear_subassemblies, restriction_ligation_overlap
+    gibson_overlap, filter_linear_subassemblies, restriction_ligation_overlap, SingleFragmentAssembly
 # Instance of the API object
 app = FastAPI()
 
@@ -384,13 +384,25 @@ async def restriction_and_ligation(source: RestrictionAndLigationSource,
     enzymes = RestrictionBatch(first=[e for e in source.restriction_enzymes if e is not None])
     algo = lambda x, y, l : restriction_ligation_overlap(x, y, enzymes, allow_partial_overlap)
 
-    asm = Assembly(fragments, algorithm=algo, use_fragment_order=False, use_all_fragments=True)
+    if len(fragments) > 1:
+        asm = Assembly(fragments, algorithm=algo, use_fragment_order=False, use_all_fragments=True)
 
-    possible_assemblies = asm.get_circular_assemblies()
-    if not circular_only:
-        possible_assemblies += filter_linear_subassemblies(asm.get_linear_assemblies(), possible_assemblies, fragments)
+        possible_assemblies = asm.get_circular_assemblies()
+        assemblies_are_circular = [True for i in possible_assemblies]
+        if not circular_only:
+            linear_assemblies = filter_linear_subassemblies(asm.get_linear_assemblies(), possible_assemblies, fragments)
+            possible_assemblies += linear_assemblies
+            assemblies_are_circular += [False for i in linear_assemblies]
+    else:
+        asm = SingleFragmentAssembly(fragments, algorithm=algo)
+        possible_assemblies = asm.get_circular_assemblies()
+        assemblies_are_circular = [True for i in possible_assemblies]
+        if not circular_only:
+            linear_assemblies = asm.get_insertion_assemblies()
+            possible_assemblies += linear_assemblies
+            assemblies_are_circular += [False for i in linear_assemblies]
 
-    out_sources = [RestrictionAndLigationSource.from_assembly(id= source.id, input=source.input, assembly=a, circular=(a[0][0] == a[-1][1]), restriction_enzymes=source.restriction_enzymes) for a in possible_assemblies]
+    out_sources = [RestrictionAndLigationSource.from_assembly(id= source.id, input=source.input, assembly=a, circular=is_circular, restriction_enzymes=source.restriction_enzymes) for a, is_circular in zip(possible_assemblies, assemblies_are_circular)]
 
     # If a specific assembly is requested
     if source.assembly is not None:
