@@ -12,6 +12,7 @@ from Bio.SeqFeature import SimpleLocation, Location
 from dna_functions import sum_is_sticky
 from Bio.Seq import reverse_complement
 from Bio.Restriction.Restriction import RestrictionBatch, AbstractCut
+import regex
 
 def ends_from_cutsite(cutsite: tuple[tuple[int,int],AbstractCut], seq: _Dseq):
     if cutsite is None:
@@ -98,6 +99,34 @@ def sticky_end_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=0):
     if overlap:
         return [(len(seqx)-overlap, 0, overlap)]
     return []
+
+def alignment_sub_strings(template_dseqr: _Dseqrecord, primer_dseqr: _Dseqrecord, reverse_primer: bool, limit=25, mismatches=0):
+    """Find alignments of a primer in a template."""
+
+    if len(primer_dseqr) < limit:
+        return []
+    # Edge case, in circular sequences the primer could align with 2 * template
+    if len(template_dseqr) < len(primer_dseqr):
+        return []
+
+    template = str(template_dseqr.seq).upper().replace('U', 'T')
+    if reverse_primer:
+        query = str(primer_dseqr.seq.reverse_complement()).upper().replace('U', 'T')[:limit]
+    else:
+        query = str(primer_dseqr.seq).upper().replace('U', 'T')[-limit:]
+
+    subject = 2 * template if template_dseqr.circular else template
+
+    matches = list(regex.finditer('(' + query + '){s<=' + str(mismatches) + '}', subject, overlapped=True))
+    matches += list(regex.finditer('(?r)(' + query + '){s<=' + str(mismatches) + '}', subject, overlapped=True))
+
+    out = set()
+    for match in matches:
+        start, end = match.span()
+        out.add((start, end-start, len(primer_dseqr)-limit))
+
+    return list(sorted(out))
+
 
 def fill_left(seq: _Dseq):
     """Fill the left overhang of a sequence with the complementary sequence."""
