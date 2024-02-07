@@ -11,7 +11,7 @@ class SourceType(str, Enum):
     repository_id = 'repository_id',
     file = 'file',
     restriction = 'restriction'
-    sticky_ligation = 'sticky_ligation'
+    ligation = 'ligation'
     PCR = 'PCR'
     homologous_recombination = 'homologous_recombination'
     gibson_assembly = 'gibson_assembly'
@@ -179,13 +179,13 @@ class PCRSource(AssemblySource):
             reverse_primer=reverse_primer
         )
 
-class StickyLigationSource(AssemblySource):
+class LigationSource(AssemblySource):
 
-    type: SourceType = SourceType('sticky_ligation')
+    type: SourceType = SourceType('ligation')
 
-    def from_assembly(assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int) -> 'StickyLigationSource':
+    def from_assembly(assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int) -> 'LigationSource':
         """Creates a StickyLigationSource from an assembly, input and circularity"""
-        return StickyLigationSource(
+        return LigationSource(
             id=id,
             assembly=[(part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None)) for part in assembly],
             input=input,

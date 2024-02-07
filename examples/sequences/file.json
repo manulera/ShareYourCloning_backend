@@ -208,7 +208,7 @@
                 8
             ],
             "output": 10,
-            "type": "sticky_ligation",
+            "type": "ligation",
             "output_index": 0,
             "output_list": [
                 {

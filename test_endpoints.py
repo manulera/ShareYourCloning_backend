@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
 from pydantic_models import RepositoryIdSource, PCRSource, PrimerModel, \
-    RestrictionEnzymeDigestionSource, SequenceEntity, StickyLigationSource, \
+    RestrictionEnzymeDigestionSource, SequenceEntity, LigationSource, \
     UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource, \
     RestrictionAndLigationSource
 from pydna.dseqrecord import Dseqrecord
@@ -185,7 +185,7 @@ class AddGeneTest(unittest.TestCase):
 
 class StickyLigationTest(unittest.TestCase):
 
-    def test_sticky_ligation(self):
+    def test_ligation(self):
         """Test whether assembly is executed when the order is provided"""
         # Load dummy sequence
 
@@ -202,17 +202,17 @@ class StickyLigationTest(unittest.TestCase):
         json_seqs = [seq.model_dump() for seq in json_seqs]
 
         # Assign ids to define deterministic assembly
-        source = StickyLigationSource(
+        source = LigationSource(
             input=[1, 2],
             assembly=[(1, 2, '8..11', '1..4')],
             circular=False
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
-        response = client.post("/sticky_ligation", json=data)
+        response = client.post("/ligation", json=data)
         payload = response.json()
 
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
-        sources = [StickyLigationSource.model_validate(s) for s in payload['sources']]
+        sources = [LigationSource.model_validate(s) for s in payload['sources']]
 
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(len(sources), 1)
@@ -222,25 +222,25 @@ class StickyLigationTest(unittest.TestCase):
         self.assertEqual(sources[0], source)
 
         # Check that the inverse assembly will not pass
-        source = StickyLigationSource(
+        source = LigationSource(
             input=[2, 1],
             assembly=[(1, 2, '8..11', '1..4')],
             circular=False
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
-        response = client.post("/sticky_ligation", json=data)
+        response = client.post("/ligation", json=data)
         self.assertEqual(response.status_code, 400)
         data = response.json()
         self.assertEqual(data['detail'], 'The provided assembly is not valid.')
 
         # Check that the circular assembly does not pass either
-        source = StickyLigationSource(
+        source = LigationSource(
             input=[1, 2],
             assembly=[(1, 2, '8..11', '1..4')],
             circular=True
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
-        response = client.post("/sticky_ligation", json=data)
+        response = client.post("/ligation", json=data)
         self.assertEqual(response.status_code, 400)
         data = response.json()
         self.assertEqual(data['detail'], 'The provided assembly is not valid.')
@@ -262,15 +262,15 @@ class StickyLigationTest(unittest.TestCase):
         json_seqs = [seq.model_dump() for seq in json_seqs]
 
         # We don't set the fragments_inverted, so we will get all possibilities (in this case only one)
-        source = StickyLigationSource(
+        source = LigationSource(
             input=[1, 2],
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
-        response = client.post("/sticky_ligation", json=data)
+        response = client.post("/ligation", json=data)
         payload = response.json()
 
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
-        sources = [StickyLigationSource.model_validate(s) for s in payload['sources']]
+        sources = [LigationSource.model_validate(s) for s in payload['sources']]
 
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(len(sources), 1)
@@ -290,14 +290,14 @@ class StickyLigationTest(unittest.TestCase):
         json_seqs[1].id = 2
         json_seqs = [seq.model_dump() for seq in json_seqs]
 
-        source = StickyLigationSource(
+        source = LigationSource(
             input=[1, 2],
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
-        response = client.post("/sticky_ligation", json=data)
+        response = client.post("/ligation", json=data)
         payload = response.json()
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
-        sources = [StickyLigationSource.model_validate(s) for s in payload['sources']]
+        sources = [LigationSource.model_validate(s) for s in payload['sources']]
 
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(len(sources), 1)
@@ -313,15 +313,66 @@ class StickyLigationTest(unittest.TestCase):
         json_seqs = [format_sequence_genbank(fragment)]
         json_seqs[0].id = 1
         json_seqs = [seq.model_dump() for seq in json_seqs]
-        source = StickyLigationSource(
+        source = LigationSource(
             input=[1],
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
-        response = client.post("/sticky_ligation", json=data)
+        response = client.post("/ligation", json=data)
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
         self.assertEqual(resulting_sequences[0].seq, fragment.looped().seq)
+
+
+class BluntLigationTest(unittest.TestCase):
+
+    def test_blunt_ligation(self):
+        seqs =[
+            Dseqrecord('ATCC', circular=False),
+            Dseqrecord('TAAT', circular=False)
+        ]
+        json_seqs = [format_sequence_genbank(seq) for seq in seqs]
+        json_seqs[0].id = 1
+        json_seqs[1].id = 2
+        json_seqs = [seq.model_dump() for seq in json_seqs]
+        source = LigationSource(
+            input=[1, 2],
+        )
+        data = {'source': source.model_dump(), 'sequences': json_seqs}
+        response = client.post("/ligation", json=data, params={'blunt': True})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        self.assertEqual(len(resulting_sequences), 2)
+
+        # We submit one of the resulting sources, to check that it does the
+        # blunt ligation without adding the request parameter
+        source = payload['sources'][0]
+        response = client.post("/ligation", json={'source': source, 'sequences': json_seqs})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        resulting_sequences2 = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        self.assertEqual(len(resulting_sequences2), 1)
+        self.assertEqual(resulting_sequences2[0].seq, resulting_sequences[0].seq)
+
+    def test_circularisation(self):
+        seqs =[
+            Dseqrecord('ATCC', circular=False)
+        ]
+        json_seqs = [format_sequence_genbank(seq) for seq in seqs]
+        json_seqs[0].id = 1
+        json_seqs = [seq.model_dump() for seq in json_seqs]
+        source = LigationSource(
+            input=[1],
+        )
+        data = {'source': source.model_dump(), 'sequences': json_seqs}
+        response = client.post("/ligation", json=data, params={'blunt': True})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        self.assertEqual(len(resulting_sequences), 1)
+        self.assertEqual(resulting_sequences[0].seq, seqs[0].looped().seq)
+
 
 class RestrictionTest(unittest.TestCase):
 
