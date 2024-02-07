@@ -8,7 +8,7 @@ from pydna.genbank import Genbank
 from dna_functions import get_invalid_enzyme_names, format_sequence_genbank, \
     read_dsrecord_from_json, request_from_addgene
 from pydantic_models import PCRSource, PrimerModel, SequenceEntity, SequenceFileFormat, \
-    RepositoryIdSource, RestrictionEnzymeDigestionSource, StickyLigationSource, \
+    RepositoryIdSource, RestrictionEnzymeDigestionSource, LigationSource, \
     UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource, RestrictionAndLigationSource, \
     AssemblySource
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +17,8 @@ from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
 from Bio.Restriction.Restriction_Dictionary import rest_dict
 from assembly2 import Assembly, assemble, sticky_end_sub_strings, assembly2str, PCRAssembly, \
-    gibson_overlap, filter_linear_subassemblies, restriction_ligation_overlap, SingleFragmentAssembly
+    gibson_overlap, filter_linear_subassemblies, restriction_ligation_overlap, SingleFragmentAssembly, \
+    blunt_overlap
 # Instance of the API object
 app = FastAPI()
 
@@ -223,31 +224,40 @@ async def restriction(source: RestrictionEnzymeDigestionSource,
 
 
 
-@ app.post('/sticky_ligation', response_model=create_model(
-    'StickyLigationResponse',
-    sources=(list[StickyLigationSource], ...),
+@ app.post('/ligation', response_model=create_model(
+    'LigationResponse',
+    sources=(list[LigationSource], ...),
     sequences=(list[SequenceEntity], ...)
 ))
-async def sticky_ligation(source: StickyLigationSource,
-                          sequences: conlist(SequenceEntity, min_length=1),
-                          allow_partial_overlap: bool = Query(True, description='Allow for partially overlapping sticky ends.'),
-                          circular_only: bool = Query(False, description='Only return circular assemblies.')):
+async def ligation(source: LigationSource,
+                   sequences: conlist(SequenceEntity, min_length=1),
+                   blunt: bool = Query(False, description='Use blunt ligation instead of sticky ends.'),
+                   allow_partial_overlap: bool = Query(True, description='Allow for partially overlapping sticky ends.'),
+                   circular_only: bool = Query(False, description='Only return circular assemblies.')):
 
     # Fragments in the same order as in source.input
     fragments = [next((read_dsrecord_from_json(seq) for seq in sequences if seq.id == id), None) for id in source.input]
     if any(f is None for f in fragments):
         raise HTTPException(400, f'Invalid fragment id in input')
 
-    create_source = lambda a, is_circular : StickyLigationSource.from_assembly(assembly=a, circular=is_circular, id=source.id, input=source.input)
+    create_source = lambda a, is_circular : LigationSource.from_assembly(assembly=a, circular=is_circular, id=source.id, input=source.input)
+
+    # If the assembly is known, the blunt parameter is ignored, and we set the algorithm type from the assembly
+    # (blunt ligations have features without length)
+    if source.assembly is not None:
+        asm = source.get_assembly_plan()
+        blunt = len(asm[0][2]) == 0
+
+    algo = blunt_overlap if blunt else sticky_end_sub_strings
     out_sources = []
     if len(fragments) > 1:
-        asm = Assembly(fragments, algorithm=sticky_end_sub_strings, limit=allow_partial_overlap, use_all_fragments=True, use_fragment_order=False)
+        asm = Assembly(fragments, algorithm=algo, limit=allow_partial_overlap, use_all_fragments=True, use_fragment_order=False)
         circular_assemblies = asm.get_circular_assemblies()
         out_sources += [create_source(a, True) for a in circular_assemblies]
         if not circular_only:
             out_sources += [create_source(a, False) for a in filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)]
     else:
-        asm = SingleFragmentAssembly(fragments, algorithm=sticky_end_sub_strings, limit=allow_partial_overlap)
+        asm = SingleFragmentAssembly(fragments, algorithm=algo, limit=allow_partial_overlap)
         out_sources += [create_source(a, True) for a in asm.get_circular_assemblies()]
         # Not possible to have insertion assemblies in this case
 
