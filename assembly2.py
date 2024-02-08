@@ -100,6 +100,8 @@ def sticky_end_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=0):
         return [(len(seqx)-overlap, 0, overlap)]
     return []
 
+def zip_match_left()
+
 def alignment_sub_strings(template_dseqr: _Dseqrecord, primer_dseqr: _Dseqrecord, reverse_primer: bool, limit=25, mismatches=0):
     """Find alignments of a primer in a template."""
 
@@ -110,10 +112,12 @@ def alignment_sub_strings(template_dseqr: _Dseqrecord, primer_dseqr: _Dseqrecord
         return []
 
     template = str(template_dseqr.seq).upper().replace('U', 'T')
+    query = str(primer_dseqr.seq).upper().replace('U', 'T')
+
     if reverse_primer:
-        query = str(primer_dseqr.seq.reverse_complement()).upper().replace('U', 'T')[:limit]
+        query = query[:limit]
     else:
-        query = str(primer_dseqr.seq).upper().replace('U', 'T')[-limit:]
+        query = query[-limit:]
 
     subject = 2 * template if template_dseqr.circular else template
 
@@ -122,8 +126,16 @@ def alignment_sub_strings(template_dseqr: _Dseqrecord, primer_dseqr: _Dseqrecord
 
     out = set()
     for match in matches:
-        start, end = match.span()
-        out.add((start, end-start, len(primer_dseqr)-limit))
+
+        # This extends match beyond the limit if the primer aligns more than that
+        # and reduces the match if the primer has mismatches
+
+        _, end_match_on_template = match.span()
+        end_match_on_primer = len(query)
+        if reverse_primer:
+            out.add((start, 0, end-start))
+        else:
+            out.add((start, len(primer_dseqr)-limit, end-start))
 
     return list(sorted(out))
 
@@ -269,15 +281,41 @@ def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, is_in
 
     return True
 
+
+def assembly_has_mismatches(fragments, assembly):
+    for u, v, loc_u, loc_v in assembly:
+        seq_u = fragments[u-1] if u > 0 else fragments[-u-1].reverse_complement()
+        seq_v = fragments[v-1] if v > 0 else fragments[-v-1].reverse_complement()
+        # TODO: Check issue where extraction failed, and whether it would give problems here
+        if str(loc_u.extract(seq_u).seq).upper() != str(loc_v.extract(seq_v).seq).upper():
+            return True
+    return False
+
+
+def assemble_mismatch_PCR(subfragments, subfragment_representation):
+    """Special version of assemble for PCR. It uses the primer sequences in their entirety, in case
+    there are mismatches or Uracils.
+    """
+
+    fw_primer, template, rv_primer = subfragments
+    temp_loc_left, temp_loc_right = subfragment_representation[1]
+
+
+
+
 def assemble(fragments, assembly, is_circular):
     """Execute an assembly, from the representation returned by get_linear_assemblies or get_circular_assemblies."""
 
     subfragment_representation = edge_representation2subfragment_representation(assembly, is_circular)
+    subfragments = get_assembly_subfragments(fragments, subfragment_representation)
+
+    if assembly_has_mismatches(fragments, assembly):
+        if is_circular or len(assembly) != 2:
+            raise NotImplementedError('Only PCRs with mismatches are supported')
+        return assemble_mismatch_PCR(subfragments, subfragment_representation)
 
     # Length of the overlaps between consecutive assembly fragments
     fragment_overlaps = [len(e[-1]) for e in assembly]
-
-    subfragments = get_assembly_subfragments(fragments, subfragment_representation)
 
     out_dseqrecord = _Dseqrecord(subfragments[0])
 
@@ -704,7 +742,7 @@ class Assembly:
 
 class PCRAssembly(Assembly):
 
-    def __init__(self, frags: tuple[_Dseqrecord, _Dseqrecord, _Dseqrecord], limit=25, algorithm=common_sub_strings):
+    def __init__(self, frags: tuple[_Dseqrecord, _Dseqrecord, _Dseqrecord], limit=25, mismatches=0):
 
         # TODO: allow for the same fragment to be included more than once?
         self.G = _nx.MultiDiGraph()
@@ -722,17 +760,21 @@ class PCRAssembly(Assembly):
                 (-2, -3)
         )
         for u, v in combinations:
-            u_seq = self.G.nodes[u]['seq']
-            v_seq = self.G.nodes[v]['seq']
-            matches = algorithm(u_seq, v_seq, limit)
-            # For now we use the same algorithm function, and filter after those in which
-            # the primer anneals until its 3'-most base, but a separate algorithm could be used.
-            if u == 1:
-                matches = filter(lambda x: x[0] + x[2] == len(forward_primer), matches)
-            elif v == -3:
-                matches = filter(lambda x: x[1] == 0, matches)
+            reverse_primer = abs(u) == 2
+            if reverse_primer:
+                primer = self.G.nodes[v]['seq']
+                template = self.G.nodes[u]['seq']
+            else:
+                primer = self.G.nodes[u]['seq']
+                template = self.G.nodes[v]['seq']
+
+            matches = alignment_sub_strings(template, primer, reverse_primer, limit, mismatches)
+
             for match in matches:
-                self.add_edges_from_match(match, u, v, u_seq, v_seq)
+                # alignment substrings returns the alignment in the template, then the primer
+                if not reverse_primer:
+                    match = (match[1], match[0], match[2])
+                self.add_edges_from_match(match, u, v, self.G.nodes[u]['seq'], self.G.nodes[v]['seq'])
 
         # These two are constrained
         self.use_fragment_order=True
@@ -740,7 +782,7 @@ class PCRAssembly(Assembly):
 
         self.fragments = frags
         self.limit = limit
-        self.algorithm = algorithm
+        self.algorithm = alignment_sub_strings
 
         return
 

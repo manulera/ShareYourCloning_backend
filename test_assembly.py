@@ -1577,3 +1577,50 @@ def test_format_insertion_assembly():
 
     asm_wrong = [(1, 2, loc1_b, loc2_a), (2, 3, loc2_b, loc2_a), (3, 1, loc2_b, loc1_a)]
     assert None == assembly_planner.format_insertion_assembly(asm_wrong)
+
+def test_alignment_sub_strings():
+    template = Dseqrecord('AATTAGCAGCGATCGAGT')
+    primer = Dseqrecord('TTAGCAGC')
+
+    # Full primer alignment
+    assert [(2, 0, 8)] == assembly.alignment_sub_strings(template, primer, False, 8, 0)
+
+    # Extra primer on the left
+    primer = Dseqrecord('GGGCTTTAGCAGC')
+    assert [(2, 5, 8)] == assembly.alignment_sub_strings(template, primer, False, 8, 0)
+
+    # Extra primer on the right does not work
+    primer = Dseqrecord('TTAGCAGCA')
+    assert [] == assembly.alignment_sub_strings(template, primer, False, 8, 0)
+
+    # Too short primer does not work either
+    primer = Dseqrecord('TAGCAGC')
+    assert [] == assembly.alignment_sub_strings(template, primer, False, 8, 0)
+
+    # Mismatch
+    primer = Dseqrecord('TTAGCAGC')
+    assert [(2, 0, 8)] == assembly.alignment_sub_strings(template, primer, False, 8, 1)
+    primer = Dseqrecord('AAAGCAGC')
+    assert [(2, 0, 8)] == assembly.alignment_sub_strings(template, primer, False, 8, 2)
+
+    # Too many mismatches for argument
+    primer = Dseqrecord('AAAGCAGC')
+    assert [] == assembly.alignment_sub_strings(template, primer, False, 8, 1)
+
+    # Reverse primer
+    primer = Dseqrecord('GCGATCGA')
+    assert [(8, 0, 8)] == assembly.alignment_sub_strings(template, primer, True, 8, 0)
+
+    # Reverse primer with 5' extension
+    primer = Dseqrecord('GCGATCGAAAAA')
+    assert [(8, 0, 8)] == assembly.alignment_sub_strings(template, primer, True, 8, 0)
+
+    # Extra bases on the 3' should not work
+    primer = Dseqrecord('AAGCGATCGA')
+    assert [] == assembly.alignment_sub_strings(template, primer, True, 8, 0)
+
+    # Mismatches
+    primer = Dseqrecord('GCGTTCGA')
+    assert [(8, 0, 8)] == assembly.alignment_sub_strings(template, primer, True, 8, 1)
+
+    # TODO: test multiple matches
