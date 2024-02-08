@@ -100,7 +100,32 @@ def sticky_end_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=0):
         return [(len(seqx)-overlap, 0, overlap)]
     return []
 
-def zip_match_left()
+def zip_match_leftwards(seqx, seqy, match):
+    """Starting from the rightmost edge of the match, return a new match encompassing the max
+    number of bases. This can be used to return a longer match if a primer aligns for longer
+    than the limit or a shorter match if there are mismatches. This is convenient to maintain
+    as many features as possible."""
+
+    end_on_x = match[0] + match[2]
+    end_on_y = match[1] + match[2]
+    count = 0
+    for x, y in zip(reversed(seqx[:end_on_x]), reversed(seqy[:end_on_y])):
+        if x != y:
+            break
+        count += 1
+    return (end_on_x - count, end_on_y - count, count)
+
+def zip_match_rightwards(seqx, seqy, match):
+    """Same as zip_match_leftwards, towards the right."""
+
+    start_on_x, start_on_y, _ = match
+    count = 0
+    for x, y in zip(seqx[start_on_x:], seqy[start_on_y:]):
+        if x != y:
+            break
+        count += 1
+    return (start_on_x, start_on_y, count)
+
 
 def alignment_sub_strings(template_dseqr: _Dseqrecord, primer_dseqr: _Dseqrecord, reverse_primer: bool, limit=25, mismatches=0):
     """Find alignments of a primer in a template."""
@@ -111,31 +136,36 @@ def alignment_sub_strings(template_dseqr: _Dseqrecord, primer_dseqr: _Dseqrecord
     if len(template_dseqr) < len(primer_dseqr):
         return []
 
-    template = str(template_dseqr.seq).upper().replace('U', 'T')
-    query = str(primer_dseqr.seq).upper().replace('U', 'T')
+    # The reason not to replace the Us here is so that the match is not returned for the
+    # primer.
+    # TODO: keep the U in the assembly match, but solve with joining.
+    template = str(template_dseqr.seq).upper()
+    primer = str(primer_dseqr.seq).upper()
 
     if reverse_primer:
-        query = query[:limit]
+        query = primer[:limit].replace('U', 'T')
     else:
-        query = query[-limit:]
+        query = primer[-limit:].replace('U', 'T')
 
-    subject = 2 * template if template_dseqr.circular else template
+    subject = 2 * template.replace('U', 'T') if template_dseqr.circular else template.replace('U', 'T')
 
-    matches = list(regex.finditer('(' + query + '){s<=' + str(mismatches) + '}', subject, overlapped=True))
-    matches += list(regex.finditer('(?r)(' + query + '){s<=' + str(mismatches) + '}', subject, overlapped=True))
+    re_matches = list(regex.finditer('(' + query + '){s<=' + str(mismatches) + '}', subject, overlapped=True))
+    re_matches += list(regex.finditer('(?r)(' + query + '){s<=' + str(mismatches) + '}', subject, overlapped=True))
 
     out = set()
-    for match in matches:
+    for re_match in re_matches:
 
         # This extends match beyond the limit if the primer aligns more than that
         # and reduces the match if the primer has mismatches
-
-        _, end_match_on_template = match.span()
-        end_match_on_primer = len(query)
+        start, end = re_match.span()
         if reverse_primer:
-            out.add((start, 0, end-start))
+            # Match in the same format as other assembly algorithms
+            starting_match = (start, 0, end-start)
+            out.add(zip_match_rightwards(template, primer, starting_match))
         else:
-            out.add((start, len(primer_dseqr)-limit, end-start))
+            # Match in the same format as other assembly algorithms
+            starting_match = (len(primer_dseqr)-limit, start, end-start)
+            out.add(zip_match_leftwards(primer, template, starting_match))
 
     return list(sorted(out))
 
@@ -771,9 +801,6 @@ class PCRAssembly(Assembly):
             matches = alignment_sub_strings(template, primer, reverse_primer, limit, mismatches)
 
             for match in matches:
-                # alignment substrings returns the alignment in the template, then the primer
-                if not reverse_primer:
-                    match = (match[1], match[0], match[2])
                 self.add_edges_from_match(match, u, v, self.G.nodes[u]['seq'], self.G.nodes[v]['seq'])
 
         # These two are constrained
