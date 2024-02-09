@@ -714,8 +714,6 @@ def test_linear_with_annotations2():
     c.name = "ccc"
     asm = assembly.Assembly((a, b, c), limit=14)
     x = asm.assemble_linear()[0]
-    # print(x.features)
-    # print(x)
     answer = 'aaa|14\n    \\/\n    /\\\n    14|bbb|15\n           \\/\n           /\\\n           15|ccc'
 
     assert x.figure() == answer.strip()
@@ -725,9 +723,6 @@ def test_linear_with_annotations2():
         try:
             assert feat.extract(x).seq == feature_sequences[feat.qualifiers['label']].seq
         except AssertionError:
-            print(feat.qualifiers['label'])
-            print(feat.extract(x).seq, 'extracted feat')
-            print(feature_sequences[feat.qualifiers['label']].seq, 'original feat')
             assert feat.extract(x).seq == feature_sequences[feat.qualifiers['label']].seq
 
 def test_sticky_ligation_algorithm_and_assembly():
@@ -868,6 +863,20 @@ def test_pcr_assembly():
 
     assert len(prods) == 1
     assert str(prods[0].seq) == 'TTTACGTACGTAAAAAAGCGCGCGCTTT'
+
+    primer1 = Dseqrecord('AUUA')
+    primer2 = Dseqrecord('UUAA')
+
+    seq = Dseqrecord(Dseq('aaATTAggccggTTAAaa'))
+    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=4)
+
+    asm.assemble_linear()[0].seq == 'AUUAggccggTTAA'
+    asm.assemble_linear()[0].seq.crick.startswith('UUAA')
+
+    primer1 = Dseqrecord('ATAUUA')
+    primer2 = Dseqrecord('ATUUAA')
+    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=6, mismatches=1)
+    asm.assemble_linear()[0].seq == 'ATAUUAggccggTTAAAT'
 
 
 
@@ -1172,8 +1181,6 @@ def test_insertion_assembly():
     fragments = [a, b, c]
     for i in range(3):
         asm = assembly.Assembly(fragments[i:] + fragments[:i], use_fragment_order=False, limit=8, use_all_fragments=True)
-        for a in asm.get_insertion_assemblies():
-            print(assembly.assembly2str(a))
         prods = asm.assemble_insertion()
 
         assert len(prods) == 1
@@ -1577,3 +1584,59 @@ def test_format_insertion_assembly():
 
     asm_wrong = [(1, 2, loc1_b, loc2_a), (2, 3, loc2_b, loc2_a), (3, 1, loc2_b, loc1_a)]
     assert None == assembly_planner.format_insertion_assembly(asm_wrong)
+
+def test_alignment_sub_strings():
+    template = Dseqrecord('AATTAGCAGCGATCGAGT')
+    primer = Dseqrecord('TTAGCAGC')
+
+    # Full primer alignment
+    assert [(0, 2, 8)] == assembly.alignment_sub_strings(template, primer, False, 8, 0)
+
+    # The alignment is zipped if more bases align than the arg limit
+    assert [(0, 2, 8)] == assembly.alignment_sub_strings(template, primer, False, 6, 0)
+
+    # Extra primer on the left
+    primer = Dseqrecord('GGGCTTTAGCAGC')
+    assert [(5, 2, 8)] == assembly.alignment_sub_strings(template, primer, False, 8, 0)
+
+    # Extra primer on the right does not work
+    primer = Dseqrecord('TTAGCAGCA')
+    assert [] == assembly.alignment_sub_strings(template, primer, False, 8, 0)
+
+    # Too short primer does not work either
+    primer = Dseqrecord('TAGCAGC')
+    assert [] == assembly.alignment_sub_strings(template, primer, False, 8, 0)
+
+    # Mismatch
+    primer = Dseqrecord('TaAGCAGC')
+    assert [(2, 4, 6)] == assembly.alignment_sub_strings(template, primer, False, 8, 1)
+    primer = Dseqrecord('aaAGCAGC')
+    assert [(2, 4, 6)] == assembly.alignment_sub_strings(template, primer, False, 8, 2)
+
+    # Too many mismatches for argument
+    primer = Dseqrecord('AAAGCAGC')
+    assert [] == assembly.alignment_sub_strings(template, primer, False, 8, 1)
+
+    # Reverse primer
+    primer = Dseqrecord('GCGATCGA')
+    assert [(8, 0, 8)] == assembly.alignment_sub_strings(template, primer, True, 8, 0)
+
+    # The alignment is zipped if more bases align than the arg limit
+    assert [(8, 0, 8)] == assembly.alignment_sub_strings(template, primer, True, 6, 0)
+
+    # Reverse primer with 5' extension
+    primer = Dseqrecord('GCGATCGAAAAA')
+    assert [(8, 0, 8)] == assembly.alignment_sub_strings(template, primer, True, 8, 0)
+
+    # Extra bases on the 3' should not work
+    primer = Dseqrecord('AAGCGATCGA')
+    assert [] == assembly.alignment_sub_strings(template, primer, True, 8, 0)
+
+    # Mismatches
+    primer = Dseqrecord('GCGtTCGA')
+    assert [(8, 0, 3)] == assembly.alignment_sub_strings(template, primer, True, 8, 1)
+
+    # Multiple matches
+    primer = Dseqrecord('AATTAGCA')
+    template = Dseqrecord('AATTAGCAGCGATCAATTAGCA')
+    assert [(0, 0, 8), (0, 14, 8)] == assembly.alignment_sub_strings(template, primer, False, 8, 1)
