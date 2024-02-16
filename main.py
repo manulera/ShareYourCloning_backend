@@ -10,7 +10,7 @@ from dna_functions import get_invalid_enzyme_names, format_sequence_genbank, \
 from pydantic_models import PCRSource, PrimerModel, SequenceEntity, SequenceFileFormat, \
     RepositoryIdSource, RestrictionEnzymeDigestionSource, LigationSource, \
     UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource, RestrictionAndLigationSource, \
-    AssemblySource
+    AssemblySource, GenomeCoordinatesSource
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
 from urllib.error import HTTPError, URLError
@@ -19,6 +19,8 @@ from Bio.Restriction.Restriction_Dictionary import rest_dict
 from assembly2 import Assembly, assemble, sticky_end_sub_strings, assembly2str, PCRAssembly, \
     gibson_overlap, filter_linear_subassemblies, restriction_ligation_overlap, SingleFragmentAssembly, \
     blunt_overlap
+import requests
+
 # Instance of the API object
 app = FastAPI()
 
@@ -171,6 +173,34 @@ async def get_from_repository_id(source: RepositoryIdSource):
                      a wrong {source.repository} id')
     except URLError as exception:
         raise HTTPException(504, f'Unable to connect to {source.repository}: {exception}')
+
+def extract_genome_coords_from_entry(entry):
+    gene_range = entry['annotation']['genomic_regions']['genomic_regions'][0]
+
+
+def validate_locus_tag():
+
+@ app.post('/genome_coordinates', response_model=create_model(
+    'GenomeRegionResponse',
+    sources=(list[GenomeCoordinatesSource], ...),
+    sequences=(list[SequenceEntity], ...)
+))
+async def get_from_repository_id(source: GenomeCoordinatesSource):
+    gb = Genbank("example@gmail.com")
+    # If a locus_tag has been provided, validate it
+    if source.locus_tag is not None:
+        url = f'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/{source.genome_accession}/annotation_report?search_text={source.locus_tag}'
+        resp = requests.get(url)
+        if resp.status_code == 404:
+            raise HTTPError(url, 404, 'wrong accession number', None)
+        data = resp.json()
+        if 'reports' not in data:
+            raise HTTPError(url, 404, 'wrong locus_tag', None)
+        next((a for a in data['reports'] if  > 2), None)
+        data['reports'].find(lambda x: x['locus_tag'] == source.locus_tag)
+    seq = Dseqrecord(gb.nucleotide(source.genome_accession, source.start, source.end, source.strand))
+    dseqs = [seq]
+    sources = [source.model_copy()]
 
 
 @ app.get('/restriction_enzyme_list', response_model=dict[str, list[str]])

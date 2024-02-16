@@ -114,6 +114,17 @@ class RepositoryIdSource(Source):
     type: SourceType = SourceType('repository_id')
 
 
+class GenomeCoordinatesSource(Source):
+    """Documents a request to NCBI for genome sequence
+    """
+    genome_accession: str
+    locus_tag: Optional[str] = None
+    start: int
+    end: int
+    strand: int
+    type: SourceType = SourceType('genome_coordinates')
+
+
 class SequenceCut(Source):
     """A class to represent a cut in a sequence"""
 
