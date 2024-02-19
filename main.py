@@ -174,11 +174,6 @@ async def get_from_repository_id(source: RepositoryIdSource):
     except URLError as exception:
         raise HTTPException(504, f'Unable to connect to {source.repository}: {exception}')
 
-def extract_genome_coords_from_entry(entry):
-    gene_range = entry['annotation']['genomic_regions']['genomic_regions'][0]
-
-
-def validate_locus_tag():
 
 @ app.post('/genome_coordinates', response_model=create_model(
     'GenomeRegionResponse',
@@ -186,21 +181,34 @@ def validate_locus_tag():
     sequences=(list[SequenceEntity], ...)
 ))
 async def get_from_repository_id(source: GenomeCoordinatesSource):
-    gb = Genbank("example@gmail.com")
-    # If a locus_tag has been provided, validate it
+
+    # If a locus_tag / gene_ids has been provided, validate it
+    # TODO validation of gene_id
     if source.locus_tag is not None:
-        url = f'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/{source.genome_accession}/annotation_report?search_text={source.locus_tag}'
+        url = f'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/{source.assembly_accession}/annotation_report?search_text={source.locus_tag}'
         resp = requests.get(url)
         if resp.status_code == 404:
-            raise HTTPError(url, 404, 'wrong accession number', None)
+            raise HTTPException(404, 'wrong accession number')
         data = resp.json()
         if 'reports' not in data:
-            raise HTTPError(url, 404, 'wrong locus_tag', None)
-        next((a for a in data['reports'] if  > 2), None)
-        data['reports'].find(lambda x: x['locus_tag'] == source.locus_tag)
-    seq = Dseqrecord(gb.nucleotide(source.genome_accession, source.start, source.end, source.strand))
-    dseqs = [seq]
-    sources = [source.model_copy()]
+            raise HTTPException(404, 'wrong locus_tag')
+        matching_annotation = next((a['annotation'] for a in data['reports'] if a['annotation']['locus_tag'] == source.locus_tag), None)
+        if matching_annotation is None:
+            raise HTTPException(404, 'wrong locus_tag')
+        gene_range = matching_annotation['genomic_regions'][0]['gene_range']['range'][0]
+        gene_strand = 1 if gene_range['orientation'] == 'plus' else -1
+
+        # The gene should fall within the range (range might be bigger if bases were requested upstream or downstream)
+        if int(gene_range['begin']) < source.start or int(gene_range['end']) > source.stop or gene_strand != source.strand:
+            raise HTTPException(400, f'wrong coordinates, expected to fall within {source.start}, {source.stop} on strand: {source.strand}')
+
+    # For some reason, strand here has a different meaning to biopython, strand = 1 is the same, but strand = -1 is equivalent to strand = 2
+    gb_strand = 1 if source.strand == 1 else 2
+    print(source.sequence_accession, source.start, source.stop, gb_strand)
+    gb = Genbank("example@gmail.com")
+    seq = Dseqrecord(gb.nucleotide(source.sequence_accession, source.start, source.stop, gb_strand))
+
+    return {'sequences': [format_sequence_genbank(seq)], 'sources': [source.model_copy()]}
 
 
 @ app.get('/restriction_enzyme_list', response_model=dict[str, list[str]])
