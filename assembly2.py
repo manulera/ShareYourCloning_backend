@@ -161,11 +161,15 @@ def alignment_sub_strings(template_dseqr: _Dseqrecord, primer_dseqr: _Dseqrecord
         if reverse_primer:
             # Match in the same format as other assembly algorithms
             starting_match = (start, 0, end-start)
-            out.add(zip_match_rightwards(template, primer, starting_match))
+            # TODO: pending on https://github.com/manulera/ShareYourCloning_backend/issues/85
+            # out.add(zip_match_rightwards(template, primer, starting_match))
+            out.add(starting_match)
         else:
             # Match in the same format as other assembly algorithms
             starting_match = (len(primer_dseqr)-limit, start, end-start)
-            out.add(zip_match_leftwards(primer, template, starting_match))
+            # TODO: pending on https://github.com/manulera/ShareYourCloning_backend/issues/85
+            # out.add(zip_match_leftwards(primer, template, starting_match))
+            out.add(starting_match)
 
     return list(sorted(out))
 
@@ -339,10 +343,10 @@ def assemble(fragments, assembly, is_circular):
     subfragment_representation = edge_representation2subfragment_representation(assembly, is_circular)
     subfragments = get_assembly_subfragments(fragments, subfragment_representation)
 
-    if assembly_has_mismatches(fragments, assembly):
-        if is_circular or len(assembly) != 2:
-            raise NotImplementedError('Only PCRs with mismatches are supported')
-        return assemble_mismatch_PCR(subfragments, subfragment_representation)
+    # if assembly_has_mismatches(fragments, assembly):
+    #     if is_circular or len(assembly) != 2:
+    #         raise NotImplementedError('Only PCRs with mismatches are supported')
+    #     return assemble_mismatch_PCR(subfragments, subfragment_representation)
 
     # Length of the overlaps between consecutive assembly fragments
     fragment_overlaps = [len(e[-1]) for e in assembly]
