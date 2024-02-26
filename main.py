@@ -51,6 +51,43 @@ def format_known_assembly_response(source: AssemblySource, out_sources: list[Ass
             return {'sequences': [format_sequence_genbank(assemble(fragments, assembly_plan, s.circular))], 'sources': [s]}
     raise HTTPException(400, 'The provided assembly is not valid.')
 
+# Workaround for internal server errors: https://github.com/tiangolo/fastapi/discussions/7847#discussioncomment-5144709
+@app.exception_handler(500)
+async def custom_http_exception_handler(request: Request, exc: Exception):
+
+    response = JSONResponse(content={'message': 'internal server error'}, status_code=500)
+
+    origin = request.headers.get('origin')
+
+    if origin:
+        # Have the middleware do the heavy lifting for us to parse
+        # all the config, then update our response headers
+        cors = CORSMiddleware(
+                app=app,
+                allow_origins=origins,
+                allow_credentials=True,
+                allow_methods=["*"],
+                allow_headers=["*"])
+
+        # Logic directly from Starlette's CORSMiddleware:
+        # https://github.com/encode/starlette/blob/master/starlette/middleware/cors.py#L152
+
+        response.headers.update(cors.simple_headers)
+        has_cookie = "cookie" in request.headers
+
+        # If request includes any cookie headers, then we must respond
+        # with the specific origin instead of '*'.
+        if cors.allow_all_origins and has_cookie:
+            response.headers["Access-Control-Allow-Origin"] = origin
+
+        # If we only allow specific origins, then we have to mirror back
+        # the Origin header in the response.
+        elif not cors.allow_all_origins and cors.is_allowed_origin(origin=origin):
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers.add_vary_header("Origin")
+
+    return response
+
 
 @app.get('/')
 async def greeting(request: Request):
