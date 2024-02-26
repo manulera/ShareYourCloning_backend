@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
 from pydantic import conlist, create_model
@@ -169,8 +170,7 @@ async def get_from_repository_id(source: RepositoryIdSource):
                 503, f'{source.repository} returned: {exception} - {source.repository} might be down')
         elif exception.code == 400 or exception.code == 404:
             raise HTTPException(
-                404, f'{source.repository} returned: {exception} - Likely you inserted\
-                     a wrong {source.repository} id')
+                404, f'{source.repository} returned: {exception} - Likely you inserted a wrong {source.repository} id')
     except URLError as exception:
         raise HTTPException(504, f'Unable to connect to {source.repository}: {exception}')
 
@@ -180,9 +180,9 @@ async def get_from_repository_id(source: RepositoryIdSource):
     sources=(list[GenomeCoordinatesSource], ...),
     sequences=(list[SequenceEntity], ...)
 ))
-async def get_from_repository_id(source: GenomeCoordinatesSource):
+async def genome_coordinates(source: GenomeCoordinatesSource):
 
-    # If a locus_tag / gene_ids has been provided, validate it
+    # If a locus_tag / gene_id has been provided, validate it
     # TODO validation of gene_id
     if source.locus_tag is not None:
         url = f'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/{source.assembly_accession}/annotation_report?search_text={source.locus_tag}'
@@ -202,9 +202,12 @@ async def get_from_repository_id(source: GenomeCoordinatesSource):
         if int(gene_range['begin']) < source.start or int(gene_range['end']) > source.stop or gene_strand != source.strand:
             raise HTTPException(400, f'wrong coordinates, expected to fall within {source.start}, {source.stop} on strand: {source.strand}')
 
+    elif source.assembly_accession is not None:
+        # TODO: validate assembly_id
+        pass
+
     # For some reason, strand here has a different meaning to biopython, strand = 1 is the same, but strand = -1 is equivalent to strand = 2
     gb_strand = 1 if source.strand == 1 else 2
-    print(source.sequence_accession, source.start, source.stop, gb_strand)
     gb = Genbank("example@gmail.com")
     seq = Dseqrecord(gb.nucleotide(source.sequence_accession, source.start, source.stop, gb_strand))
 
