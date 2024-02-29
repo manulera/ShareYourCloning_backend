@@ -87,12 +87,13 @@ class Source(BaseModel):
     """A class to represent sources of DNA
     """
     # Fields required to execute a source step
-    id: Optional[int] = None
-    kind: str = 'source'
-    input: list[int] = []
-    output: Optional[int] = None
-    type: Optional[SourceType]
-    info: dict = {}
+    id: Optional[int] = Field(None, description='Unique identifier of the source')
+    kind: str = Field('source', description='The kind entity (always equal to "source"). Should probably be removed.')
+    input: list[int] = Field([], description='Identifiers of the sequences that are an input to this source. \
+                             If the source represents external import of a sequence, it\'s empty.')
+    output: Optional[int] = Field(None, description='Identifier of the sequence that is an output of this source.')
+    type: Optional[SourceType] = Field(..., description='The type source (PCR, restriction, etc.)')
+    info: dict = Field({}, description='Additional information about the source (not used much yet, and probably should be removed)')
     model_config = ConfigDict(extra='forbid')
 
 
@@ -116,8 +117,8 @@ class RepositoryIdSource(Source):
 class SequenceCut(Source):
     """A class to represent a cut in a sequence"""
 
-    left_edge : Optional[tuple[int, int]] = None
-    right_edge : Optional[tuple[int, int]] = None
+    left_edge : Optional[tuple[int, int]] = Field(None, description='The left edge of the cut, in the format (cut_watson, ovhg)')
+    right_edge : Optional[tuple[int, int]] = Field(None, description='The right edge of the cut, in the format (cut_watson, ovhg)')
 
 class RestrictionEnzymeDigestionSource(SequenceCut):
     """Documents a restriction enzyme digestion, and the selection of one of the fragments."""
@@ -138,8 +139,8 @@ class RestrictionEnzymeDigestionSource(SequenceCut):
         )
 
 class AssemblySource(Source):
-    assembly:  Optional[conlist(tuple[int, int, str, str], min_length=1)] = None
-    circular: Optional[bool] = None
+    assembly:  Optional[conlist(tuple[int, int, str, str], min_length=1)] = Field(None, description='The assembly plan as a list of tuples (part_1_id, part_2_id, loc1, loc2)')
+    circular: Optional[bool] = Field(None, description='Whether the assembly is circular or not')
 
     def minimal_overlap(self):
         """Returns the minimal overlap between the fragments in the assembly"""
