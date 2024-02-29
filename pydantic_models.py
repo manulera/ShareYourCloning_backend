@@ -45,9 +45,9 @@ class GenbankSequence(BaseModel):
 
 
 class SequenceEntity(BaseModel):
-    id: Optional[int] = None
-    kind: str = 'entity'
-    sequence: Optional[GenbankSequence]
+    id: Optional[int] = Field(None, description='Unique identifier of the sequence')
+    kind: str = Field('entity', description='The kind entity (always equal to "entity"). Should probably be removed.')
+    sequence: Optional[GenbankSequence] = Field(..., description='The sequence in genbank format + some extra info that is not captured by the genbank format')
 
 
 class PrimerModel(BaseModel):
