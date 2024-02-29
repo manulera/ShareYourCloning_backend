@@ -128,7 +128,7 @@ class RestrictionEnzymeDigestionSource(SequenceCut):
     # The order of the enzymes in the list corresponds to the fragment_boundaries.
     # For instance, if a fragment 5' is cut with EcoRI and the 3' with BamHI,
     # restriction_enzymes = ['EcoRI', 'BamHI']
-    restriction_enzymes: conlist(str|None, min_length=1, description='Enzymes associated with the left and right sides of the cut. It can contain None to represent the edge the sequence in linear sequences.')
+    restriction_enzymes: conlist(str|None, min_length=1) = Field(..., description='Enzymes associated with the left and right sides of the cut. It can contain None to represent the edge the sequence in linear sequences.')
 
     def from_cutsites(left: tuple[tuple[int,int], RestrictionType], right: tuple[tuple[int,int], RestrictionType], input: list[int], id: int) -> 'RestrictionEnzymeDigestionSource':
         return RestrictionEnzymeDigestionSource(
