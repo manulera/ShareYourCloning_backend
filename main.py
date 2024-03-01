@@ -532,7 +532,7 @@ async def restriction_and_ligation(source: RestrictionAndLigationSource,
         return format_known_assembly_response(source, out_sources, fragments)
 
     if len(out_sources) == 0:
-        raise HTTPException(400, 'No terminal homology was found.')
+        raise HTTPException(400, 'No compatible restriction-ligation was found.')
 
     out_sequences = [format_sequence_genbank(assemble(fragments, s.get_assembly_plan(), s.circular)) for s in out_sources]
 
