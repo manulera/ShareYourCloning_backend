@@ -1,4 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
 from pydantic import conlist, create_model
@@ -10,7 +11,7 @@ from dna_functions import get_invalid_enzyme_names, format_sequence_genbank, \
 from pydantic_models import PCRSource, PrimerModel, SequenceEntity, SequenceFileFormat, \
     RepositoryIdSource, RestrictionEnzymeDigestionSource, LigationSource, \
     UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource, RestrictionAndLigationSource, \
-    AssemblySource
+    AssemblySource, GenomeCoordinatesSource
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
 from urllib.error import HTTPError, URLError
@@ -19,6 +20,8 @@ from Bio.Restriction.Restriction_Dictionary import rest_dict
 from assembly2 import Assembly, assemble, sticky_end_sub_strings, assembly2str, PCRAssembly, \
     gibson_overlap, filter_linear_subassemblies, restriction_ligation_overlap, SingleFragmentAssembly, \
     blunt_overlap
+import requests
+
 # Instance of the API object
 app = FastAPI()
 
@@ -47,6 +50,43 @@ def format_known_assembly_response(source: AssemblySource, out_sources: list[Ass
         if s == source:
             return {'sequences': [format_sequence_genbank(assemble(fragments, assembly_plan, s.circular))], 'sources': [s]}
     raise HTTPException(400, 'The provided assembly is not valid.')
+
+# Workaround for internal server errors: https://github.com/tiangolo/fastapi/discussions/7847#discussioncomment-5144709
+@app.exception_handler(500)
+async def custom_http_exception_handler(request: Request, exc: Exception):
+
+    response = JSONResponse(content={'message': 'internal server error'}, status_code=500)
+
+    origin = request.headers.get('origin')
+
+    if origin:
+        # Have the middleware do the heavy lifting for us to parse
+        # all the config, then update our response headers
+        cors = CORSMiddleware(
+                app=app,
+                allow_origins=origins,
+                allow_credentials=True,
+                allow_methods=["*"],
+                allow_headers=["*"])
+
+        # Logic directly from Starlette's CORSMiddleware:
+        # https://github.com/encode/starlette/blob/master/starlette/middleware/cors.py#L152
+
+        response.headers.update(cors.simple_headers)
+        has_cookie = "cookie" in request.headers
+
+        # If request includes any cookie headers, then we must respond
+        # with the specific origin instead of '*'.
+        if cors.allow_all_origins and has_cookie:
+            response.headers["Access-Control-Allow-Origin"] = origin
+
+        # If we only allow specific origins, then we have to mirror back
+        # the Origin header in the response.
+        elif not cors.allow_all_origins and cors.is_allowed_origin(origin=origin):
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers.add_vary_header("Origin")
+
+    return response
 
 
 @app.get('/')
@@ -167,10 +207,48 @@ async def get_from_repository_id(source: RepositoryIdSource):
                 503, f'{source.repository} returned: {exception} - {source.repository} might be down')
         elif exception.code == 400 or exception.code == 404:
             raise HTTPException(
-                404, f'{source.repository} returned: {exception} - Likely you inserted\
-                     a wrong {source.repository} id')
+                404, f'{source.repository} returned: {exception} - Likely you inserted a wrong {source.repository} id')
     except URLError as exception:
         raise HTTPException(504, f'Unable to connect to {source.repository}: {exception}')
+
+
+@ app.post('/genome_coordinates', response_model=create_model(
+    'GenomeRegionResponse',
+    sources=(list[GenomeCoordinatesSource], ...),
+    sequences=(list[SequenceEntity], ...)
+))
+async def genome_coordinates(source: GenomeCoordinatesSource):
+
+    # If a locus_tag / gene_id has been provided, validate it
+    # TODO validation of gene_id
+    if source.locus_tag is not None:
+        url = f'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/{source.assembly_accession}/annotation_report?search_text={source.locus_tag}'
+        resp = requests.get(url)
+        if resp.status_code == 404:
+            raise HTTPException(404, 'wrong accession number')
+        data = resp.json()
+        if 'reports' not in data:
+            raise HTTPException(404, 'wrong locus_tag')
+        matching_annotation = next((a['annotation'] for a in data['reports'] if a['annotation']['locus_tag'] == source.locus_tag), None)
+        if matching_annotation is None:
+            raise HTTPException(404, 'wrong locus_tag')
+        gene_range = matching_annotation['genomic_regions'][0]['gene_range']['range'][0]
+        gene_strand = 1 if gene_range['orientation'] == 'plus' else -1
+
+        # The gene should fall within the range (range might be bigger if bases were requested upstream or downstream)
+        if int(gene_range['begin']) < source.start or int(gene_range['end']) > source.stop or gene_strand != source.strand:
+            raise HTTPException(400, f'wrong coordinates, expected to fall within {source.start}, {source.stop} on strand: {source.strand}')
+
+    elif source.assembly_accession is not None:
+        # TODO: validate assembly_id
+        pass
+
+    # For some reason, strand here has a different meaning to biopython, strand = 1 is the same, but strand = -1 is equivalent to strand = 2
+    gb_strand = 1 if source.strand == 1 else 2
+    gb = Genbank("example@gmail.com")
+    seq = Dseqrecord(gb.nucleotide(source.sequence_accession, source.start, source.stop, gb_strand))
+
+    return {'sequences': [format_sequence_genbank(seq)], 'sources': [source.model_copy()]}
 
 
 @ app.get('/restriction_enzyme_list', response_model=dict[str, list[str]])

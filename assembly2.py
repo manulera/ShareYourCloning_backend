@@ -100,54 +100,98 @@ def sticky_end_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=0):
         return [(len(seqx)-overlap, 0, overlap)]
     return []
 
-def zip_match_leftwards(seqx, seqy, match):
+def zip_match_leftwards(seqx: _Dseqrecord, seqy: _Dseqrecord, match: tuple[int, int, int]):
     """Starting from the rightmost edge of the match, return a new match encompassing the max
     number of bases. This can be used to return a longer match if a primer aligns for longer
     than the limit or a shorter match if there are mismatches. This is convenient to maintain
-    as many features as possible."""
+    as many features as possible.
+
+    >>> seq = _Dseqrecord('AAAAACGTCCCGT')
+    >>> primer = _Dseqrecord('ACGTCCCGT')
+    >>> match = (13, 9, 0) # an empty match at the end of each
+    >>> zip_match_leftwards(seq, primer, match)
+    (4, 0, 9)
+
+    Works in circular molecules if the match spans the origin:
+    >>> seq = _Dseqrecord('TCCCGTAAAAACG', circular=True)
+    >>> primer = _Dseqrecord('ACGTCCCGT')
+    >>> match = (6, 9, 0)
+    >>> zip_match_leftwards(seq, primer, match)
+    >>> (10, 0, 9)
+
+    """
+
+    query_x = dseqrecord2str_for_alignment(seqx)
+    query_y = dseqrecord2str_for_alignment(seqy)
+
+    # In circular sequences, the match may go beyond the left-most edge of the sequence if it spans
+    # the origin:
+    # Primer:          ACGTCCCGT
+    #                  |||||||||
+    # Circular seq:    ACGTCCCGT -> Equivalent to Dseqrecord('CCCGTACGT', circular=True)
+    #                      ^
+    #                      Origin
+    # We would start from the last T and move leftwards, but we would stop at the origin
+    # For those cases we shift by length, then go back
 
     end_on_x = match[0] + match[2]
+    if seqx.circular and end_on_x <= len(seqx):
+        end_on_x += len(seqx)
+
     end_on_y = match[1] + match[2]
+    if seqy.circular and end_on_y <= len(seqy):
+        end_on_y += len(seqy)
+
     count = 0
-    for x, y in zip(reversed(seqx[:end_on_x]), reversed(seqy[:end_on_y])):
+    for x, y in zip(reversed(query_x[:end_on_x]), reversed(query_y[:end_on_y])):
         if x != y:
             break
         count += 1
-    return (end_on_x - count, end_on_y - count, count)
 
-def zip_match_rightwards(seqx, seqy, match):
+    # Shift back by length if needed
+    start_on_x = (end_on_x - count) % len(seqx)
+    start_on_y = (end_on_y - count) % len(seqy)
+
+    return (start_on_x, start_on_y, count)
+
+def zip_match_rightwards(seqx: _Dseqrecord, seqy: _Dseqrecord, match: tuple[int, int, int]):
     """Same as zip_match_leftwards, towards the right."""
+
+    query_x = dseqrecord2str_for_alignment(seqx)
+    query_y = dseqrecord2str_for_alignment(seqy)
 
     start_on_x, start_on_y, _ = match
     count = 0
-    for x, y in zip(seqx[start_on_x:], seqy[start_on_y:]):
+    for x, y in zip(query_x[start_on_x:], query_y[start_on_y:]):
         if x != y:
             break
         count += 1
     return (start_on_x, start_on_y, count)
 
 
-def alignment_sub_strings(template_dseqr: _Dseqrecord, primer_dseqr: _Dseqrecord, reverse_primer: bool, limit=25, mismatches=0):
+def dseqrecord2str_for_alignment(dseqr: _Dseqrecord):
+    """Transform a Dseqrecord to a string representation where U is replaced by T, everything is upper case and
+    circular sequences are repeated twice."""
+    out = str(dseqr.seq).upper().replace('U', 'T')
+    if dseqr.circular:
+        return out * 2
+    return out
+
+def alignment_sub_strings(template: _Dseqrecord, primer: _Dseqrecord, reverse_primer: bool, limit=25, mismatches=0):
     """Find alignments of a primer in a template."""
 
-    if len(primer_dseqr) < limit:
+    if len(primer) < limit:
         return []
     # Edge case, in circular sequences the primer could align with 2 * template
-    if len(template_dseqr) < len(primer_dseqr):
+    if len(template) < len(primer):
         return []
 
-    # The reason not to replace the Us here is so that the match is not returned for the
-    # primer.
-    # TODO: keep the U in the assembly match, but solve with joining.
-    template = str(template_dseqr.seq).upper()
-    primer = str(primer_dseqr.seq).upper()
-
     if reverse_primer:
-        query = primer[:limit].replace('U', 'T')
+        query = dseqrecord2str_for_alignment(primer[:limit])
     else:
-        query = primer[-limit:].replace('U', 'T')
+        query = dseqrecord2str_for_alignment(primer[-limit:])
 
-    subject = 2 * template.replace('U', 'T') if template_dseqr.circular else template.replace('U', 'T')
+    subject = dseqrecord2str_for_alignment(template)
 
     re_matches = list(regex.finditer('(' + query + '){s<=' + str(mismatches) + '}', subject, overlapped=True))
     re_matches += list(regex.finditer('(?r)(' + query + '){s<=' + str(mismatches) + '}', subject, overlapped=True))
@@ -155,16 +199,22 @@ def alignment_sub_strings(template_dseqr: _Dseqrecord, primer_dseqr: _Dseqrecord
     out = set()
     for re_match in re_matches:
 
+        start, end = re_match.span()
+
+        # For circular sequences the same match is returned twice unless it falls
+        # on the origin, we eliminate duplicates here
+        if start >= len(template):
+            continue
+
         # This extends match beyond the limit if the primer aligns more than that
         # and reduces the match if the primer has mismatches
-        start, end = re_match.span()
         if reverse_primer:
             # Match in the same format as other assembly algorithms
             starting_match = (start, 0, end-start)
             out.add(zip_match_rightwards(template, primer, starting_match))
         else:
             # Match in the same format as other assembly algorithms
-            starting_match = (len(primer_dseqr)-limit, start, end-start)
+            starting_match = (len(primer)-limit, start, end-start)
             out.add(zip_match_leftwards(primer, template, starting_match))
 
     return list(sorted(out))
@@ -339,10 +389,10 @@ def assemble(fragments, assembly, is_circular):
     subfragment_representation = edge_representation2subfragment_representation(assembly, is_circular)
     subfragments = get_assembly_subfragments(fragments, subfragment_representation)
 
-    if assembly_has_mismatches(fragments, assembly):
-        if is_circular or len(assembly) != 2:
-            raise NotImplementedError('Only PCRs with mismatches are supported')
-        return assemble_mismatch_PCR(subfragments, subfragment_representation)
+    # if assembly_has_mismatches(fragments, assembly):
+    #     if is_circular or len(assembly) != 2:
+    #         raise NotImplementedError('Only PCRs with mismatches are supported')
+    #     return assemble_mismatch_PCR(subfragments, subfragment_representation)
 
     # Length of the overlaps between consecutive assembly fragments
     fragment_overlaps = [len(e[-1]) for e in assembly]

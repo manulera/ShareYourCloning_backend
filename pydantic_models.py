@@ -16,6 +16,7 @@ class SourceType(str, Enum):
     homologous_recombination = 'homologous_recombination'
     gibson_assembly = 'gibson_assembly'
     restriction_and_ligation = 'restriction_and_ligation'
+    genome_coordinates = 'genome_coordinates'
 
 
 class SequenceFileFormat(str, Enum):
@@ -112,6 +113,21 @@ class RepositoryIdSource(Source):
     repository: RepositoryName
     repository_id: str
     type: SourceType = SourceType('repository_id')
+
+
+class GenomeCoordinatesSource(Source):
+    """Documents a request to NCBI for genome sequence
+    """
+    assembly_accession: str
+    sequence_accession: str
+    # The unique identifier of a gene can come from either the gene_id or the locus_tag
+    # For instance, genes in the human reference genome have a gene_id, but no locus_tag
+    locus_tag: Optional[str] = None
+    gene_id: Optional[int] = None
+    start: int
+    stop: int
+    strand: int
+    type: SourceType = SourceType('genome_coordinates')
 
 
 class SequenceCut(Source):
