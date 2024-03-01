@@ -7,7 +7,7 @@ from Bio.Restriction.Restriction import CommOnly
 from pydantic_models import RepositoryIdSource, PCRSource, PrimerModel, \
     RestrictionEnzymeDigestionSource, SequenceEntity, LigationSource, \
     UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource, \
-    RestrictionAndLigationSource
+    RestrictionAndLigationSource, ManuallyTypedSource
 from pydna.dseqrecord import Dseqrecord
 import unittest
 from pydna.dseq import Dseq
@@ -971,6 +971,36 @@ class RestrictionAndLigationTest(unittest.TestCase):
 
         self.assertEqual(str(sequences[0].seq), 'AATTCAAAG')
         self.assertEqual(str(sequences[1].seq), 'AAAGAATTCAAAA')
+
+
+class ManuallyTypedTest(unittest.TestCase):
+
+    def test_manually_typed(self):
+        """Test the manually_typed endpoint"""
+
+        source = ManuallyTypedSource(
+            user_input='ATGC',
+        )
+
+        response = client.post("/manually_typed", json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        sources = [ManuallyTypedSource.model_validate(s) for s in payload['sources']]
+
+        self.assertEqual(len(resulting_sequences), 1)
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(str(resulting_sequences[0].seq), 'ATGC')
+        self.assertEqual(sources[0], source)
+
+    # Test that it fails if not acgt or empty
+    def test_manually_typed_fail(self):
+
+        response = client.post("/manually_typed", json={'user_input': 'ATGZ'})
+        self.assertEqual(response.status_code, 422)
+
+        response = client.post("/manually_typed", json={'user_input': ''})
+        self.assertEqual(response.status_code, 422)
 
 
 

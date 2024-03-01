@@ -11,7 +11,7 @@ from dna_functions import get_invalid_enzyme_names, format_sequence_genbank, \
 from pydantic_models import PCRSource, PrimerModel, SequenceEntity, SequenceFileFormat, \
     RepositoryIdSource, RestrictionEnzymeDigestionSource, LigationSource, \
     UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource, RestrictionAndLigationSource, \
-    AssemblySource, GenomeCoordinatesSource
+    AssemblySource, GenomeCoordinatesSource, ManuallyTypedSource
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
 from urllib.error import HTTPError, URLError
@@ -249,6 +249,18 @@ async def genome_coordinates(source: GenomeCoordinatesSource):
     seq = Dseqrecord(gb.nucleotide(source.sequence_accession, source.start, source.stop, gb_strand))
 
     return {'sequences': [format_sequence_genbank(seq)], 'sources': [source.model_copy()]}
+
+
+@ app.post('/manually_typed', response_model=create_model(
+    'ManuallyTypedResponse',
+    sources=(list[ManuallyTypedSource], ...),
+    sequences=(list[SequenceEntity], ...)
+))
+async def manually_typed(source: ManuallyTypedSource):
+    """Return the sequence from a manually typed sequence
+    """
+    seq = Dseqrecord(source.user_input)
+    return {'sequences': [format_sequence_genbank(seq)], 'sources': [source]}
 
 
 @ app.get('/restriction_enzyme_list', response_model=dict[str, list[str]])
