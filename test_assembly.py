@@ -1585,56 +1585,83 @@ def test_format_insertion_assembly():
     asm_wrong = [(1, 2, loc1_b, loc2_a), (2, 3, loc2_b, loc2_a), (3, 1, loc2_b, loc1_a)]
     assert None == assembly_planner.format_insertion_assembly(asm_wrong)
 
+def test_zip_leftwards():
+    seq = Dseqrecord('AAAAACGTCCCGT')
+    primer = Dseqrecord('ACGTCCCGT')
+    match = (13, 9, 0) # an empty match at the end of each
+    assert (4, 0, 9) == assembly.zip_match_leftwards(seq, primer, match)
+
+    # Works in circular molecules if the match spans the origin:
+    seq = Dseqrecord('TCCCGTAAAAACG', circular=True)
+    primer = Dseqrecord('ACGTCCCGT')
+    match = (6, 9, 0)
+    assert (10, 0, 9) == assembly.zip_match_leftwards(seq, primer, match)
+
+def test_zip_rightwards():
+    seq = Dseqrecord('AAAAACGTCCCGT')
+    primer = Dseqrecord('ACGTCCCGT')
+    match = (4, 0, 0) # an empty match at the end of each
+    assert (4, 0, 9) == assembly.zip_match_rightwards(seq, primer, match)
+
+    # Works in circular molecules if the match spans the origin:
+    seq = Dseqrecord('TCCCGTAAAAACG', circular=True)
+    primer = Dseqrecord('ACGTCCCGT')
+    match = (10, 0, 0)
+    assert (10, 0, 9) == assembly.zip_match_rightwards(seq, primer, match)
+
 def test_alignment_sub_strings():
-    template = Dseqrecord('AATTAGCAGCGATCGAGT')
-    primer = Dseqrecord('TTAGCAGC')
+    template = Dseqrecord('AATTAGCAGCGATCGAGT', circular=True)
+    for shift in range(len(template)):
 
-    # Full primer alignment
-    assert [(0, 2, 8)] == assembly.alignment_sub_strings(template, primer, False, 8, 0)
+        template_shifted = template.shifted(-shift)
 
-    # The alignment is zipped if more bases align than the arg limit
-    assert [(0, 2, 8)] == assembly.alignment_sub_strings(template, primer, False, 6, 0)
+        primer = Dseqrecord('TTAGCAGC')
+        assert [(0, (2 + shift) % len(template), 8)] == assembly.alignment_sub_strings(template_shifted, primer, False, 8, 0)
 
-    # Extra primer on the left
-    primer = Dseqrecord('GGGCTTTAGCAGC')
-    assert [(5, 2, 8)] == assembly.alignment_sub_strings(template, primer, False, 8, 0)
+        # The alignment is zipped if more bases align than the arg limit
+        assert [(0, (2 + shift) % len(template), 8)] == assembly.alignment_sub_strings(template_shifted, primer, False, 6, 0)
 
-    # Extra primer on the right does not work
-    primer = Dseqrecord('TTAGCAGCA')
-    assert [] == assembly.alignment_sub_strings(template, primer, False, 8, 0)
+        # Extra primer on the left
+        primer_extra_left = Dseqrecord('GGGCTTTAGCAGC')
+        assert [(5, (2 + shift) % len(template), 8)] == assembly.alignment_sub_strings(template_shifted, primer_extra_left, False, 8, 0)
 
-    # Too short primer does not work either
-    primer = Dseqrecord('TAGCAGC')
-    assert [] == assembly.alignment_sub_strings(template, primer, False, 8, 0)
+        # Extra primer on the right does not work
+        primer_extra_right = Dseqrecord('TTAGCAGCA')
+        assert [] == assembly.alignment_sub_strings(template_shifted, primer_extra_right, False, 8, 0)
 
-    # Mismatch
-    primer = Dseqrecord('TaAGCAGC')
-    assert [(2, 4, 6)] == assembly.alignment_sub_strings(template, primer, False, 8, 1)
-    primer = Dseqrecord('aaAGCAGC')
-    assert [(2, 4, 6)] == assembly.alignment_sub_strings(template, primer, False, 8, 2)
+        # Too short primer does not work either
+        primer2short = Dseqrecord('TAGCAGC')
+        assert [] == assembly.alignment_sub_strings(template_shifted, primer2short, False, 8, 0)
 
-    # Too many mismatches for argument
-    primer = Dseqrecord('AAAGCAGC')
-    assert [] == assembly.alignment_sub_strings(template, primer, False, 8, 1)
+        # Mismatch
+        primer = Dseqrecord('TaAGCAGC')
+        assert [(2, (4 + shift) % len(template), 6)] == assembly.alignment_sub_strings(template_shifted, primer, False, 8, 1)
+        primer = Dseqrecord('aaAGCAGC')
+        assert [(2, (4 + shift) % len(template), 6)] == assembly.alignment_sub_strings(template_shifted, primer, False, 8, 2)
 
-    # Reverse primer
-    primer = Dseqrecord('GCGATCGA')
-    assert [(8, 0, 8)] == assembly.alignment_sub_strings(template, primer, True, 8, 0)
+        # Too many mismatches for argument
+        primer = Dseqrecord('AAAGCAGC')
+        assert [] == assembly.alignment_sub_strings(template_shifted, primer, False, 8, 1)
 
-    # The alignment is zipped if more bases align than the arg limit
-    assert [(8, 0, 8)] == assembly.alignment_sub_strings(template, primer, True, 6, 0)
+        # Reverse primer
+        primer = Dseqrecord('GCGATCGA')
+        assert [((8  + shift) % len(template), 0, 8)] == assembly.alignment_sub_strings(template_shifted, primer, True, 8, 0)
 
-    # Reverse primer with 5' extension
-    primer = Dseqrecord('GCGATCGAAAAA')
-    assert [(8, 0, 8)] == assembly.alignment_sub_strings(template, primer, True, 8, 0)
+        # The alignment is zipped if more bases align than the arg limit
+        assert [((8  + shift) % len(template), 0, 8)] == assembly.alignment_sub_strings(template_shifted, primer, True, 6, 0)
 
-    # Extra bases on the 3' should not work
-    primer = Dseqrecord('AAGCGATCGA')
-    assert [] == assembly.alignment_sub_strings(template, primer, True, 8, 0)
+        # Reverse primer with 5' extension
+        primer = Dseqrecord('GCGATCGAAAAA')
+        assert [((8  + shift) % len(template), 0, 8)] == assembly.alignment_sub_strings(template_shifted, primer, True, 8, 0)
 
-    # Mismatches
-    primer = Dseqrecord('GCGtTCGA')
-    assert [(8, 0, 3)] == assembly.alignment_sub_strings(template, primer, True, 8, 1)
+        # Extra bases on the 3' should not work
+        primer = Dseqrecord('AAGCGATCGA')
+        assert [] == assembly.alignment_sub_strings(template_shifted, primer, True, 8, 0)
+
+        # Mismatches
+        primer = Dseqrecord('GCGtTCGA')
+        assert [((8  + shift) % len(template), 0, 3)] == assembly.alignment_sub_strings(template_shifted, primer, True, 8, 1)
+
 
     # Multiple matches
     primer = Dseqrecord('AATTAGCA')
