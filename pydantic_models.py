@@ -17,6 +17,7 @@ class SourceType(str, Enum):
     gibson_assembly = 'gibson_assembly'
     restriction_and_ligation = 'restriction_and_ligation'
     genome_coordinates = 'genome_coordinates'
+    manually_typed = 'manually_typed'
 
 
 class SequenceFileFormat(str, Enum):
@@ -96,6 +97,12 @@ class Source(BaseModel):
     type: Optional[SourceType] = Field(..., description='The type source (PCR, restriction, etc.)')
     info: dict = Field({}, description='Additional information about the source (not used much yet, and probably should be removed)')
     model_config = ConfigDict(extra='forbid')
+
+class ManuallyTypedSource(Source):
+    """Describes a sequence that is typed manually by the user
+    """
+    type: SourceType = SourceType('manually_typed')
+    user_input: constr(pattern='^[acgtACGT]+$') = Field(..., description='The sequence typed by the user')
 
 
 class UploadedFileSource(Source):
