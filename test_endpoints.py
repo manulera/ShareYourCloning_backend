@@ -1003,6 +1003,9 @@ class ManuallyTypedTest(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
 
 
+class GenomeRegionTest(unittest.TestCase):
+
+
 
 if __name__ == "__main__":
     unittest.main()

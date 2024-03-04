@@ -1,4 +1,5 @@
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body
+from typing import Annotated
 from fastapi.responses import JSONResponse
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
@@ -21,6 +22,7 @@ from assembly2 import Assembly, assemble, sticky_end_sub_strings, assembly2str, 
     gibson_overlap, filter_linear_subassemblies, restriction_ligation_overlap, SingleFragmentAssembly, \
     blunt_overlap
 import requests
+import request_examples
 
 # Instance of the API object
 app = FastAPI()
@@ -217,10 +219,9 @@ async def get_from_repository_id(source: RepositoryIdSource):
     sources=(list[GenomeCoordinatesSource], ...),
     sequences=(list[SequenceEntity], ...)
 ))
-async def genome_coordinates(source: GenomeCoordinatesSource):
+async def genome_coordinates(source: Annotated[GenomeCoordinatesSource, Body(openapi_examples=request_examples.genome_region_examples)]):
 
-    # If a locus_tag / gene_id has been provided, validate it
-    # TODO validation of gene_id
+    # Case1 : an annotated assembly (may or may not be the reference)
     if source.locus_tag is not None:
         url = f'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/{source.assembly_accession}/annotation_report?search_text={source.locus_tag}'
         resp = requests.get(url)
@@ -229,24 +230,61 @@ async def genome_coordinates(source: GenomeCoordinatesSource):
         data = resp.json()
         if 'reports' not in data:
             raise HTTPException(404, 'wrong locus_tag')
-        matching_annotation = next((a['annotation'] for a in data['reports'] if a['annotation']['locus_tag'] == source.locus_tag), None)
-        if matching_annotation is None:
+
+        matching_annotations = list(a['annotation'] for a in data['reports'] if a['annotation']['locus_tag'] == source.locus_tag)
+
+        if len(matching_annotations) == 0:
             raise HTTPException(404, 'wrong locus_tag')
-        gene_range = matching_annotation['genomic_regions'][0]['gene_range']['range'][0]
+        elif len(matching_annotations) > 1:
+            # Not sure if this can ever happen, but just in case
+            raise HTTPException(400, 'multiple matches for locus_tag')
+
+        annotation = matching_annotations[0]
+        gene_range = annotation['genomic_regions'][0]['gene_range']['range'][0]
         gene_strand = 1 if gene_range['orientation'] == 'plus' else -1
+
+        # This field will not be present in all cases, but should be there in reference genomes
+        if source.gene_id is not None:
+            if 'gene_id' not in annotation:
+                raise HTTPException(404, 'gene_id is set, but not found in the annotation')
+            if source.gene_id != int(annotation['gene_id']):
+                raise HTTPException(404, 'gene_id does not match the locus_tag')
+        elif 'gene_id' in annotation:
+            source.gene_id = int(annotation['gene_id'])
 
         # The gene should fall within the range (range might be bigger if bases were requested upstream or downstream)
         if int(gene_range['begin']) < source.start or int(gene_range['end']) > source.stop or gene_strand != source.strand:
             raise HTTPException(400, f'wrong coordinates, expected to fall within {source.start}, {source.stop} on strand: {source.strand}')
 
+    elif source.gene_id is not None:
+        raise HTTPException(404, 'gene_id is set, but not locus_tag')
+
+    # Case2 : a specific region of an NCBI sequence has been requested, but an assembly accession
+    # is also given, we validate it.
     elif source.assembly_accession is not None:
-        # TODO: validate assembly_id
-        pass
+        url = f'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/{source.assembly_accession}/sequence_reports'
+        resp = requests.get(url)
+        if resp.status_code == 404:
+            raise HTTPException(404, 'wrong accession number')
+        data = resp.json()
+
+        if 'reports' not in data or len(data['reports']) == 0:
+            raise HTTPException(404, 'no sequences found associated to the assembly accession')
+
+        refseq_accessions = [r['refseq_accession'] for r in data['reports']]
+        if source.sequence_accession not in refseq_accessions:
+            raise HTTPException(404, 'sequence accession not found in the assembly accession')
 
     # For some reason, strand here has a different meaning to biopython, strand = 1 is the same, but strand = -1 is equivalent to strand = 2
     gb_strand = 1 if source.strand == 1 else 2
     gb = Genbank("example@gmail.com")
-    seq = Dseqrecord(gb.nucleotide(source.sequence_accession, source.start, source.stop, gb_strand))
+    try:
+        seq = Dseqrecord(gb.nucleotide(source.sequence_accession, source.start, source.stop, gb_strand))
+    except HTTPError as e:
+        if e.code == 404:
+            raise HTTPException(404, 'wrong sequence accession')
+        else:
+            raise HTTPException(503, 'NCBI returned an error')
 
     return {'sequences': [format_sequence_genbank(seq)], 'sources': [source.model_copy()]}
 
