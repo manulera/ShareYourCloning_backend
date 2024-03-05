@@ -1005,6 +1005,7 @@ class ManuallyTypedTest(unittest.TestCase):
 
 class GenomeRegionTest(unittest.TestCase):
 
+    
 
 
 if __name__ == "__main__":
