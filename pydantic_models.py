@@ -1,10 +1,11 @@
 from pydantic import BaseModel, Field, ConfigDict
-from pydantic.types import constr, conlist
+from pydantic.types import conlist
 from enum import Enum
 from typing import Optional
 from Bio.SeqFeature import SeqFeature, Location
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
 from Bio.Restriction.Restriction import RestrictionType
+from typing import Annotated
 
 
 class SourceType(str, Enum):
@@ -68,7 +69,7 @@ class PrimerModel(BaseModel):
     name: str
     # TODO: add this to the flake8 exceptions
     # TODO: implement constrains when there is an answer for https://github.com/pydantic/pydantic/issues/7745
-    sequence: constr(pattern='^[acgtACGT]+$')
+    sequence: Annotated[str, Field(pattern=r'^[acgtACGT]+$')]
     # sequence: str
 
 
@@ -112,7 +113,9 @@ class ManuallyTypedSource(Source):
     """Describes a sequence that is typed manually by the user"""
 
     type: SourceType = SourceType('manually_typed')
-    user_input: constr(pattern='^[acgtACGT]+$') = Field(..., description='The sequence typed by the user')
+    user_input: Annotated[str, Field(pattern=r'^[acgtACGT]+$')] = Field(
+        ..., description='The sequence typed by the user'
+    )
 
 
 class UploadedFileSource(Source):

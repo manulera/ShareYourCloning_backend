@@ -19,7 +19,7 @@ def test_built():
     lin = sorted(asm.assemble_linear(), key=len)
     crc = asm.assemble_circular()
 
-    assert [l.seq for l in lin] == [l.seq for l in sorted(assembly.linear_results, key=len)]
+    assert [dseqr.seq for dseqr in lin] == [dseqr.seq for dseqr in sorted(assembly.linear_results, key=len)]
     assert [c.seq.seguid() for c in crc] == [c.seq.seguid() for c in assembly.circular_results]
 
 
@@ -68,9 +68,9 @@ def test_new_assembly():
     ]
 
     ln0 = assembly.Assembly((a, b, c), limit=14)
-    l = ln0.assemble_linear()[0]
+    dseqr = ln0.assemble_linear()[0]
 
-    assert str(l.seq) == 'ACTACGGCCTTCTCTCCCCCtgtgctgtgctctaTTTTTtattctggctgtatctGGGGGTacgatgctatactgg'
+    assert str(dseqr.seq) == 'ACTACGGCCTTCTCTCCCCCtgtgctgtgctctaTTTTTtattctggctgtatctGGGGGTacgatgctatactgg'
 
     feature_seqs = (
         [f.extract(a).seq for f in a.features]
@@ -78,7 +78,7 @@ def test_new_assembly():
         + [f.extract(c).seq for f in c.features]
     )
 
-    assembled_feature_seqs = [f.extract(l).seq for f in l.features]
+    assembled_feature_seqs = [f.extract(dseqr).seq for f in dseqr.features]
     for f1, f2 in zip(feature_seqs, assembled_feature_seqs):
         assert f1 == f2
 
@@ -416,23 +416,6 @@ algorithm..: common_sub_strings"""
     # assert repr(candidate) == "Contig(o7911)"
 
     h = """\
- -|5681|61
-|       \\/
-|       /\\
-|       61|650_rc|32
-|                 \\/
-|                 /\\
-|                 32|1196_rc|49
-|                            \\/
-|                            /\\
-|                            49|630_rc|98
-|                                      \\/
-|                                      /\\
-|                                      98-
-|                                         |
- -----------------------------------------"""
-
-    h = """\
  -|630|49
 |      \\/
 |      /\\
@@ -447,7 +430,7 @@ algorithm..: common_sub_strings"""
 |                                /\\
 |                                98-
 |                                   |
- -----------------------------------"""
+ -----------------------------------"""  # noqa: F841
 
     # assert h == candidate.small_figure()
 
@@ -868,13 +851,13 @@ def test_pcr_assembly():
     seq = Dseqrecord(Dseq('aaATTAggccggTTAAaa'))
     asm = assembly.PCRAssembly([primer1, seq, primer2], limit=4)
 
-    asm.assemble_linear()[0].seq == 'AUUAggccggTTAA'
-    asm.assemble_linear()[0].seq.crick.startswith('UUAA')
+    assert asm.assemble_linear()[0].seq == 'AUUAggccggTTAA'
+    assert asm.assemble_linear()[0].seq.crick.startswith('UUAA')
 
     primer1 = Dseqrecord('ATAUUA')
     primer2 = Dseqrecord('ATUUAA')
     asm = assembly.PCRAssembly([primer1, seq, primer2], limit=6, mismatches=1)
-    asm.assemble_linear()[0].seq == 'ATAUUAggccggTTAAAT'
+    assert asm.assemble_linear()[0].seq == 'ATAUUAggccggTTAAAT'
 
 
 def test_pcr_assembly_invalid():
@@ -902,7 +885,7 @@ def test_pcr_assembly_invalid():
     except ValueError:
         pass
     else:
-        assert False, 'Clashing primers should give ValueError'
+        AssertionError('Clashing primers should give ValueError')
 
 
 def test_fragments_only_once():
@@ -967,7 +950,9 @@ def test_restriction_ligation_assembly():
 
         products = [a1 + b2, a1 + b1.reverse_complement(), b1 + a2, b1 + a1.reverse_complement()]
 
-        algo = lambda x, y, l: assembly.restriction_ligation_overlap(x, y, [enz])
+        def algo(x, y, _l):
+            return assembly.restriction_ligation_overlap(x, y, [enz])  # noqa: B023
+
         f = assembly.Assembly([a, b], algorithm=algo, use_fragment_order=False)
         assert sorted(products) == sorted(f.assemble_linear())
 
@@ -984,7 +969,9 @@ def test_restriction_ligation_assembly():
         ]
     )
 
-    algo = lambda x, y, l: assembly.restriction_ligation_overlap(x, y, [EcoRI])
+    def algo(x, y, _l):
+        return assembly.restriction_ligation_overlap(x, y, [EcoRI])
+
     # We shift
     for shift in range(len(f2)):
         f2_shifted = f2.shifted(shift)
@@ -1007,7 +994,9 @@ def test_restriction_ligation_assembly():
         ]
     )
 
-    algo = lambda x, y, l: assembly.restriction_ligation_overlap(x, y, [EcoRI, SalI])
+    def algo(x, y, _l):
+        return assembly.restriction_ligation_overlap(x, y, [EcoRI, SalI])
+
     # We shift
     for shift in range(len(f1)):
         f1_shifted = f1.shifted(shift)
@@ -1022,12 +1011,16 @@ def test_restriction_ligation_assembly():
     fragments = [Dseqrecord('GGTCTCCCCAATT'), Dseqrecord('GGTCTCCAACCAA')]
 
     # Not allowing partial overlaps
-    algo = lambda x, y, l: assembly.restriction_ligation_overlap(x, y, [BsaI], False)
-    f = assembly.Assembly(fragments, algorithm=algo, use_fragment_order=False)
+    def algo(x, y, _l):
+        return assembly.restriction_ligation_overlap(x, y, [BsaI], False)
+
+    f = assembly.Assembly(fragments, use_fragment_order=False, algorithm=algo)
     assert len(f.get_linear_assemblies()) == 0
 
     # Allowing partial overlaps
-    algo = lambda x, y, l: assembly.restriction_ligation_overlap(x, y, [BsaI], True)
+    def algo(x, y, _l):
+        return assembly.restriction_ligation_overlap(x, y, [BsaI], True)
+
     f = assembly.Assembly(fragments, algorithm=algo, use_fragment_order=False)
     assert len(f.get_linear_assemblies()) == 2
     p1, p2 = f.assemble_linear()
@@ -1038,20 +1031,26 @@ def test_restriction_ligation_assembly():
     fragments = [Dseqrecord('GACACCAGAGTC'), Dseqrecord('GACTAACGGGTC')]
 
     # Not allowing partial overlaps
-    algo = lambda x, y, l: assembly.restriction_ligation_overlap(x, y, [DrdI], False)
+    def algo(x, y, _l):
+        return assembly.restriction_ligation_overlap(x, y, [DrdI], False)
+
     f = assembly.Assembly(fragments, algorithm=algo, use_fragment_order=False)
     assert len(f.get_linear_assemblies()) == 0
 
     # Allowing partial overlaps
-    algo = lambda x, y, l: assembly.restriction_ligation_overlap(x, y, [DrdI], True)
+    def algo(x, y, _l):
+        return assembly.restriction_ligation_overlap(x, y, [DrdI], True)
+
     f = assembly.Assembly(fragments, algorithm=algo, use_fragment_order=False)
     products = f.assemble_linear()
     assert str(products[0].seq) == 'GACACCACGGGTC'
     assert str(products[1].seq) == 'GACTAACAGAGTC'
 
     # Single fragment assemblies
+    def algo(x, y, _l):
+        return assembly.restriction_ligation_overlap(x, y, [EcoRI], False)
+
     f1 = Dseqrecord('aaGAATTCtttGAATTCaa', circular=True)
-    algo = lambda x, y, l: assembly.restriction_ligation_overlap(x, y, [EcoRI], False)
     f = assembly.SingleFragmentAssembly([f1], algorithm=algo)
     products = f.assemble_circular()
     assert len(products) == 2
@@ -1086,7 +1085,10 @@ def test_golden_gate():
     _, v = vector.cut(BsaI)
 
     sum_output = (i1 + i2 + i3 + v).looped()
-    algo = lambda x, y, l: assembly.restriction_ligation_overlap(x, y, [BsaI])
+
+    def algo(x, y, _l):
+        return assembly.restriction_ligation_overlap(x, y, [BsaI])
+
     asm = assembly.Assembly([insert1, insert2, insert3, vector], use_fragment_order=False, algorithm=algo)
 
     assembly_output = asm.assemble_circular()
@@ -1095,7 +1097,10 @@ def test_golden_gate():
 
     # Linear assembly (all four possibilities)
     sum_output = i1 + i2 + i3
-    algo = lambda x, y, l: assembly.restriction_ligation_overlap(x, y, [BsaI])
+
+    def algo(x, y, _l):
+        return assembly.restriction_ligation_overlap(x, y, [BsaI])
+
     asm = assembly.Assembly(
         [insert1, insert2, insert3], use_fragment_order=False, limit=10, algorithm=algo, use_all_fragments=True
     )
@@ -1330,7 +1335,7 @@ def test_assembly_is_valid():
         (2, 3, SimpleLocation(3, 6), SimpleLocation(0, 3)),
     ]
 
-    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == True
+    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True)
 
     # Partial overlap should be allowed, a fragment could act like a "bridge"
     # 1 ------
@@ -1344,7 +1349,7 @@ def test_assembly_is_valid():
         (2, 3, SimpleLocation(2, 6), SimpleLocation(0, 4)),
     ]
 
-    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == True
+    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True)
 
     # Complete overlap in linear assemblies should be discarded as is redundant
     # 1 ------
@@ -1359,7 +1364,7 @@ def test_assembly_is_valid():
         (2, 3, SimpleLocation(0, 4), SimpleLocation(0, 4)),
     ]
 
-    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == False
+    assert not assembly.assembly_is_valid(fragments, assembly_plan, False, True)
 
     # Invalid assembly
     # 1   ------
@@ -1373,7 +1378,7 @@ def test_assembly_is_valid():
         (2, 3, SimpleLocation(0, 2), SimpleLocation(0, 2)),
     ]
 
-    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == False
+    assert not assembly.assembly_is_valid(fragments, assembly_plan, False, True)
 
     # Assembly plan including two fragments extracted from circular molecules:
     f1 = Dseqrecord('ccTTTc')
@@ -1404,7 +1409,7 @@ def test_assembly_is_valid():
                 ),
                 (3, 4, find_feature_by_id(f3_shifted, 'f3_f4').location, f4.features[0].location),
             ]
-            assert assembly.assembly_is_valid(fragments, assembly_plan, False, True) == True
+            assert assembly.assembly_is_valid(fragments, assembly_plan, False, True)
             # Does not really belong here, but
             assert str(assembly.assemble(fragments, assembly_plan, False).seq) == 'ccTTTAAACCCg'
 
@@ -1626,7 +1631,7 @@ def test_format_insertion_assembly():
     assert asm_correct == assembly_planner.format_insertion_assembly(asm_correct[2:] + asm_correct[:2])
 
     asm_wrong = [(1, 2, loc1_b, loc2_a), (2, 3, loc2_b, loc2_a), (3, 1, loc2_b, loc1_a)]
-    assert None == assembly_planner.format_insertion_assembly(asm_wrong)
+    assert assembly_planner.format_insertion_assembly(asm_wrong) is None
 
 
 def test_zip_leftwards():

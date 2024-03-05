@@ -275,7 +275,7 @@ def filter_linear_subassemblies(linear_assemblies, circular_assemblies, fragment
         reverse_complement_assembly(c, fragments) for c in circular_assemblies
     ]
     filtered_assemblies = [
-        l for l in linear_assemblies if not any(is_sublist(l, c, True) for c in all_circular_assemblies)
+        assem for assem in linear_assemblies if not any(is_sublist(assem, c, True) for c in all_circular_assemblies)
     ]
     # I don't think the line below is necessary, but just in case
     # filtered_assemblies = [l for l in filtered_assemblies if not any(is_sublist(reverse_complement_assembly(l, fragments), c, True) for c in all_circular_assemblies)]
@@ -362,7 +362,7 @@ def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, is_in
     else:
         edge_pairs = zip(assembly, assembly[1:])
 
-    for (u1, v1, _, start_location), (u2, v2, end_location, _) in edge_pairs:
+    for (_u1, v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
         # Incompatible as described in figure above
         fragment = fragments[abs(v1) - 1]
         if not fragment.circular and _location_boundaries(start_location)[1] >= _location_boundaries(end_location)[1]:
@@ -456,7 +456,7 @@ def edge_representation2subfragment_representation(assembly, is_circular):
         temp = [(None, assembly[0][0], None, None)] + list(assembly) + [(assembly[-1][1], None, None, None)]
     edge_pairs = zip(temp, temp[1:])
     subfragment_representation = list()
-    for (u1, v1, _, start_location), (u2, v2, end_location, _) in edge_pairs:
+    for (_u1, v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
         subfragment_representation.append((v1, start_location, end_location))
 
     return subfragment_representation
@@ -734,7 +734,7 @@ class Assembly:
             G.add_edge(-len(self.fragments), 'end')
         else:
             # Path must start with forward fragment
-            for node in filter(lambda x: type(x) == int, G.nodes):
+            for node in filter(lambda x: type(x) is int, G.nodes):
                 if not self.use_fragment_order and node > 0:
                     G.add_edge('begin', node)
                 G.add_edge(node, 'end')
@@ -792,7 +792,7 @@ class Assembly:
         edge_pair_index = list()
 
         # Pair edges with one another
-        for i, ((u1, v1, _, start_location), (u2, v2, end_location, _)) in enumerate(
+        for i, ((_u1, v1, _, start_location), (_u2, _v2, end_location, _)) in enumerate(
             zip(assembly, assembly[1:] + assembly[:1])
         ):
             fragment = self.fragments[abs(v1) - 1]
@@ -902,7 +902,7 @@ class PCRAssembly(Assembly):
         # Error if clashing primers
         for a in assemblies:
             edge_pairs = zip(a, a[1:])
-            for (u1, v1, _, start_location), (u2, v2, end_location, _) in edge_pairs:
+            for (_u1, _v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
                 # Incompatible as described in figure above
                 if _location_boundaries(start_location)[1] > _location_boundaries(end_location)[0]:
                     raise ValueError('Clashing primers in assembly ' + assembly2str(a))

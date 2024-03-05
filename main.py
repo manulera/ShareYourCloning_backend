@@ -38,7 +38,6 @@ from assembly2 import (
     Assembly,
     assemble,
     sticky_end_sub_strings,
-    assembly2str,
     PCRAssembly,
     gibson_overlap,
     filter_linear_subassemblies,
@@ -630,7 +629,7 @@ async def restriction_and_ligation(
         return RestrictionAndLigationSource.from_assembly(assembly=a, circular=is_circular, **common_args)
 
     # Algorithm used by assembly class
-    def algo(x, y, l):
+    def algo(x, y, _l):
         return restriction_ligation_overlap(x, y, enzymes, allow_partial_overlap)
 
     out_sources = []

@@ -4,7 +4,7 @@ from Bio.Restriction.Restriction import RestrictionBatch
 from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from pydantic_models import PrimerModel, RepositoryIdSource, GenbankSequence, SequenceEntity
+from pydantic_models import RepositoryIdSource, GenbankSequence, SequenceEntity
 from pydna.parsers import parse as pydna_parse
 import requests
 from bs4 import BeautifulSoup
