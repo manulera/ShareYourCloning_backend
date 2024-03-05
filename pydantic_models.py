@@ -5,6 +5,7 @@ from typing import Optional
 from Bio.SeqFeature import SeqFeature, Location
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
 from Bio.Restriction.Restriction import RestrictionType
+import request_examples
 # Enumerations:
 
 class SourceType(str, Enum):
@@ -125,7 +126,7 @@ class RepositoryIdSource(Source):
 class GenomeCoordinatesSource(Source):
     """Documents a request to NCBI for genome sequence
     """
-    assembly_accession: str
+    assembly_accession: Optional[str] = None
     sequence_accession: str
     # The unique identifier of a gene can come from either the gene_id or the locus_tag
     # For instance, genes in the human reference genome have a gene_id, but no locus_tag

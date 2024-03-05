@@ -7,10 +7,12 @@ from Bio.Restriction.Restriction import CommOnly
 from pydantic_models import RepositoryIdSource, PCRSource, PrimerModel, \
     RestrictionEnzymeDigestionSource, SequenceEntity, LigationSource, \
     UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource, \
-    RestrictionAndLigationSource, ManuallyTypedSource
+    RestrictionAndLigationSource, ManuallyTypedSource, GenomeCoordinatesSource
 from pydna.dseqrecord import Dseqrecord
 import unittest
 from pydna.dseq import Dseq
+from request_examples import genome_region_examples
+
 
 client = TestClient(app)
 
@@ -1002,6 +1004,121 @@ class ManuallyTypedTest(unittest.TestCase):
         response = client.post("/manually_typed", json={'user_input': ''})
         self.assertEqual(response.status_code, 422)
 
+
+class GenomeRegionTest(unittest.TestCase):
+
+    def assertStatusCode(self, response_code: int, expected: int):
+        if response_code == 503:
+            self.skipTest('NCBI not available')
+        else:
+            self.assertEqual(response_code, expected)
+
+    def test_examples(self):
+        for example_name in genome_region_examples:
+            example = genome_region_examples[example_name]
+            response = client.post('/genome_coordinates', json=example['value'])
+            self.assertStatusCode(response.status_code, 200)
+            payload = response.json()
+            try:
+                sources = [GenomeCoordinatesSource.model_validate(s) for s in payload['sources']]
+            except Exception:
+                self.fail(f'Cannot parse the sources for example {example_name}')
+            response_source = sources[0]
+            request_source = GenomeCoordinatesSource.model_validate(example['value'])
+            if example_name == 'full':
+                self.assertEqual(response_source, request_source)
+            elif example_name == 'id_omitted':
+                request_source.gene_id = 2543372
+                self.assertEqual(response_source, request_source)
+            elif example_name == 'assembly_accession_omitted':
+                request_source.assembly_accession = 'GCF_000002945.1'
+                self.assertEqual(response_source, request_source)
+            elif example_name == 'viral_sequence':
+                self.assertEqual(response_source, request_source)
+
+    def test_exceptions(self):
+        # Load first example
+        correct_source = GenomeCoordinatesSource.model_validate(genome_region_examples['full']['value'])
+
+        # Ommit assembly accession
+        s = correct_source.model_copy()
+        s.assembly_accession = None
+        response = client.post('/genome_coordinates', json=s.model_dump())
+        self.assertStatusCode(response.status_code, 422)
+
+        # Ommit locus_tag keeping gene id
+        s = correct_source.model_copy()
+        s.locus_tag = None
+        response = client.post('/genome_coordinates', json=s.model_dump())
+        self.assertStatusCode(response.status_code, 422)
+
+        # Wrong gene_id (not matching that of the locus_tag)
+        s = correct_source.model_copy()
+        s.gene_id = 123
+        response = client.post('/genome_coordinates', json=s.model_dump())
+        self.assertStatusCode(response.status_code, 400)
+
+        # Wrong assembly accession
+        s = correct_source.model_copy()
+        s.assembly_accession = 'blah'
+        response = client.post('/genome_coordinates', json=s.model_dump())
+        self.assertStatusCode(response.status_code, 404)
+
+        # Wrong locus_tag
+        s = correct_source.model_copy()
+        s.locus_tag = 'blah'
+        response = client.post('/genome_coordinates', json=s.model_dump())
+        self.assertStatusCode(response.status_code, 404)
+
+        # Wrong coordinates
+        s = correct_source.model_copy()
+        s.start = 1
+        s.stop = 10
+        response = client.post('/genome_coordinates', json=s.model_dump())
+        self.assertStatusCode(response.status_code, 400)
+
+        # Assembly accession that does not correspond to sequence_accession
+        s = correct_source.model_copy()
+        s.locus_tag = None
+        s.gene_id = None
+        s.assembly_accession = 'blah'
+        response = client.post('/genome_coordinates', json=s.model_dump())
+        self.assertStatusCode(response.status_code, 422)
+
+        # Wrong sequence accession
+        s = correct_source.model_copy()
+        s.locus_tag = None
+        s.gene_id = None
+        s.assembly_accession = None
+        s.sequence_accession = 'blah'
+        response = client.post('/genome_coordinates', json=s.model_dump())
+        self.assertStatusCode(response.status_code, 404)
+
+        # Coordinates malformatted
+        viral_source = GenomeCoordinatesSource.model_validate(genome_region_examples['viral_sequence']['value'])
+        viral_source.start = 10
+        viral_source.stop = 1
+        response = client.post('/genome_coordinates', json=viral_source.model_dump())
+        self.assertStatusCode(response.status_code, 422)
+
+        viral_source.start = 0
+        viral_source.stop = 20
+        response = client.post('/genome_coordinates', json=viral_source.model_dump())
+        self.assertStatusCode(response.status_code, 422)
+
+        viral_source.start = 1
+        viral_source.stop = 20
+        viral_source.strand = 0
+        response = client.post('/genome_coordinates', json=viral_source.model_dump())
+        self.assertStatusCode(response.status_code, 422)
+
+        # Coordinates outside of the sequence
+        viral_source.start = 1
+        # the length is 2151
+        viral_source.stop = 2152
+        viral_source.strand = 1
+        response = client.post('/genome_coordinates', json=viral_source.model_dump())
+        self.assertStatusCode(response.status_code, 400)
 
 
 if __name__ == "__main__":

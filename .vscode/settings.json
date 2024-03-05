@@ -8,8 +8,7 @@
         "**/*.pyc": true,
         "**/__pycache__": true
     },
-    // "python.linting.enabled": true,
-    // "python.linting.flake8Enabled": true,
-    // "python.linting.flake8Path": ".venv/bin/flake8",
+    // Set flakes8 as the default linter
+    "black-formatter.path": [".venv/bin/black"],
     "python.defaultInterpreterPath": ".venv/bin/python",
 }
