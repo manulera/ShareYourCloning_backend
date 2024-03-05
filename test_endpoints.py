@@ -1,13 +1,22 @@
-
 from dna_functions import format_sequence_genbank, read_dsrecord_from_json
 from main import app
 from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
-from pydantic_models import RepositoryIdSource, PCRSource, PrimerModel, \
-    RestrictionEnzymeDigestionSource, SequenceEntity, LigationSource, \
-    UploadedFileSource, HomologousRecombinationSource, GibsonAssemblySource, \
-    RestrictionAndLigationSource, ManuallyTypedSource, GenomeCoordinatesSource
+from pydantic_models import (
+    RepositoryIdSource,
+    PCRSource,
+    PrimerModel,
+    RestrictionEnzymeDigestionSource,
+    SequenceEntity,
+    LigationSource,
+    UploadedFileSource,
+    HomologousRecombinationSource,
+    GibsonAssemblySource,
+    RestrictionAndLigationSource,
+    ManuallyTypedSource,
+    GenomeCoordinatesSource,
+)
 from pydna.dseqrecord import Dseqrecord
 import unittest
 from pydna.dseq import Dseq
@@ -20,42 +29,30 @@ client = TestClient(app)
 
 
 class ReadFileTest(unittest.TestCase):
-
     def test_read_files(self):
         """Test that uploading files with single and multiple sequences works."""
 
         examples = [
-            {
-                'file': './examples/sequences/pFA6a-hphMX6.gb',
-                'format': 'genbank',
-                'nb_sequences': 1
-            },
-            {
-                'file': './examples/sequences/dummy_EcoRI.fasta',
-                'format': 'fasta',
-                'nb_sequences': 1
-            },
-            {
-                'file': './examples/sequences/dummy_multi_fasta.fasta',
-                'format': 'fasta',
-                'nb_sequences': 2
-            },
+            {'file': './examples/sequences/pFA6a-hphMX6.gb', 'format': 'genbank', 'nb_sequences': 1},
+            {'file': './examples/sequences/dummy_EcoRI.fasta', 'format': 'fasta', 'nb_sequences': 1},
+            {'file': './examples/sequences/dummy_multi_fasta.fasta', 'format': 'fasta', 'nb_sequences': 2},
             {
                 'file': './examples/sequences/addgene-plasmid-39296-sequence-49545.dna',
                 'format': 'snapgene',
-                'nb_sequences': 1
-            }
-
+                'nb_sequences': 1,
+            },
         ]
 
         for example in examples:
             with open(example['file'], 'rb') as f:
-                response = client.post("/read_from_file", files={"file": f})
+                response = client.post('/read_from_file', files={'file': f})
 
             self.assertEqual(response.status_code, 200)
             payload = response.json()
 
-            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+            resulting_sequences = [
+                read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']
+            ]
             sources = [UploadedFileSource.model_validate(s) for s in payload['sources']]
 
             self.assertEqual(len(sources), example['nb_sequences'])
@@ -82,11 +79,11 @@ class ReadFileTest(unittest.TestCase):
                 'file': './test_endpoints.py',
                 'format': 'genbank',
                 'error_message': 'Pydna parser',
-            }
+            },
         ]
         for example in examples:
             with open(example['file'], 'rb') as f:
-                if example["format"] is not None:
+                if example['format'] is not None:
                     response = client.post(f'/read_from_file?file_format={example["format"]}', files={'file': f})
                 else:
                     response = client.post('/read_from_file', files={'file': f})
@@ -104,7 +101,7 @@ class GenBankTest(unittest.TestCase):
             repository='genbank',
             repository_id='NM_001018957.2',
         )
-        response = client.post("/repository_id", json=source.model_dump())
+        response = client.post('/repository_id', json=source.model_dump())
         self.assertEqual(response.status_code, 200)
 
     def test_request_wrong_id(self):
@@ -113,7 +110,7 @@ class GenBankTest(unittest.TestCase):
             repository='genbank',
             repository_id='wrong_id',
         )
-        response = client.post("/repository_id", json=source.model_dump())
+        response = client.post('/repository_id', json=source.model_dump())
         self.assertEqual(response.status_code, 404)
 
 
@@ -124,12 +121,12 @@ class AddGeneTest(unittest.TestCase):
             {
                 'id': '39282',
                 'url': 'https://media.addgene.org/snapgene-media/v1.7.9-0-g88a3305/sequences/240599/4936a6ae-6b4d-4d24-b7ac-2339fad5755d/addgene-plasmid-39282-sequence-240599.gbk',
-                'type': 'addgene-full'
+                'type': 'addgene-full',
             },
             {
                 'id': '39289',
                 'url': 'https://media.addgene.org/snapgene-media/v1.7.9-0-g88a3305/sequences/49640/4fa9f18b-d5ca-4ac6-a50c-76a6cd15cbab/addgene-plasmid-39289-sequence-49640.gbk',
-                'type': 'depositor-full'
+                'type': 'depositor-full',
             },
         ]
         for example in examples:
@@ -138,10 +135,12 @@ class AddGeneTest(unittest.TestCase):
                 repository_id=example['id'],
             )
 
-            response = client.post("/repository_id", json=source.model_dump())
+            response = client.post('/repository_id', json=source.model_dump())
             self.assertEqual(response.status_code, 200)
             payload = response.json()
-            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+            resulting_sequences = [
+                read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']
+            ]
             sources = [RepositoryIdSource.model_validate(s) for s in payload['sources']]
 
             self.assertEqual(len(resulting_sequences), 1)
@@ -150,7 +149,7 @@ class AddGeneTest(unittest.TestCase):
             self.assertEqual(sources[0].info['url'], example['url'])
 
             # We get the same response when making the response with the url
-            response2 = client.post("/repository_id", json=payload['sources'][0])
+            response2 = client.post('/repository_id', json=payload['sources'][0])
             self.assertEqual(response.json(), response2.json())
 
     def test_missing_sequences(self):
@@ -160,7 +159,7 @@ class AddGeneTest(unittest.TestCase):
             repository_id='DUMMYTEST',
         )
 
-        response = client.post("/repository_id", json=source.model_dump())
+        response = client.post('/repository_id', json=source.model_dump())
         self.assertEqual(response.status_code, 404)
         self.assertIn('wrong addgene id', response.json()['detail'])
 
@@ -169,7 +168,7 @@ class AddGeneTest(unittest.TestCase):
             repository='addgene',
             repository_id='39291',
         )
-        response = client.post("/repository_id", json=source.model_dump())
+        response = client.post('/repository_id', json=source.model_dump())
         self.assertEqual(response.status_code, 404)
         self.assertIn('The requested plasmid does not exist, or does not have', response.json()['detail'])
 
@@ -177,16 +176,15 @@ class AddGeneTest(unittest.TestCase):
         source = RepositoryIdSource(
             repository='addgene',
             repository_id='39282',
-            info={'url': 'https://media.addgene.org/snapgene-media/wrongggggggg.gbk'}
+            info={'url': 'https://media.addgene.org/snapgene-media/wrongggggggg.gbk'},
         )
-        response = client.post("/repository_id", json=source.model_dump())
+        response = client.post('/repository_id', json=source.model_dump())
         self.assertEqual(response.status_code, 404)
 
         # TODO url exists but does not match id, or does not match
 
 
 class StickyLigationTest(unittest.TestCase):
-
     def test_ligation(self):
         """Test whether assembly is executed when the order is provided"""
         # Load dummy sequence
@@ -204,13 +202,9 @@ class StickyLigationTest(unittest.TestCase):
         json_seqs = [seq.model_dump() for seq in json_seqs]
 
         # Assign ids to define deterministic assembly
-        source = LigationSource(
-            input=[1, 2],
-            assembly=[(1, 2, '8..11', '1..4')],
-            circular=False
-        )
+        source = LigationSource(input=[1, 2], assembly=[(1, 2, '8..11', '1..4')], circular=False)
         data = {'source': source.model_dump(), 'sequences': json_seqs}
-        response = client.post("/ligation", json=data)
+        response = client.post('/ligation', json=data)
         payload = response.json()
 
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
@@ -224,25 +218,17 @@ class StickyLigationTest(unittest.TestCase):
         self.assertEqual(sources[0], source)
 
         # Check that the inverse assembly will not pass
-        source = LigationSource(
-            input=[2, 1],
-            assembly=[(1, 2, '8..11', '1..4')],
-            circular=False
-        )
+        source = LigationSource(input=[2, 1], assembly=[(1, 2, '8..11', '1..4')], circular=False)
         data = {'source': source.model_dump(), 'sequences': json_seqs}
-        response = client.post("/ligation", json=data)
+        response = client.post('/ligation', json=data)
         self.assertEqual(response.status_code, 400)
         data = response.json()
         self.assertEqual(data['detail'], 'The provided assembly is not valid.')
 
         # Check that the circular assembly does not pass either
-        source = LigationSource(
-            input=[1, 2],
-            assembly=[(1, 2, '8..11', '1..4')],
-            circular=True
-        )
+        source = LigationSource(input=[1, 2], assembly=[(1, 2, '8..11', '1..4')], circular=True)
         data = {'source': source.model_dump(), 'sequences': json_seqs}
-        response = client.post("/ligation", json=data)
+        response = client.post('/ligation', json=data)
         self.assertEqual(response.status_code, 400)
         data = response.json()
         self.assertEqual(data['detail'], 'The provided assembly is not valid.')
@@ -268,7 +254,7 @@ class StickyLigationTest(unittest.TestCase):
             input=[1, 2],
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
-        response = client.post("/ligation", json=data)
+        response = client.post('/ligation', json=data)
         payload = response.json()
 
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
@@ -296,7 +282,7 @@ class StickyLigationTest(unittest.TestCase):
             input=[1, 2],
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
-        response = client.post("/ligation", json=data)
+        response = client.post('/ligation', json=data)
         payload = response.json()
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
         sources = [LigationSource.model_validate(s) for s in payload['sources']]
@@ -319,7 +305,7 @@ class StickyLigationTest(unittest.TestCase):
             input=[1],
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
-        response = client.post("/ligation", json=data)
+        response = client.post('/ligation', json=data)
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
@@ -327,12 +313,8 @@ class StickyLigationTest(unittest.TestCase):
 
 
 class BluntLigationTest(unittest.TestCase):
-
     def test_blunt_ligation(self):
-        seqs =[
-            Dseqrecord('ATCC', circular=False),
-            Dseqrecord('TAAT', circular=False)
-        ]
+        seqs = [Dseqrecord('ATCC', circular=False), Dseqrecord('TAAT', circular=False)]
         json_seqs = [format_sequence_genbank(seq) for seq in seqs]
         json_seqs[0].id = 1
         json_seqs[1].id = 2
@@ -341,7 +323,7 @@ class BluntLigationTest(unittest.TestCase):
             input=[1, 2],
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
-        response = client.post("/ligation", json=data, params={'blunt': True})
+        response = client.post('/ligation', json=data, params={'blunt': True})
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
@@ -350,17 +332,17 @@ class BluntLigationTest(unittest.TestCase):
         # We submit one of the resulting sources, to check that it does the
         # blunt ligation without adding the request parameter
         source = payload['sources'][0]
-        response = client.post("/ligation", json={'source': source, 'sequences': json_seqs})
+        response = client.post('/ligation', json={'source': source, 'sequences': json_seqs})
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        resulting_sequences2 = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        resulting_sequences2 = [
+            read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']
+        ]
         self.assertEqual(len(resulting_sequences2), 1)
         self.assertEqual(resulting_sequences2[0].seq, resulting_sequences[0].seq)
 
     def test_circularisation(self):
-        seqs =[
-            Dseqrecord('ATCC', circular=False)
-        ]
+        seqs = [Dseqrecord('ATCC', circular=False)]
         json_seqs = [format_sequence_genbank(seq) for seq in seqs]
         json_seqs[0].id = 1
         json_seqs = [seq.model_dump() for seq in json_seqs]
@@ -368,7 +350,7 @@ class BluntLigationTest(unittest.TestCase):
             input=[1],
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
-        response = client.post("/ligation", json=data, params={'blunt': True})
+        response = client.post('/ligation', json=data, params={'blunt': True})
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
@@ -377,7 +359,6 @@ class BluntLigationTest(unittest.TestCase):
 
 
 class RestrictionTest(unittest.TestCase):
-
     def test_enzyme_doesnt_exist(self):
         dseq = Dseqrecord('AAAAAAGAATTCTTTTTT', circular=False)
         json_seq = format_sequence_genbank(dseq)
@@ -475,10 +456,7 @@ class RestrictionTest(unittest.TestCase):
 
         # Now we specify the output
         source = RestrictionEnzymeDigestionSource(
-            input=[1],
-            restriction_enzymes=[None, 'EcoRI'],
-            left_edge=None,
-            right_edge=(7, -4)
+            input=[1], restriction_enzymes=[None, 'EcoRI'], left_edge=None, right_edge=(7, -4)
         )
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data)
@@ -542,7 +520,9 @@ class RestrictionTest(unittest.TestCase):
             response = client.post('/restriction', json=data)
             payload = response.json()
 
-            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+            resulting_sequences = [
+                read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']
+            ]
             sources = [RestrictionEnzymeDigestionSource.model_validate(s) for s in payload['sources']]
 
             self.assertEqual(len(resulting_sequences), 1)
@@ -600,16 +580,15 @@ class RestrictionTest(unittest.TestCase):
 
         for i in range(len(edges)):
             source = RestrictionEnzymeDigestionSource(
-                input=[1],
-                restriction_enzymes=restriction_enzymes[i],
-                left_edge=edges[i][0],
-                right_edge=edges[i][1]
+                input=[1], restriction_enzymes=restriction_enzymes[i], left_edge=edges[i][0], right_edge=edges[i][1]
             )
             data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
             response = client.post('/restriction', json=data)
             payload = response.json()
 
-            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+            resulting_sequences = [
+                read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']
+            ]
             sources = [RestrictionEnzymeDigestionSource.model_validate(s) for s in payload['sources']]
 
             self.assertEqual(len(resulting_sequences), 1)
@@ -658,16 +637,15 @@ class RestrictionTest(unittest.TestCase):
         # Submitting the known fragments
         for i in range(len(edges)):
             source = RestrictionEnzymeDigestionSource(
-                input=[1],
-                restriction_enzymes=restriction_enzymes[i],
-                left_edge=edges[i][0],
-                right_edge=edges[i][1]
+                input=[1], restriction_enzymes=restriction_enzymes[i], left_edge=edges[i][0], right_edge=edges[i][1]
             )
             data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
             response = client.post('/restriction', json=data)
             payload = response.json()
 
-            resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+            resulting_sequences = [
+                read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']
+            ]
             sources = [RestrictionEnzymeDigestionSource.model_validate(s) for s in payload['sources']]
 
             self.assertEqual(len(resulting_sequences), 1)
@@ -676,7 +654,6 @@ class RestrictionTest(unittest.TestCase):
 
 
 class PCRTest(unittest.TestCase):
-
     def test_pcr(self):
 
         template = Dseqrecord(Dseq('TTTTACGTACGTAAAAAAGCGCGCGCTTTTT'))
@@ -690,20 +667,16 @@ class PCRTest(unittest.TestCase):
             reverse_primer=3,
         )
 
-        primer_fwd = PrimerModel(
-            sequence='ACGTACGT',
-            id=2,
-            name='forward'
-        )
+        primer_fwd = PrimerModel(sequence='ACGTACGT', id=2, name='forward')
 
-        primer_rvs = PrimerModel(
-            sequence='GCGCGCGC',
-            id=3,
-            name='reverse'
-        )
+        primer_rvs = PrimerModel(sequence='GCGCGCGC', id=3, name='reverse')
 
-        data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data, params={'minimal_annealing': 8})
+        data = {
+            'source': submitted_source.model_dump(),
+            'sequences': [json_seq.model_dump()],
+            'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
+        }
+        response = client.post('/pcr', json=data, params={'minimal_annealing': 8})
         payload = response.json()
 
         sources = [PCRSource.model_validate(s) for s in payload['sources']]
@@ -722,8 +695,12 @@ class PCRTest(unittest.TestCase):
 
         # Now we submit the deterministic PCR (we already know which fragment we want)
 
-        data = {'source': source1.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data)
+        data = {
+            'source': source1.model_dump(),
+            'sequences': [json_seq.model_dump()],
+            'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
+        }
+        response = client.post('/pcr', json=data)
         payload = response.json()
 
         sources = [PCRSource.model_validate(s) for s in payload['sources']]
@@ -745,41 +722,38 @@ class PCRTest(unittest.TestCase):
 
         submitted_source = PCRSource(input=[1], forward_primer=2, reverse_primer=3)
 
-        primer_fwd = PrimerModel(
-            sequence='CCCCCCCC',
-            id=2,
-            name='forward'
+        primer_fwd = PrimerModel(sequence='CCCCCCCC', id=2, name='forward')
 
-        )
-
-        primer_rvs = PrimerModel(
-            sequence='GCGCGCGC',
-            id=3,
-            name='reverse'
-        )
+        primer_rvs = PrimerModel(sequence='GCGCGCGC', id=3, name='reverse')
 
         # Without specifying the pair
-        data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data, params={'minimal_annealing': 8})
+        data = {
+            'source': submitted_source.model_dump(),
+            'sequences': [json_seq.model_dump()],
+            'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
+        }
+        response = client.post('/pcr', json=data, params={'minimal_annealing': 8})
         payload = response.json()
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(payload['detail'], 'No pair of annealing primers was found. Try changing the annealing settings.')
+        self.assertEqual(
+            payload['detail'], 'No pair of annealing primers was found. Try changing the annealing settings.'
+        )
 
         # We submit the right pair of primers, but the wrong annealing information
 
-        primer_fwd = PrimerModel(
-            sequence='ACGTACGT',
-            id=2,
-            name='forward'
-        )
+        primer_fwd = PrimerModel(sequence='ACGTACGT', id=2, name='forward')
 
         # This would be the correct annealing info
         submitted_source.forward_primer = 2
         submitted_source.reverse_primer = 3
         submitted_source.assembly = [(1, 2, '1..8', '5..12'), (2, -3, '19..26', '1..8')]
 
-        data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data)
+        data = {
+            'source': submitted_source.model_dump(),
+            'sequences': [json_seq.model_dump()],
+            'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
+        }
+        response = client.post('/pcr', json=data)
         payload = response.json()
         self.assertEqual(response.status_code, 200)
 
@@ -788,8 +762,12 @@ class PCRTest(unittest.TestCase):
         submitted_source.reverse_primer = 3
         submitted_source.assembly = [(2, -3, '19..26', '1..8'), (1, 2, '1..8', '5..12')]
 
-        data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data)
+        data = {
+            'source': submitted_source.model_dump(),
+            'sequences': [json_seq.model_dump()],
+            'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
+        }
+        response = client.post('/pcr', json=data)
         payload = response.json()
         self.assertEqual(response.status_code, 400)
         self.assertEqual(payload['detail'], 'The provided assembly is not valid.')
@@ -806,27 +784,22 @@ class PCRTest(unittest.TestCase):
             reverse_primer=3,
         )
 
-        primer_fwd = PrimerModel(
-            sequence='ACGTACGTG',
-            id=2,
-            name='forward'
-        )
+        primer_fwd = PrimerModel(sequence='ACGTACGTG', id=2, name='forward')
 
-        primer_rvs = PrimerModel(
-            sequence='GCGCGCGCA',
-            id=3,
-            name='reverse'
-        )
+        primer_rvs = PrimerModel(sequence='GCGCGCGCA', id=3, name='reverse')
 
-        data = {'source': submitted_source.model_dump(), 'sequences': [json_seq.model_dump()], 'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()]}
-        response = client.post("/pcr", json=data, params={'minimal_annealing': 8})
+        data = {
+            'source': submitted_source.model_dump(),
+            'sequences': [json_seq.model_dump()],
+            'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
+        }
+        response = client.post('/pcr', json=data, params={'minimal_annealing': 8})
         payload = response.json()
         self.assertEqual(response.status_code, 400)
         self.assertIn('Clashing primers', payload['detail'])
 
 
 class HomologousRecombinationTest(unittest.TestCase):
-
     def test_homologous_recombination(self):
         template = Dseqrecord('TTTTacgatAAtgctccCCCC', circular=False)
         json_template = format_sequence_genbank(template)
@@ -848,7 +821,13 @@ class HomologousRecombinationTest(unittest.TestCase):
         self.assertEqual(len(sequences), 1)
         self.assertEqual(str(sequences[0].seq), 'TTTTacgatCCCtgctccCCCC'.upper())
 
-        response = client.post('/homologous_recombination', json={'source': payload['sources'][0], 'sequences': [json_template.model_dump(), json_insert.model_dump()]})
+        response = client.post(
+            '/homologous_recombination',
+            json={
+                'source': payload['sources'][0],
+                'sequences': [json_template.model_dump(), json_insert.model_dump()],
+            },
+        )
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
@@ -857,13 +836,12 @@ class HomologousRecombinationTest(unittest.TestCase):
 
 
 class GibsonAssemblyTest(unittest.TestCase):
-
     def test_gibson_assembly(self):
         # A circular one
         fragments = [
             Dseqrecord('TTTTacgatAAtgctccCCCC', circular=False),
             Dseqrecord('CCCCtcatGGGG', circular=False),
-            Dseqrecord('GGGGatataTTTT', circular=False)
+            Dseqrecord('GGGGatataTTTT', circular=False),
         ]
 
         json_fragments = [format_sequence_genbank(f) for f in fragments]
@@ -905,7 +883,6 @@ class GibsonAssemblyTest(unittest.TestCase):
 
 
 class RestrictionAndLigationTest(unittest.TestCase):
-
     def test_restriction_and_ligation(self):
         fragments = [Dseqrecord('AAAGAATTCAAA'), Dseqrecord('CCCCGAATTCCCC')]
         [format_sequence_genbank(f) for f in fragments]
@@ -927,7 +904,8 @@ class RestrictionAndLigationTest(unittest.TestCase):
         self.assertEqual(len(payload['sources']), 4)
 
     def test_golden_gate(self):
-        fragments =[ Dseqrecord('GGTCTCAattaAAAAAttaaAGAGACC'),
+        fragments = [
+            Dseqrecord('GGTCTCAattaAAAAAttaaAGAGACC'),
             Dseqrecord('GGTCTCAttaaCCCCCatatAGAGACC'),
             Dseqrecord('GGTCTCAatatGGGGGccggAGAGACC'),
             Dseqrecord('TTTTattaAGAGACCTTTTTGGTCTCAccggTTTT', circular=True),
@@ -976,7 +954,6 @@ class RestrictionAndLigationTest(unittest.TestCase):
 
 
 class ManuallyTypedTest(unittest.TestCase):
-
     def test_manually_typed(self):
         """Test the manually_typed endpoint"""
 
@@ -984,7 +961,7 @@ class ManuallyTypedTest(unittest.TestCase):
             user_input='ATGC',
         )
 
-        response = client.post("/manually_typed", json=source.model_dump())
+        response = client.post('/manually_typed', json=source.model_dump())
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
@@ -998,15 +975,14 @@ class ManuallyTypedTest(unittest.TestCase):
     # Test that it fails if not acgt or empty
     def test_manually_typed_fail(self):
 
-        response = client.post("/manually_typed", json={'user_input': 'ATGZ'})
+        response = client.post('/manually_typed', json={'user_input': 'ATGZ'})
         self.assertEqual(response.status_code, 422)
 
-        response = client.post("/manually_typed", json={'user_input': ''})
+        response = client.post('/manually_typed', json={'user_input': ''})
         self.assertEqual(response.status_code, 422)
 
 
 class GenomeRegionTest(unittest.TestCase):
-
     def assertStatusCode(self, response_code: int, expected: int):
         if response_code == 503:
             self.skipTest('NCBI not available')
@@ -1121,5 +1097,5 @@ class GenomeRegionTest(unittest.TestCase):
         self.assertStatusCode(response.status_code, 400)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

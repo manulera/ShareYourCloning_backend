@@ -27,6 +27,9 @@ poetry install
 
 # If you want to develop: poetry install --with dev --with test
 
+# If you want to commit to the repo, install the pre-commit hooks (needs poetry install --with dev)
+pre-commit install
+
 # Activate the virtual environment
 poetry shell
 
