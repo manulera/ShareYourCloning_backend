@@ -5,7 +5,7 @@ genome_region_examples = {
             "sequence_accession": "NC_003424.3",
             "assembly_accession": "GCF_000002945.1",
             "locus_tag": "SPAPB1A10.09",
-            "gene_id": "2543372",
+            "gene_id": 2543372,
             "start": 1877009,
             "stop": 1881726,
             "strand": 1,

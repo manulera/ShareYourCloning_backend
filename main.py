@@ -197,7 +197,7 @@ async def get_from_repository_id(source: RepositoryIdSource):
                 raise HTTPException(
                     404, f'The requested plasmid does not exist, or does not have full sequences, see https://www.addgene.org/{source.repository_id}/sequences/')
         else:
-            raise HTTPException(400, 'wrong repository name')
+            raise HTTPException(404, 'wrong ID')
 
         output_sequences = [format_sequence_genbank(s) for s in dseqs]
 
@@ -221,11 +221,14 @@ async def get_from_repository_id(source: RepositoryIdSource):
 ))
 async def genome_coordinates(source: Annotated[GenomeCoordinatesSource, Body(openapi_examples=request_examples.genome_region_examples)]):
 
+    # Validate that coordinates make sense
+    ncbi_requests.validate_coordinates_pre_request(source.start, source.stop, source.strand)
+
     # Source includes a locus tag in annotated assembly
     if source.locus_tag is not None:
 
         if source.assembly_accession is None:
-            raise HTTPException(404, 'assembly_accession is required if locus_tag is set')
+            raise HTTPException(422, 'assembly_accession is required if locus_tag is set')
 
         annotation = ncbi_requests.get_annotation_from_locus_tag(source.locus_tag, source.assembly_accession)
         gene_range = annotation['genomic_regions'][0]['gene_range']['range'][0]
@@ -234,9 +237,9 @@ async def genome_coordinates(source: Annotated[GenomeCoordinatesSource, Body(ope
         # This field will not be present in all cases, but should be there in reference genomes
         if source.gene_id is not None:
             if 'gene_id' not in annotation:
-                raise HTTPException(404, 'gene_id is set, but not found in the annotation')
+                raise HTTPException(400, 'gene_id is set, but not found in the annotation')
             if source.gene_id != int(annotation['gene_id']):
-                raise HTTPException(404, 'gene_id does not match the locus_tag')
+                raise HTTPException(400, 'gene_id does not match the locus_tag')
         elif 'gene_id' in annotation:
             source.gene_id = int(annotation['gene_id'])
 
@@ -245,17 +248,21 @@ async def genome_coordinates(source: Annotated[GenomeCoordinatesSource, Body(ope
             raise HTTPException(400, f'wrong coordinates, expected to fall within {source.start}, {source.stop} on strand: {source.strand}')
 
     elif source.gene_id is not None:
-        raise HTTPException(404, 'gene_id is set, but not locus_tag')
+        raise HTTPException(422, 'gene_id is set, but not locus_tag')
 
     # We get the assembly accession (if it exists), and if the user provided one we validate it
     assembly_accession = ncbi_requests.get_assembly_accession_from_sequence_accession(source.sequence_accession)
     if source.assembly_accession is not None:
         if source.assembly_accession != assembly_accession:
-            raise HTTPException(404, 'assembly_accession does not match the one from the sequence_accession')
+            raise HTTPException(422, 'assembly_accession does not match the one from the sequence_accession')
 
     source.assembly_accession = assembly_accession
 
-    seq = ncbi_requests.get_genbank_sequence_subset(source.assembly_accession, source.start, source.stop, source.strand)
+    seq = ncbi_requests.get_genbank_sequence_subset(source.sequence_accession, source.start, source.stop, source.strand)
+
+    # NCBI does not complain for coordinates that fall out of the sequence, so we have to check here
+    if len(seq) != source.stop - source.start + 1:
+        raise HTTPException(400, 'coordinates fall outside the sequence')
 
     return {'sequences': [format_sequence_genbank(seq)], 'sources': [source.model_copy()]}
 
