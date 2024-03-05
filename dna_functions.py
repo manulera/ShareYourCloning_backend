@@ -4,10 +4,8 @@ from Bio.Restriction.Restriction import RestrictionBatch
 from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from pydantic_models import PrimerModel, RepositoryIdSource, \
-    GenbankSequence, SequenceEntity
+from pydantic_models import RepositoryIdSource, GenbankSequence, SequenceEntity
 from pydna.parsers import parse as pydna_parse
-from pydna.primer import Primer
 import requests
 from bs4 import BeautifulSoup
 import regex
@@ -15,7 +13,7 @@ from Bio.SeqFeature import SimpleLocation, Location, CompoundLocation
 from pydna.utils import shift_location
 
 
-def sum_is_sticky(three_prime_end: tuple[str,str], five_prime_end: tuple[str,str], partial: bool=False) -> int:
+def sum_is_sticky(three_prime_end: tuple[str, str], five_prime_end: tuple[str, str], partial: bool = False) -> int:
     """Return true if the 3' end of seq1 and 5' end of seq2 ends are sticky and compatible for ligation."""
     type_seq1, sticky_seq1 = three_prime_end
     type_seq2, sticky_seq2 = five_prime_end
@@ -26,7 +24,7 @@ def sum_is_sticky(three_prime_end: tuple[str,str], five_prime_end: tuple[str,str
     if not partial:
         return 0
 
-    if type_seq1 != type_seq2 or type_seq2 == "blunt":
+    if type_seq1 != type_seq2 or type_seq2 == 'blunt':
         return 0
     elif type_seq2 == "5'":
         sticky_seq1 = str(reverse_complement(sticky_seq1))
@@ -35,7 +33,7 @@ def sum_is_sticky(three_prime_end: tuple[str,str], five_prime_end: tuple[str,str
 
     ovhg_len = min(len(sticky_seq1), len(sticky_seq2))
     # [::-1] to try the longest overhangs first
-    for i in range(1, ovhg_len+1)[::-1]:
+    for i in range(1, ovhg_len + 1)[::-1]:
         if sticky_seq1[-i:] == sticky_seq2[:i]:
             return i
     else:
@@ -47,9 +45,11 @@ def format_sequence_genbank(seq: Dseqrecord) -> SequenceEntity:
     if seq.name.lower() == 'exported':
         correct_name(seq)
     # In principle here we do not set the id from the id of the Dseqrecord
-    gb_seq = GenbankSequence(file_content=seq.format('genbank'),
-                             overhang_crick_3prime=seq.seq.ovhg,
-                             overhang_watson_3prime=seq.seq.watson_ovhg())
+    gb_seq = GenbankSequence(
+        file_content=seq.format('genbank'),
+        overhang_crick_3prime=seq.seq.ovhg,
+        overhang_watson_3prime=seq.seq.watson_ovhg(),
+    )
     return SequenceEntity(sequence=gb_seq)
 
 
@@ -58,19 +58,19 @@ def read_dsrecord_from_json(seq: SequenceEntity) -> Dseqrecord:
     if seq.sequence.overhang_watson_3prime == 0 and seq.sequence.overhang_crick_3prime == 0:
         out_dseq_record = initial_dseqrecord
     else:
-        out_dseq_record = Dseqrecord(Dseq.from_full_sequence_and_overhangs(
-            str(initial_dseqrecord.seq),
-            seq.sequence.overhang_crick_3prime,
-            seq.sequence.overhang_watson_3prime
-        ), features=initial_dseqrecord.features )
+        out_dseq_record = Dseqrecord(
+            Dseq.from_full_sequence_and_overhangs(
+                str(initial_dseqrecord.seq), seq.sequence.overhang_crick_3prime, seq.sequence.overhang_watson_3prime
+            ),
+            features=initial_dseqrecord.features,
+        )
     # We set the id to the integer converted to integer (this is only
     # useful for assemblies)
     out_dseq_record.id = str(seq.id)
     return out_dseq_record
 
 
-
-def get_invalid_enzyme_names(enzyme_names_list: list[str|None]) -> list[str]:
+def get_invalid_enzyme_names(enzyme_names_list: list[str | None]) -> list[str]:
     rest_batch = RestrictionBatch()
     invalid_names = list()
     for name in enzyme_names_list:
@@ -105,7 +105,9 @@ def request_from_addgene(source: RepositoryIdSource) -> tuple[list[Dseqrecord], 
     for _type in ['depositor-full', 'depositor-partial', 'addgene-full', 'addgene-partial']:
         sequence_file_url_dict[_type] = []
         if soup.find(id=_type) is not None:
-            sequence_file_url_dict[_type] = [a.get('href') for a in soup.find(id=_type).findAll(class_='genbank-file-download')]
+            sequence_file_url_dict[_type] = [
+                a.get('href') for a in soup.find(id=_type).findAll(class_='genbank-file-download')
+            ]
 
     # TODO provide addgene sequencing data supporting the sequence
     # We prefer to return addgene full if both available
@@ -161,14 +163,18 @@ def find_sequence_regex(pattern: str, seq: str, is_circular: bool) -> list[Locat
     # Strand 1
     feature_edges = get_all_regex_feature_edges(pattern, seq, is_circular)
     # We use shift_location to format origin-spanning features in circular DNA
-    feature_locations += [ shift_location(SimpleLocation(start, end, 1), 0, len(seq)) for start, end in feature_edges]
+    feature_locations += [shift_location(SimpleLocation(start, end, 1), 0, len(seq)) for start, end in feature_edges]
 
     # Strand -1
     feature_edges = get_all_regex_feature_edges(pattern, reverse_complement(seq), is_circular)
-    feature_locations += [ shift_location(SimpleLocation(start, end, 1)._flip(len(seq)), 0, len(seq)) for start, end in feature_edges]
+    feature_locations += [
+        shift_location(SimpleLocation(start, end, 1)._flip(len(seq)), 0, len(seq)) for start, end in feature_edges
+    ]
 
     # We return a unique list, cannot use a set because Location is not hashable
-    return sorted([x for i, x in enumerate(feature_locations) if x not in feature_locations[:i]], key=cmp_to_key(location_sorter))
+    return sorted(
+        [x for i, x in enumerate(feature_locations) if x not in feature_locations[:i]], key=cmp_to_key(location_sorter)
+    )
 
 
 def location_edges(location: Location):
@@ -178,7 +184,9 @@ def location_edges(location: Location):
         return location.parts[0].start, location.parts[-1].end
 
 
-def get_homologous_recombination_locations(template: Dseqrecord, insert: Dseqrecord, minimal_homology) -> list[Location]:
+def get_homologous_recombination_locations(
+    template: Dseqrecord, insert: Dseqrecord, minimal_homology
+) -> list[Location]:
     """Return the locations of the possible homologous recombination sites."""
     template_seq = str(template.seq)
     insert_seq = str(insert.seq)
@@ -190,6 +198,5 @@ def get_homologous_recombination_locations(template: Dseqrecord, insert: Dseqrec
 def perform_homologous_recombination(template: Dseqrecord, insert: Dseqrecord, location: Location):
     edges = location_edges(location)
     if template.circular:
-        return (template[edges[1]:edges[0]] + insert).looped()
-    return template[0:edges[0]] + insert + template[edges[1]:]
-
+        return (template[edges[1] : edges[0]] + insert).looped()
+    return template[0 : edges[0]] + insert + template[edges[1] :]
