@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body
+from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter
 from typing import Annotated
 from fastapi.responses import JSONResponse
 from pydna.dseqrecord import Dseqrecord
@@ -47,9 +47,18 @@ from assembly2 import (
 )
 import request_examples
 import ncbi_requests
+import os
+from record_stub_route import RecordStubRoute
+
+record_stubs = os.environ['RECORD_STUBS'] == '1' if 'RECORD_STUBS' in os.environ else False
 
 # Instance of the API object
 app = FastAPI()
+if record_stubs:
+    router = APIRouter(route_class=RecordStubRoute)
+else:
+    router = APIRouter()
+
 
 # Allow CORS
 # TODO put a wildcard on the shareyourcloning.netlify to
@@ -118,7 +127,7 @@ async def custom_http_exception_handler(request: Request, exc: Exception):
     return response
 
 
-@app.get('/')
+@router.get('/')
 async def greeting(request: Request):
     html_content = f"""
         <html>
@@ -134,7 +143,7 @@ async def greeting(request: Request):
     return HTMLResponse(content=html_content, status_code=200)
 
 
-@app.post(
+@router.post(
     '/read_from_file',
     response_model=create_model(
         'UploadedFileResponse', sources=(list[UploadedFileSource], ...), sequences=(list[SequenceEntity], ...)
@@ -198,7 +207,7 @@ async def read_from_file(
 # directly the object.
 
 
-@app.post(
+@router.post(
     '/repository_id',
     response_model=create_model(
         'RepositoryIdResponse', sources=(list[RepositoryIdSource], ...), sequences=(list[SequenceEntity], ...)
@@ -240,7 +249,7 @@ async def get_from_repository_id(source: RepositoryIdSource):
         raise HTTPException(504, f'Unable to connect to {source.repository}: {exception}')
 
 
-@app.post(
+@router.post(
     '/genome_coordinates',
     response_model=create_model(
         'GenomeRegionResponse', sources=(list[GenomeCoordinatesSource], ...), sequences=(list[SequenceEntity], ...)
@@ -305,7 +314,7 @@ async def genome_coordinates(
     return {'sequences': [format_sequence_genbank(seq)], 'sources': [source.model_copy()]}
 
 
-@app.post(
+@router.post(
     '/manually_typed',
     response_model=create_model(
         'ManuallyTypedResponse', sources=(list[ManuallyTypedSource], ...), sequences=(list[SequenceEntity], ...)
@@ -317,13 +326,13 @@ async def manually_typed(source: ManuallyTypedSource):
     return {'sequences': [format_sequence_genbank(seq)], 'sources': [source]}
 
 
-@app.get('/restriction_enzyme_list', response_model=dict[str, list[str]])
+@router.get('/restriction_enzyme_list', response_model=dict[str, list[str]])
 async def get_restriction_enzyme_list():
     """Return the dictionary of restriction enzymes"""
     return {'enzyme_names': list(rest_dict.keys())}
 
 
-@app.post(
+@router.post(
     '/restriction',
     response_model=create_model(
         'RestrictionEnzymeDigestionResponse',
@@ -373,7 +382,7 @@ async def restriction(
     return {'sequences': products, 'sources': sources}
 
 
-@app.post(
+@router.post(
     '/ligation',
     response_model=create_model(
         'LigationResponse', sources=(list[LigationSource], ...), sequences=(list[SequenceEntity], ...)
@@ -434,7 +443,7 @@ async def ligation(
     return {'sources': out_sources, 'sequences': out_sequences}
 
 
-@app.post(
+@router.post(
     '/pcr',
     response_model=create_model('PCRResponse', sources=(list[PCRSource], ...), sequences=(list[SequenceEntity], ...)),
 )
@@ -497,7 +506,7 @@ async def pcr(
     return {'sources': out_sources, 'sequences': out_sequences}
 
 
-@app.post(
+@router.post(
     '/homologous_recombination',
     response_model=create_model(
         'HomologousRecombinationResponse',
@@ -543,7 +552,7 @@ async def homologous_recombination(
     return {'sources': out_sources, 'sequences': out_sequences}
 
 
-@app.post(
+@router.post(
     '/gibson_assembly',
     response_model=create_model(
         'GibsonAssemblyResponse', sources=(list[GibsonAssemblySource], ...), sequences=(list[SequenceEntity], ...)
@@ -599,7 +608,7 @@ async def gibson_assembly(
     return {'sources': out_sources, 'sequences': out_sequences}
 
 
-@app.post(
+@router.post(
     '/restriction_and_ligation',
     response_model=create_model(
         'RestrictionAndLigationResponse',
@@ -661,3 +670,5 @@ async def restriction_and_ligation(
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
+
+app.include_router(router)
