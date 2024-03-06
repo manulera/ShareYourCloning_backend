@@ -29,7 +29,12 @@ jobs:
           poetry config virtualenvs.create false
           poetry install --with test
       - name: Run tests
-        run: pytest -v
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.event.pull_request.base.ref }}" = "master" ]; then
+            pytest -v --cov='.' --cov-report term --cov-report xml:coverage.xml
+          else
+            pytest -v
+          fi
 
       - uses: actions/cache@v4
         id: cache-precommit
@@ -46,6 +51,17 @@ jobs:
         run: |
           pre-commit run --files ${{ steps.changed-files.outputs.all_changed_files }}
 
+      - name: 🔼 Upload coverage to Codecov
+        # Run only if PR to master
+        if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'master'
+        uses: codecov/codecov-action@v4
+        with:
+          fail_ci_if_error: true
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
 
   # Update docker image when committing to prod branch if tests pass
   push_to_registry:
