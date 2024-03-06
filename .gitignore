@@ -3,3 +3,7 @@
 .DS_Store
 .ipynb_checkpoints
 /.venv
+
+# Test coverage
+.coverage
+coverage.xml
