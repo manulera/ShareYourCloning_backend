@@ -85,13 +85,22 @@ Check [contribution guidelines in the main repository](https://github.com/manule
 ## Running the tests locally
 
 ```
-poetry run python -m unittest
+pytest -v
 ```
 
 ## Notes
 
-Ping a particular library version from github:
+### Ping a particular library version from github:
 
 ```
 poetry add git+https://github.com/BjornFJohansson/pydna#4fd760d075f77cceeb27969e017e04b42f6d0aa3
+```
+
+### Generating API stubs
+
+For the frontend, it may be useful to produce stubs (I use them for writing the tests). See how this is implemented
+by looking at the `RecordStubRoute` class in `record_stub_route.py`. To run the dev server and record stubs:
+
+```bash
+RECORD_STUBS=1 uvicorn main:app --reload
 ```
