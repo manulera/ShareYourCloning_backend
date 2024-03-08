@@ -240,10 +240,13 @@ async def get_from_repository_id(source: RepositoryIdSource):
 
     except HTTPError as exception:
         if exception.code == 500:
-            raise HTTPException(503, f'{source.repository} returned: {exception} - {source.repository} might be down')
+            raise HTTPException(
+                503, f'{source.repository.value} returned: {exception} - {source.repository} might be down'
+            )
         elif exception.code == 400 or exception.code == 404:
             raise HTTPException(
-                404, f'{source.repository} returned: {exception} - Likely you inserted a wrong {source.repository} id'
+                404,
+                f'{source.repository.value} returned: {exception} - Likely you inserted a wrong {source.repository} id',
             )
     except URLError as exception:
         raise HTTPException(504, f'Unable to connect to {source.repository}: {exception}')
@@ -670,5 +673,6 @@ async def restriction_and_ligation(
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
+
 
 app.include_router(router)

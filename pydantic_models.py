@@ -66,7 +66,7 @@ class PrimerModel(BaseModel):
     """Called PrimerModel not to be confused with the class from pydna."""
 
     id: int
-    name: str
+    name: str = Field(..., min_length=1)
     # TODO: add this to the flake8 exceptions
     # TODO: implement constrains when there is an answer for https://github.com/pydantic/pydantic/issues/7745
     sequence: Annotated[str, Field(pattern=r'^[acgtACGT]+$')]
@@ -121,7 +121,7 @@ class ManuallyTypedSource(Source):
 class UploadedFileSource(Source):
     """Describes a sequence from a file uploaded by the user"""
 
-    file_name: str
+    file_name: str = Field(..., min_length=1)
     file_format: SequenceFileFormat
     type: SourceType = SourceType('file')
     index_in_file: Optional[int] = None
@@ -131,7 +131,7 @@ class RepositoryIdSource(Source):
     """Documents a request to a repository"""
 
     repository: RepositoryName
-    repository_id: str
+    repository_id: str = Field(..., min_length=1)
     type: SourceType = SourceType('repository_id')
 
 
@@ -139,7 +139,7 @@ class GenomeCoordinatesSource(Source):
     """Documents a request to NCBI for genome sequence"""
 
     assembly_accession: Optional[str] = None
-    sequence_accession: str
+    sequence_accession: str = Field(..., min_length=1)
     # The unique identifier of a gene can come from either the gene_id or the locus_tag
     # For instance, genes in the human reference genome have a gene_id, but no locus_tag
     locus_tag: Optional[str] = None
