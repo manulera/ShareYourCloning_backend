@@ -15,6 +15,7 @@ class RecordStubRoute(APIRoute):
         original_route_handler = super().get_route_handler()
 
         async def custom_route_handler(request: Request) -> Response:
+            print('called')
             if request.method != 'POST':
                 return await original_route_handler(request)
             formatted_request = {

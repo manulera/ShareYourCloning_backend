@@ -1,20 +1,20 @@
 from fastapi.testclient import TestClient
 import unittest
 import shutil
-from pydantic_models import ManuallyTypedSource
+from unittest import TestCase, mock
 import os
-import pytest
+from pydantic_models import ManuallyTypedSource
 
-# activate the stubs
-os.environ['RECORD_STUBS'] = '1'
-from main import app
 
-client = TestClient(app)
-
-class StubRouteTest(unittest.TestCase):
-
+class StubRouteTest(TestCase):
+    @mock.patch.dict(os.environ, {'RECORD_STUBS': '1'})
     # DO this before each test
     def setUp(self):
+        # Has to be imported here to get the right environment variable
+        from main import app
+
+        client = TestClient(app)
+        self.client = client
         # remove the stubs folder
         shutil.rmtree('stubs', ignore_errors=True)
 
@@ -22,22 +22,22 @@ class StubRouteTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree('stubs', ignore_errors=True)
 
-    @pytest.mark.xfail(reason='Problem with env variables on GH action, works locally', run=True)
     def test_stub_route(self):
         source = ManuallyTypedSource(
             user_input='ATGC',
         )
 
-        response = client.post('/manually_typed', json=source.model_dump())
+        response = self.client.post('/manually_typed', json=source.model_dump())
         self.assertEqual(response.status_code, 200)
 
         self.assertTrue(os.path.exists('stubs/manually_typed/'))
         self.assertTrue(len(os.listdir('stubs/manually_typed/')), 1)
         # Also works for 422 response
         source.user_input = 'io'
-        response = client.post('/manually_typed', json=source.model_dump())
+        response = self.client.post('/manually_typed', json=source.model_dump())
         self.assertEqual(response.status_code, 422)
         self.assertTrue(len(os.listdir('stubs/manually_typed/')), 2)
+
 
 if __name__ == '__main__':
     unittest.main()
