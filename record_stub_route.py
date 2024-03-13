@@ -6,6 +6,7 @@ from fastapi.routing import APIRoute
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 import os
+import glob
 
 
 class RecordStubRoute(APIRoute):
@@ -15,7 +16,6 @@ class RecordStubRoute(APIRoute):
         original_route_handler = super().get_route_handler()
 
         async def custom_route_handler(request: Request) -> Response:
-            print('called')
             if request.method != 'POST':
                 return await original_route_handler(request)
             formatted_request = {
@@ -42,6 +42,8 @@ class RecordStubRoute(APIRoute):
 
                 formatted_time = datetime.datetime.now().strftime('%Y_%m_%d-%H_%M_%S')
                 stub_folder = f'stubs{formatted_request["path"]}/{formatted_time}'
+                existing_folders = glob.glob(f'{stub_folder}_*')
+                stub_folder = f'{stub_folder}_{len(existing_folders)}'
                 if not os.path.exists(stub_folder):
                     os.makedirs(stub_folder)
                 with open(f'{stub_folder}/request.json', 'w') as f:
