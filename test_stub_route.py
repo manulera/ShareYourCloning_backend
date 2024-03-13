@@ -26,7 +26,7 @@ class StubRouteTest(unittest.TestCase):
         source = ManuallyTypedSource(
             user_input='ATGC',
         )
-
+        print('reached the test')
         response = self.client.post('/manually_typed', json=source.model_dump())
         self.assertEqual(response.status_code, 200)
 
