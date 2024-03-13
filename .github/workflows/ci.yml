@@ -38,7 +38,7 @@ jobs:
       - name: Run tests
         env:
           PYTHONUNBUFFERED: "1"
-        run: poetry run python -u -m pytest -v -s --cov='.' --cov-report term --cov-report xml:coverage.xml
+        run: poetry run python -u -m pytest -v --capture=no --cov='.' --cov-report term --cov-report xml:coverage.xml
 
       - uses: actions/cache@v4
         id: cache-precommit
