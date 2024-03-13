@@ -4,8 +4,7 @@ import shutil
 import os
 from pydantic_models import ManuallyTypedSource
 from pytest import MonkeyPatch
-
-# from importlib import reload
+from importlib import reload
 
 
 class StubRouteTest(unittest.TestCase):
@@ -15,6 +14,7 @@ class StubRouteTest(unittest.TestCase):
         MonkeyPatch().setenv('RECORD_STUBS', '1')
         import main
 
+        reload(main)
         client = TestClient(main.app)
         self.client = client
         # remove the stubs folder
