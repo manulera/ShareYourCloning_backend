@@ -239,7 +239,7 @@ async def get_from_repository_id(source: RepositoryIdSource):
         return {'sequences': output_sequences, 'sources': sources}
 
     except HTTPError as exception:
-        if exception.code == 500:
+        if exception.code == 500:  # pragma: no cover
             raise HTTPException(
                 503, f'{source.repository.value} returned: {exception} - {source.repository} might be down'
             )
