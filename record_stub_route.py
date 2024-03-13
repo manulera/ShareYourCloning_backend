@@ -1,16 +1,20 @@
 import json
 import datetime
-from fastapi.exceptions import RequestValidationError
+from fastapi.exceptions import RequestValidationError, HTTPException
 from typing import Callable
 from fastapi.routing import APIRoute
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 import os
+import glob
+
 
 class RecordStubRoute(APIRoute):
     """Subclass of APIRoute that stores the request and response of a route in the folder `stubs`"""
+
     def get_route_handler(self) -> Callable:
         original_route_handler = super().get_route_handler()
+
         async def custom_route_handler(request: Request) -> Response:
             if request.method != 'POST':
                 return await original_route_handler(request)
@@ -23,8 +27,11 @@ class RecordStubRoute(APIRoute):
             try:
                 response: JSONResponse = await original_route_handler(request)
             except RequestValidationError as exc:
-                detail = {"detail": exc.errors()}
+                detail = {'detail': exc.errors()}
                 response = JSONResponse(content=detail, status_code=422)
+            except HTTPException as exc:
+                detail = {'detail': exc.detail}
+                response = JSONResponse(content=detail, status_code=exc.status_code)
 
             if type(response) is JSONResponse:
                 formatted_response = {
@@ -33,8 +40,10 @@ class RecordStubRoute(APIRoute):
                     'headers': dict(response.headers),
                 }
 
-                formatted_time = datetime.datetime.now().strftime("%Y_%m_%d-%H_%M_%S")
+                formatted_time = datetime.datetime.now().strftime('%Y_%m_%d-%H_%M_%S')
                 stub_folder = f'stubs{formatted_request["path"]}/{formatted_time}'
+                existing_folders = glob.glob(f'{stub_folder}_*')
+                stub_folder = f'{stub_folder}_{len(existing_folders)}'
                 if not os.path.exists(stub_folder):
                     os.makedirs(stub_folder)
                 with open(f'{stub_folder}/request.json', 'w') as f:
@@ -44,7 +53,7 @@ class RecordStubRoute(APIRoute):
                 with open(f'{stub_folder}/response_body.json', 'w') as f:
                     json.dump(formatted_response['body'], f, indent=4)
 
-            print(9*' ', '> stub written to', stub_folder)
+            print(9 * ' ', '> stub written to', stub_folder)
             return response
 
         return custom_route_handler

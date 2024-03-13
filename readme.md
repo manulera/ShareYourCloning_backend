@@ -41,7 +41,7 @@ Now you should be able to run the api by running:
 
 ```bash
 # The --reload argument will reload the API if you make changes to the code
-uvicorn main:app --reload
+uvicorn main:app --reload --reload-exclude='.venv'
 ```
 
 Then you should be able to open the API docs at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) to know that your API is working.
@@ -102,5 +102,5 @@ For the frontend, it may be useful to produce stubs (I use them for writing the 
 by looking at the `RecordStubRoute` class in `record_stub_route.py`. To run the dev server and record stubs:
 
 ```bash
-RECORD_STUBS=1 uvicorn main:app --reload
+RECORD_STUBS=1 uvicorn main:app --reload --reload-exclude='.venv'
 ```
