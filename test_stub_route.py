@@ -5,15 +5,17 @@ import os
 from pydantic_models import ManuallyTypedSource
 from pytest import MonkeyPatch
 
+# from importlib import reload
+
 
 class StubRouteTest(unittest.TestCase):
     # DO this before each test
     def setUp(self):
         # Has to be imported here to get the right environment variable
         MonkeyPatch().setenv('RECORD_STUBS', '1')
-        from main import app
+        import main
 
-        client = TestClient(app)
+        client = TestClient(main.app)
         self.client = client
         # remove the stubs folder
         shutil.rmtree('stubs', ignore_errors=True)
