@@ -29,6 +29,8 @@ jobs:
           poetry config virtualenvs.create false
           poetry install --with test
       - name: Run tests
+        env:
+          PYTHONUNBUFFERED: "1"
         run: pytest -v -s --cov='.' --cov-report term --cov-report xml:coverage.xml
 
       - uses: actions/cache@v4
