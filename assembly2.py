@@ -916,6 +916,39 @@ class PCRAssembly(Assembly):
         raise NotImplementedError('Insertion PCR assembly not implemented')
 
 
+class TemplatelessPCRAssembly(Assembly):
+    def __init__(self, frags: tuple[_Dseqrecord, _Dseqrecord], limit=25, mismatches=0):
+
+        self.G = _nx.MultiDiGraph()
+        forward_primer, reverse_primer = frags
+        # Add positive node for forward primer and negative node for reverse primer
+        self.G.add_node(1, seq=forward_primer)
+        self.G.add_node(-2, seq=reverse_primer.reverse_complement())
+
+        # One only possible combination ((1, -2))
+        u, v = (1, -2)
+        primer = self.G.nodes[u]['seq']
+        template = self.G.nodes[v]['seq']  # Treating reverse primer as template to reuse code
+
+        matches = alignment_sub_strings(template, primer, False, limit, mismatches)
+
+        for match in matches:
+            self.add_edges_from_match(match, u, v, self.G.nodes[u]['seq'], self.G.nodes[v]['seq'])
+
+        # These two are constrained
+        self.use_fragment_order = True
+        self.use_all_fragments = True
+
+        self.fragments = frags
+        self.limit = limit
+        self.algorithm = alignment_sub_strings
+
+        return
+
+    def get_linear_assemblies(self):
+        assemblies = super().get_linear_assemblies()
+        return assemblies
+
 class SingleFragmentAssembly(Assembly):
     """
     An assembly that represents the circularisation or splicing of a single fragment.

@@ -19,6 +19,7 @@ class SourceType(str, Enum):
     restriction_and_ligation = 'restriction_and_ligation'
     genome_coordinates = 'genome_coordinates'
     manually_typed = 'manually_typed'
+    templateless_PCR = 'templateless_PCR'
 
 
 class SequenceFileFormat(str, Enum):
@@ -324,4 +325,35 @@ class RestrictionAndLigationSource(AssemblySource):
             input=input,
             circular=circular,
             restriction_enzymes=restriction_enzymes,
+        )
+
+
+class TemplatelessPCRSource(AssemblySource):
+    """Documents a Templateless PCR, and the selection of one of the products."""
+
+    type: SourceType = SourceType('templateless_PCR')
+    circular: bool = False
+    forward_primer: int = Field(..., description='The forward primer')
+    reverse_primer: int = Field(..., description='The reverse primer')
+
+    # This can only take one input
+    #input: conlist(int, min_length=1, max_length=1)
+
+    def from_assembly(
+        assembly: list[tuple[int, int, Location, Location]],
+        #input: list[int],
+        id: int,
+        forward_primer: int,
+        reverse_primer: int,
+    ) -> 'TemplatelessPCRSource':
+        """Creates a TemplatelessPCRSource from an assembly and id"""
+        return TemplatelessPCRSource(
+            id=id,
+            assembly=[
+                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
+                for part in assembly
+            ],
+            #input=input,
+            forward_primer=forward_primer,
+            reverse_primer=reverse_primer,
         )
