@@ -336,12 +336,11 @@ class TemplatelessPCRSource(AssemblySource):
     forward_primer: int = Field(..., description='The forward primer')
     reverse_primer: int = Field(..., description='The reverse primer')
 
-    # This can only take one input
-    #input: conlist(int, min_length=1, max_length=1)
+    # Templateless PCR does not take any inputs
+    input: conlist(int, max_length=0) = []
 
     def from_assembly(
         assembly: list[tuple[int, int, Location, Location]],
-        #input: list[int],
         id: int,
         forward_primer: int,
         reverse_primer: int,
@@ -353,7 +352,6 @@ class TemplatelessPCRSource(AssemblySource):
                 (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
                 for part in assembly
             ],
-            #input=input,
             forward_primer=forward_primer,
             reverse_primer=reverse_primer,
         )

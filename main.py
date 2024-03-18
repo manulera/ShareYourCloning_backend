@@ -514,14 +514,15 @@ async def pcr(
 
 @router.post(
     '/templateless_pcr',
-    response_model=create_model('TemplatelessPCRResponse', sources=(list[TemplatelessPCRSource], ...), sequences=(list[SequenceEntity], ...)),
+    response_model=create_model(
+        'TemplatelessPCRResponse', sources=(list[TemplatelessPCRSource], ...), sequences=(list[SequenceEntity], ...)
+    ),
 )
 async def templateless_pcr(
     source: TemplatelessPCRSource,
-    #sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+    # sequences: conlist(SequenceEntity, min_length=1, max_length=1),
     primers: conlist(PrimerModel, min_length=1, max_length=2),
     minimal_annealing: int = Query(6, description='The minimal annealing length for each primer.'),
-    allowed_mismatches: int = Query(0, description='The number of mismatches allowed'),
 ):
 
     forward_primer = next((Dseqrecord(Dseq(p.sequence)) for p in primers if p.id == source.forward_primer), None)
@@ -533,22 +534,11 @@ async def templateless_pcr(
     if forward_primer is None or reverse_primer is None:
         raise HTTPException(404, 'Invalid primer id.')
 
-    # TODO: This may have to be re-written if we allow mismatches
-    # If an assembly is provided, we ignore minimal_annealing
-    # What happens if annealing is zero? That would mean
-    # mismatch in the 3' of the primer, which maybe should
-    # not be allowed.
     if source.assembly is not None:
         minimal_annealing = source.minimal_overlap()
-        # Only the ones that match are included in the output assembly
-        # location, so the submitted assembly should be returned without
-        # allowed mistmatches
-        # TODO: tests for this
-        allowed_mismatches = 0
-    
+
     fragments = [forward_primer, reverse_primer]
-    
-    #asm = PCRAssembly(fragments, limit=minimal_annealing, mismatches=allowed_mismatches)
+
     asm = TemplatelessPCRAssembly((forward_primer, reverse_primer), limit=minimal_annealing)
     try:
         possible_assemblies = asm.get_linear_assemblies()
@@ -558,7 +548,6 @@ async def templateless_pcr(
     out_sources = [
         TemplatelessPCRSource.from_assembly(
             id=source.id,
-            #input=source.input,
             assembly=a,
             forward_primer=source.forward_primer,
             reverse_primer=source.reverse_primer,

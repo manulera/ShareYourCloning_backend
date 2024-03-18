@@ -917,7 +917,7 @@ class PCRAssembly(Assembly):
 
 
 class TemplatelessPCRAssembly(Assembly):
-    def __init__(self, frags: tuple[_Dseqrecord, _Dseqrecord], limit=25, mismatches=0):
+    def __init__(self, frags: tuple[_Dseqrecord, _Dseqrecord], limit=25):
 
         self.G = _nx.MultiDiGraph()
         forward_primer, reverse_primer = frags
@@ -930,7 +930,8 @@ class TemplatelessPCRAssembly(Assembly):
         primer = self.G.nodes[u]['seq']
         template = self.G.nodes[v]['seq']  # Treating reverse primer as template to reuse code
 
-        matches = alignment_sub_strings(template, primer, False, limit, mismatches)
+        # Mismatches are not allowed in templateless PCR
+        matches = alignment_sub_strings(template, primer, False, limit, 0)
 
         for match in matches:
             self.add_edges_from_match(match, u, v, self.G.nodes[u]['seq'], self.G.nodes[v]['seq'])
@@ -948,6 +949,7 @@ class TemplatelessPCRAssembly(Assembly):
     def get_linear_assemblies(self):
         assemblies = super().get_linear_assemblies()
         return assemblies
+
 
 class SingleFragmentAssembly(Assembly):
     """
