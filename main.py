@@ -28,6 +28,7 @@ from pydantic_models import (
     AssemblySource,
     GenomeCoordinatesSource,
     ManuallyTypedSource,
+    TemplatelessPCRSource,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
@@ -39,6 +40,7 @@ from assembly2 import (
     assemble,
     sticky_end_sub_strings,
     PCRAssembly,
+    TemplatelessPCRAssembly,
     gibson_overlap,
     filter_linear_subassemblies,
     restriction_ligation_overlap,
@@ -459,6 +461,7 @@ async def pcr(
 ):
 
     dseq = read_dsrecord_from_json(sequences[0])
+    print(dseq)
     forward_primer = next((Dseqrecord(Dseq(p.sequence)) for p in primers if p.id == source.forward_primer), None)
     reverse_primer = next((Dseqrecord(Dseq(p.sequence)) for p in primers if p.id == source.reverse_primer), None)
     if forward_primer is None or reverse_primer is None:
@@ -488,6 +491,63 @@ async def pcr(
         PCRSource.from_assembly(
             id=source.id,
             input=source.input,
+            assembly=a,
+            forward_primer=source.forward_primer,
+            reverse_primer=source.reverse_primer,
+        )
+        for a in possible_assemblies
+    ]
+
+    # If a specific assembly is requested
+    if source.assembly is not None:
+        return format_known_assembly_response(source, out_sources, fragments)
+
+    if len(possible_assemblies) == 0:
+        raise HTTPException(400, 'No pair of annealing primers was found. Try changing the annealing settings.')
+
+    out_sequences = [
+        format_sequence_genbank(assemble(fragments, a, s.circular)) for s, a in zip(out_sources, possible_assemblies)
+    ]
+
+    return {'sources': out_sources, 'sequences': out_sequences}
+
+
+@router.post(
+    '/templateless_pcr',
+    response_model=create_model(
+        'TemplatelessPCRResponse', sources=(list[TemplatelessPCRSource], ...), sequences=(list[SequenceEntity], ...)
+    ),
+)
+async def templateless_pcr(
+    source: TemplatelessPCRSource,
+    # sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+    primers: conlist(PrimerModel, min_length=1, max_length=2),
+    minimal_annealing: int = Query(6, description='The minimal annealing length for each primer.'),
+):
+
+    forward_primer = next((Dseqrecord(Dseq(p.sequence)) for p in primers if p.id == source.forward_primer), None)
+    reverse_primer = next((Dseqrecord(Dseq(p.sequence)) for p in primers if p.id == source.reverse_primer), None)
+
+    print(forward_primer.seq)
+    print(reverse_primer.seq)
+
+    if forward_primer is None or reverse_primer is None:
+        raise HTTPException(404, 'Invalid primer id.')
+
+    if source.assembly is not None:
+        minimal_annealing = source.minimal_overlap()
+
+    fragments = [forward_primer, reverse_primer]
+
+    asm = TemplatelessPCRAssembly((forward_primer, reverse_primer), limit=minimal_annealing)
+    try:
+        possible_assemblies = asm.get_linear_assemblies()
+    except ValueError as e:
+        raise HTTPException(400, *e.args)
+
+    out_sources = [
+        TemplatelessPCRSource.from_assembly(
+            id=source.id,
             assembly=a,
             forward_primer=source.forward_primer,
             reverse_primer=source.reverse_primer,
