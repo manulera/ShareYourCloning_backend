@@ -6,6 +6,7 @@ from Bio.Restriction.Restriction import CommOnly
 from pydantic_models import (
     RepositoryIdSource,
     PCRSource,
+    TemplatelessPCRSource,
     PrimerModel,
     RestrictionEnzymeDigestionSource,
     SequenceEntity,
@@ -797,6 +798,98 @@ class PCRTest(unittest.TestCase):
         payload = response.json()
         self.assertEqual(response.status_code, 400)
         self.assertIn('Clashing primers', payload['detail'])
+
+
+class TemplatelessPCRTest(unittest.TestCase):
+    def test_templateless(self):
+        submitted_source = TemplatelessPCRSource(
+            input=[],
+            forward_primer=1,
+            reverse_primer=2,
+        )
+
+        # Test case of initial example
+
+        primer_fwd = PrimerModel(sequence='TTACGTAAAAAA', id=1, name='fwd')
+        primer_rvs = PrimerModel(sequence='CGTACGTTTTTT', id=2, name='rvs')
+
+        data = {
+            'source': submitted_source.model_dump(),
+            'sequences': [],
+            'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
+        }
+
+        response = client.post('/templateless_pcr', json=data, params={'minimal_annealing': 6})
+        payload = response.json()
+
+        sources = [TemplatelessPCRSource.model_validate(s) for s in payload['sources']]
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+        assert len(sources) == 1
+        assert len(sequences) == 1
+
+        seq1 = sequences[0]
+        assert str(seq1.seq) == 'TTACGTAAAAAACGTACG'
+
+        # Test case of fully overlapping primers (it is not particularly special)
+
+        primer_fwd = PrimerModel(sequence='ACGTACGT', id=1, name='fwd')
+        primer_rvs = PrimerModel(sequence='ACGTACGT', id=2, name='rvs')
+
+        data = {
+            'source': submitted_source.model_dump(),
+            'sequences': [],
+            'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
+        }
+
+        response = client.post('/templateless_pcr', json=data, params={'minimal_annealing': 8})
+        payload = response.json()
+
+        sources = [TemplatelessPCRSource.model_validate(s) for s in payload['sources']]
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+        assert len(sources) == 1
+        assert len(sequences) == 1
+
+        seq1 = sequences[0]
+        assert str(seq1.seq) == 'ACGTACGT'
+
+        # Test several sources
+        response = client.post('/templateless_pcr', json=data, params={'minimal_annealing': 4})
+        payload = response.json()
+
+        sources = [TemplatelessPCRSource.model_validate(s) for s in payload['sources']]
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+        assert len(sources) == 2
+        assert len(sequences) == 2
+
+        seq1 = sequences[0]
+        seq2 = sequences[1]
+
+        assert str(seq1.seq) == 'ACGTACGT'
+        assert str(seq2.seq) == 'ACGTACGTACGT'
+
+        # Test overhanging primers (should result in a fragment with overhang, as this would happen in a real PCR)
+        primer_fwd = PrimerModel(sequence='ACGTACGT', id=1, name='fwd')
+        primer_rvs = PrimerModel(sequence='ACGTACGTTTT', id=2, name='rvs')
+
+        data = {
+            'source': submitted_source.model_dump(),
+            'sequences': [],
+            'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
+        }
+
+        response = client.post('/templateless_pcr', json=data, params={'minimal_annealing': 8})
+        payload = response.json()
+
+        sources = [TemplatelessPCRSource.model_validate(s) for s in payload['sources']]
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+        assert len(sources) == 1
+        assert len(sequences) == 1
+
+        seq1 = sequences[0]
 
 
 class HomologousRecombinationTest(unittest.TestCase):

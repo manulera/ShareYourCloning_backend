@@ -917,7 +917,7 @@ class PCRAssembly(Assembly):
 
 
 class TemplatelessPCRAssembly(Assembly):
-    def __init__(self, frags: tuple[_Dseqrecord, _Dseqrecord], limit=25):
+    def __init__(self, frags: tuple[_Dseqrecord, _Dseqrecord], limit=20):
 
         self.G = _nx.MultiDiGraph()
         forward_primer, reverse_primer = frags

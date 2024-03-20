@@ -522,14 +522,11 @@ async def templateless_pcr(
     source: TemplatelessPCRSource,
     # sequences: conlist(SequenceEntity, min_length=1, max_length=1),
     primers: conlist(PrimerModel, min_length=1, max_length=2),
-    minimal_annealing: int = Query(6, description='The minimal annealing length for each primer.'),
+    minimal_annealing: int = Query(20, description='The minimal annealing length for each primer.'),
 ):
 
     forward_primer = next((Dseqrecord(Dseq(p.sequence)) for p in primers if p.id == source.forward_primer), None)
     reverse_primer = next((Dseqrecord(Dseq(p.sequence)) for p in primers if p.id == source.reverse_primer), None)
-
-    print(forward_primer.seq)
-    print(reverse_primer.seq)
 
     if forward_primer is None or reverse_primer is None:
         raise HTTPException(404, 'Invalid primer id.')
