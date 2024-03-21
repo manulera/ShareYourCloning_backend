@@ -1,4 +1,5 @@
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter
+import json
+from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter, Form
 from typing import Annotated
 from fastapi.responses import JSONResponse
 from pydna.dseqrecord import Dseqrecord
@@ -157,6 +158,7 @@ async def read_from_file(
         None,
         description='Format of the sequence file. Unless specified, it will be guessed from the extension',
     ),
+    info_str: str = Form(...),
     index_in_file: int = Query(
         None,
         description='The index of the sequence in the file for multi-sequence files',
@@ -195,9 +197,11 @@ async def read_from_file(
     # The common part
     parent_source = UploadedFileSource(file_format=file_format, file_name=file.filename)
     out_sources = list()
+    info = json.loads(info_str) if info_str else dict()
     for i in range(len(dseqs)):
         new_source = parent_source.model_copy()
         new_source.index_in_file = i
+        new_source.info = info
         out_sources.append(new_source)
 
     out_sequences = [format_sequence_genbank(s) for s in dseqs]
