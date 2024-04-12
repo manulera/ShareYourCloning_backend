@@ -152,7 +152,7 @@ def test_new_assembly():
     ]
     c1 = assembly.Assembly((a, b, c), limit=14)
     result = c1.assemble_circular()[0]
-    assert result.seguid() == 'cdseguid-qj3q-0rsUxj8xLIxKuhVEIQ8kIw'
+    assert result.seguid() == 'cdseguid=CRIbOfddcwCZbvVOOOU4uJYP-So'
     assert str(result.seq) == 'acgatgctatactggCCCCCtgtgctgtgctctaTTTTTtattctggctgtatctGGGGGT'
     # acgatgctatactggCCCCCtgtgctgtgctctaGG
     feature_seqs = (
@@ -184,10 +184,10 @@ def test_new_assembly():
     circprods = c2.assemble_circular()
 
     # Changed
-    assert circprods[0].seguid() == 'cdseguid-qj3q-0rsUxj8xLIxKuhVEIQ8kIw'
-    # assert circprods[1].seguid() == "cdseguid-qj3q-0rsUxj8xLIxKuhVEIQ8kIw"
-    assert circprods[1].seguid() == 'cdseguid-qCuwUw63xkh58WM-ADaT7uX_-oQ'
-    # assert circprods[1].seguid() == "cdseguid-qCuwUw63xkh58WM-ADaT7uX_-oQ"
+    assert circprods[0].seguid() == 'cdseguid=CRIbOfddcwCZbvVOOOU4uJYP-So'
+    # assert circprods[1].seguid() == "cdseguid=CRIbOfddcwCZbvVOOOU4uJYP-So"
+    assert circprods[1].seguid() == 'cdseguid=zFIq5LWXL_YSxrSF2Q5hbzO0BPw'
+    # assert circprods[1].seguid() == "cdseguid=zFIq5LWXL_YSxrSF2Q5hbzO0BPw"
     assert str(circprods[0].seq) == 'acgatgctatactggCCCCCtgtgctgtgctctaTTTTTtattctggctgtatctGGGGGT'
     assert str(circprods[1].seq) == 'acgatgctatactggCCCCCtgtgctgtgctctaCCtattctggctgtatctGGGGGT'
 
@@ -369,15 +369,15 @@ algorithm..: common_sub_strings"""
     # text4
     x, y = parse(text4)
     a = assembly.Assembly((x, y), limit=557)
-    assert a.assemble_linear()[1].seguid() == 'ldseguid-4p-1ecqJRcsQrJogHIX1Axux75I'
+    assert a.assemble_linear()[1].seguid() == 'ldseguid=3ay9lXqyTHRr348YDQ4JrtFVx40'
     a = assembly.Assembly((y, x), limit=557)
-    assert a.assemble_linear()[1].seguid() == 'ldseguid-4p-1ecqJRcsQrJogHIX1Axux75I'
+    assert a.assemble_linear()[1].seguid() == 'ldseguid=3ay9lXqyTHRr348YDQ4JrtFVx40'
     a = assembly.Assembly((x.rc(), y), limit=557)
-    assert a.assemble_linear()[0].seguid() == 'ldseguid-4p-1ecqJRcsQrJogHIX1Axux75I'
+    assert a.assemble_linear()[0].seguid() == 'ldseguid=3ay9lXqyTHRr348YDQ4JrtFVx40'
     a = assembly.Assembly((x, y.rc()), limit=557)
-    assert a.assemble_linear()[1].seguid() == 'ldseguid-4p-1ecqJRcsQrJogHIX1Axux75I'
+    assert a.assemble_linear()[1].seguid() == 'ldseguid=3ay9lXqyTHRr348YDQ4JrtFVx40'
     a = assembly.Assembly((x.rc(), y.rc()), limit=557)
-    assert a.assemble_linear()[0].seguid() == 'ldseguid-4p-1ecqJRcsQrJogHIX1Axux75I'
+    assert a.assemble_linear()[0].seguid() == 'ldseguid=3ay9lXqyTHRr348YDQ4JrtFVx40'
 
     candidate = a.assemble_linear()[0]
     correct = 'tcctgacgggtaattttgatttgcatgccgtccgggtgagtcatagcgtctggttgttttgccagattcagcagagtctgtgcaatgcggccgctgaccacatacgatttaggtgacactatagaacgcggccgccagctgaagcttcgtacgctgcaggtcgacggatccccgggttaattaaggcgcgccagatctgtttagcttgccttgtccccgccgggtcacccggccagcgacatggaggcccagaataccctccttgacagtcttgacgtgcgcagctcaggggcatgatgtgactgtcgcccgtacatttagcccatacatccccatgtataatcatttgcatccatacattttgatggccgcacggcgcgaagcaaaaattacggctcctcgctgcagacctgcgagcagggaaacgctcccctcacagacgcgttgaattgtccccacgccgcgcccctgtagagaaatataaaaggttaggatttgccactgaggttcttctttcatatacttccttttaaaatcttgctaggatacagttctcacatcacatccgaacataaacaaccgtcgaggaacgccaggttgcccactttctcactagtgacctgcagccgacccaatcacatcacatccgaacataaacaaccatgggtaaaaagcctgaactcaccgcgacgtctgtcgagaagtttctgatcgaaaagttcgacagcgtctccgacctgatgcagctctcggagggcgaagaatctcgtgctttcagcttcgatgtaggagggcgtggatatgtcctgcgggtaaatagctgcgccgatggtttctacaaagatcgttatgtttatcggcactttgcatcggccgcgctcccgattccggaagtgcttgacattggggaattcagcgagagcctgacctattgcatctcccgccgtgcacagggtgtcacgttgcaagacctgcctgaaaccgaactgcccgctgttctgcagccggtcgcggaggccatggatgcgatcgctgcggccgatcttagccagacgagcgggttcggcccattcggaccgcaaggaatcggtcaatacactacatggcgtgatttcatatgcgcgattgctgatccccatgtgtatcactggcaaactgtgatggacgacaccgtcagtgcgtccgtcgcgcaggctctcgatgagctgatgctttgggccgaggactgccccgaagtccggcacctcgtgcacgcggatttcggctccaacaatgtcctgacggacaatggccgcataacagcggtcattgactggagcgaggcgatgttcggggattcccaatacgaggtcgccaacatcttcttctggaggccgtggttggcttgtatggagcagcagacgcgctacttcgagcggaggcatccggagcttgcaggatcgccgcggctccgggcgtatatgctccgcattggtcttgaccaactctatcagagcttggttgacggcaatttcgatgatgcagcttgggcgcagggtcgatgcgacgcaatcgtccgatccggagccgggactgtcgggcgtacacaaatcgcccgcagaagcgcggccgtctggaccgatggctgtgtagaagtactcgccgatagtggaaaccgacgccccagcactcgtccgagggcaaaggaataatcagtactgacaataaaaagattcttgtagggataacagggtaatcggagtgccatctgtgcagacaaacgcatcaggatagagtcttttgtaacgaccccgtctccaccaacttggtatgcttgaaatctcaaggccattacacattcagttatgtgaacgaaaggtctttatttaacgtagcataaactaaataatacaggttccggttagcctgcaatgtgttaaatctaaaggagcatacccaaaatgaactgaagacaaggaaatttgcttgtccagatgtgattgagcatttgaacgttaataacataacatttttatacttaactatagaaagacttgtataaaaactggcaaacgagatattctgaatattggtgcatatttcaggtagaaaagcttacaaaacaatctaatcataatattgagatgaagagaaagataaaagaaaaaacgataagtcagatgagattatgattgtactttgaaatcgaggaacaaagtatatacggtagtagttccccgagttataacgggagatcatgtaaattgagaaaccagataaagatttggtatgcactctagcaagaaaataaaatgatgaatctatgatatagatcacttttgttccagcgtcgaggaacgccaggttgcccactttctcactagtgacctgcagccgacgatcagatctttcaggaaagtttcggaggagatagtgttcggcagtttgtacatcatctgcgggatcaggtacggtttgatcaggttgtagaagatcaggtaagacatagaatcgatgtagatgatcggtttgtttttgttgatttttacgtaacagttcagttggaatttgttacgcagacccttaaccaggtattctacttcttcgaaagtgaaagactgggtgttcagtacgatcgatttgttggtagagtttttgttgtaatcccatttaccaccatcatccatgaaccagtatgccagagacatcggggtcaggtagttttcaaccaggttgttcgggatggtttttttgttgttaacgatgaacaggttagccagtttgttgaaagcttggtgtttgaaagtctgggcgccccaggtgattaccaggttacccaggtggttaacacgttcttttttgtgcggcggggacagtacccactgatcgtacagcagacatacgtggtccatgtatgctttgtttttccactcgaactgcatacagtaggttttaccttcatcacgagaacggatgtaagcatcacccaggatcagaccgatacctgcttcgaactgttcgatgttcagttcgatcagctgggatttgtattctttcagcagtttagagttcggacccaggttcattacctggttttttttgatgtttttcatatgcatggatccggggttttttctccttgacgttaaagtatagaggtatattaacaattttttgttgatacttttattacatttgaataagaagtaatacaaaccgaaaatgttgaaagtattagttaaagtggttatgcagtttttgcatttatatatctgttaatagatcaaaaatcatcgcttcgctgattaattaccccagaaataaggctaaaaaactaatcgcattatcatcctatggttgttaatttgattcgttcatttgaaggtttgtggggccaggttactgccaatttttcctcttcataaccataaaagctagtattgtagaatctttattgttcggagcagtgcggcgcgaggcacatctgcgtttcaggaacgcgaccggtgaagacgaggacgcacggaggagagtcttccttcggagggctgtcacccgctcggcggcttctaatccgtacttcaatatagcaatgagcagttaagcgtattactgaaagttccaaagagaaggtttttttaggctaagataatggggctctttacatttccacaacatataagtaagattagatatggatatgtatatggatatgtatatggtggtaatgccatgtaatatgattattaaacttctttgcgtccatccaacgagatctggcgcgccttaattaacccaacctgcattaatgaatcggccaacgcgcggattaccctgttatccctacatattgttgtgccatctgtgcagacaaacgcatcaggattcagtactgacaataaaaagattcttgttttcaagaacttgtcatttgtatagtttttttatattgtagttgttctattttaatcaaatgttagcgtgatttatattttttttcgcctcgacatcatctgcccagatgcgaagttaagtgcgcagaaagtaatatcatgcgtcaatcgtatgtgaatgctggtcgctatactgctgtcgattcgatactaacgccgccatccagtgtcgaaaacgagctcgaattcatcgatgatatcagatccactagtggcctatgcggccgcggatctgccggtctccctatagtgagtcgatccggatttacctgaatcaattggcgaaattttttgtacgaaatttcagccacttcacag'
@@ -448,7 +448,7 @@ algorithm..: common_sub_strings"""
     list_of_formatted_seq_records = parse(text8)
     a = assembly.Assembly(list_of_formatted_seq_records, limit=28)
     candidate = a.assemble_circular()[0]
-    assert candidate.seguid() == 'cdseguid-shtCglCTM_qST6oYZ7_iz80jZ6s'
+    assert candidate.seguid() == 'cdseguid=-mVwekticpAYIT9C4JcXmOGFkRo'
 
 
 def test_MXblaster1():
@@ -502,7 +502,7 @@ def test_MXblaster1():
 
     a = assembly.Assembly((pCAPs_pSU0_E_Z, A_AgTEFp_b, B_hph_c, C_KlLEU2tt_d), limit=28)
     candidate = a.assemble_circular()[0]
-    assert candidate.seguid() == 'cdseguid-shtCglCTM_qST6oYZ7_iz80jZ6s'
+    assert candidate.seguid() == 'cdseguid=-mVwekticpAYIT9C4JcXmOGFkRo'
     assert len(candidate) == 7911
     YPK0_AgTEFp_hph_KlLEU2tt = candidate
 
@@ -516,7 +516,7 @@ def test_MXblaster1():
 
     a = assembly.Assembly((pCAPs_pSU0_E_Z, A_KlLEU2tt_b, B_gal1_ISceI_c, C_AgTEFt_d), limit=25)
     candidate = a.assemble_circular()[0]
-    assert candidate.seguid() == 'cdseguid-SBr-IeJRj68Wyjq1yth3Y35pH_c'
+    assert candidate.seguid() == 'cdseguid=GGV2uIPTRD0lcV7RJPbVTItXNII'
     assert len(candidate) == 8099
     YPK0_KlLEU2tt_gal1_ISceI_AgTEFt = candidate
 
@@ -536,12 +536,12 @@ def test_MXblaster1():
     a = assembly.Assembly((AgTEFp_hph_KlLEU2tt_2, KlLEU2tt_gal1_ISceI_AgTEFt_2, pCAPs_pSU0_E_Z), limit=61)
     candidate = a.assemble_circular()[0]
     assert len(candidate) == 9772
-    assert candidate.seguid() == 'cdseguid-CF4kR78Kt_gRWaVRagRqI0dotyE'
+    assert candidate.seguid() == 'cdseguid=bUl04KTp5LpAulZX3UHdejwnuIQ'
     pCAPs_MX4blaster1 = candidate
 
     pCAPs_MX4blaster1 = pCAPs_MX4blaster1.synced('tcgcgcgtttcggtgatgacggtgaaaacc')
 
-    assert pCAPs_MX4blaster1.seguid() == 'cdseguid-CF4kR78Kt_gRWaVRagRqI0dotyE'
+    assert pCAPs_MX4blaster1.seguid() == 'cdseguid=bUl04KTp5LpAulZX3UHdejwnuIQ'
 
     AX023560 = read('test_files/AX023560.gb')
 
@@ -555,19 +555,19 @@ def test_MXblaster1():
 
     GAL_GIN = pcr(primer[592], primer[593], GAL10prom + GIN11M86)
 
-    assert GAL_GIN.seguid() == 'ldseguid-dJ_VblJ0kbzEJpEy1RmzQsa9Z1w'
+    assert GAL_GIN.seguid() == 'ldseguid=E4I5zDE-86ifdL8J9Wd9K827oLo'
 
-    assert pCAPs.seguid() == 'cdseguid-Z8mrStkBQUOs3VcINmizy1WfzNM'
+    assert pCAPs.seguid() == 'cdseguid=IFLMpKpCGZio0R0YkGSfqPaKKiw'
 
     pCAPs_GAL_GIN = (pCAPs.cut(AjiI)[0] + GAL_GIN).looped()
 
-    assert pCAPs_GAL_GIN.seguid() == 'cdseguid-c_9naB_WFu9MAknrtwG55Ux_KUM'
+    assert pCAPs_GAL_GIN.seguid() == 'cdseguid=WLRtLIqKRV3iM_le_IL7kDUqN2I'
 
     GAL_GIN2 = pcr(primer[592], primer[467], pCAPs_GAL_GIN)
 
-    assert GAL_GIN2.seguid() == 'ldseguid-onGqkKmNR25g94SUElmhUPMOCXE'
+    assert GAL_GIN2.seguid() == 'ldseguid=VMbnoWQyowa92XOf2wbKlsM26f8'
 
-    assert pCAPs_MX4blaster1.seguid() == 'cdseguid-CF4kR78Kt_gRWaVRagRqI0dotyE'  # 9772bp__a
+    assert pCAPs_MX4blaster1.seguid() == 'cdseguid=bUl04KTp5LpAulZX3UHdejwnuIQ'  # 9772bp__a
 
     pCAPs_MX4blaster1_AgeI = pCAPs_MX4blaster1.cut(AgeI)[0]
 
@@ -581,7 +581,7 @@ def test_MXblaster1():
 
     assert len(candidate) == 10566
 
-    assert candidate.seguid() == 'cdseguid-Bhuxi6G1Zo6v2ub34XrTsG7VHjA'
+    assert candidate.seguid() == 'cdseguid=c48cBUb3wF-Sdhzh0Tlprp-0CEg'
 
     pCAPs_MX4blaster2 = candidate
 
@@ -591,9 +591,9 @@ def test_MXblaster1():
     pCAPs_MX4blaster2_old = read('test_files/pMX4blaster2_old.gb')
 
     assert len(pCAPs_MX4blaster2_old) == 10566
-    assert pCAPs_MX4blaster2_old.seguid() == 'cdseguid-Bhuxi6G1Zo6v2ub34XrTsG7VHjA'
+    assert pCAPs_MX4blaster2_old.seguid() == 'cdseguid=c48cBUb3wF-Sdhzh0Tlprp-0CEg'
     assert eq(pCAPs_MX4blaster2, pCAPs_MX4blaster2_old)
-    assert pCAPs_MX4blaster2.seguid() == 'cdseguid-Bhuxi6G1Zo6v2ub34XrTsG7VHjA'
+    assert pCAPs_MX4blaster2.seguid() == 'cdseguid=c48cBUb3wF-Sdhzh0Tlprp-0CEg'
 
 
 def test_assemble_pGUP1():
@@ -618,8 +618,8 @@ def test_assemble_pGUP1():
     assert len(pGUP1_correct) == 9981
     assert len(pGUP1) == 9981
     assert eq(pGUP1, pGUP1_correct)
-    assert pGUP1_correct.seguid() == 'cdseguid-5aiMDLWXOfvl0PBCQV-96q9UKqY'
-    assert pGUP1.seguid() == 'cdseguid-5aiMDLWXOfvl0PBCQV-96q9UKqY'
+    assert pGUP1_correct.seguid() == 'cdseguid=QiK2pH9yioTPfSobUTLz4CPiNzY'
+    assert pGUP1.seguid() == 'cdseguid=QiK2pH9yioTPfSobUTLz4CPiNzY'
 
 
 def test_pYPK7_TDH3_GAL2_PGI1():
@@ -632,7 +632,7 @@ def test_pYPK7_TDH3_GAL2_PGI1():
 
     z = assembly.Assembly((pYPKp7_AatII, pMEC1142), limit=300)
 
-    assert 'cdseguid-N2gMOgsUuGgBKnikyuy-dXNDztM' in map(lambda x: x.seguid(), z.assemble_circular())
+    assert 'cdseguid=DeflrptvvS6m532WogvxQSgVKpk' in map(lambda x: x.seguid(), z.assemble_circular())
 
 
 def test_marker_replacement_on_plasmid():
