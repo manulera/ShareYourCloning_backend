@@ -12,7 +12,7 @@ httpx = "^0.25.0"
 python = "^3.10"
 python-multipart = "*"
 uvicorn = "*"
-pydna = {git = "https://github.com/BjornFJohansson/pydna", rev = "4fd760d075f77cceeb27969e017e04b42f6d0aa3"}
+pydna = {git = "https://github.com/BjornFJohansson/pydna", rev = "e32977fa21b108de7414cc675e25dff20b7aaf4d"}
 requests = "^2.31.0"
 regex = "^2023.10.3"
 
