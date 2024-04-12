@@ -339,7 +339,7 @@ async def genome_coordinates(
 )
 async def manually_typed(source: ManuallyTypedSource):
     """Return the sequence from a manually typed sequence"""
-    seq = Dseqrecord(source.user_input)
+    seq = Dseqrecord(source.user_input, circular=source.circular)
     return {'sequences': [format_sequence_genbank(seq)], 'sources': [source]}
 
 
