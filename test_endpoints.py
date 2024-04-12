@@ -957,6 +957,7 @@ class ManuallyTypedTest(unittest.TestCase):
     def test_manually_typed(self):
         """Test the manually_typed endpoint"""
 
+        # Test linear (default)
         source = ManuallyTypedSource(
             user_input='ATGC',
         )
@@ -970,6 +971,20 @@ class ManuallyTypedTest(unittest.TestCase):
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(len(sources), 1)
         self.assertEqual(str(resulting_sequences[0].seq), 'ATGC')
+        self.assertEqual(sources[0], source)
+
+        # Test circular
+        source.circular = True
+        response = client.post('/manually_typed', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        sources = [ManuallyTypedSource.model_validate(s) for s in payload['sources']]
+
+        self.assertEqual(len(resulting_sequences), 1)
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(str(resulting_sequences[0].seq), 'ATGC')
+        self.assertEqual(resulting_sequences[0].seq.circular, True)
         self.assertEqual(sources[0], source)
 
     # Test that it fails if not acgt or empty
