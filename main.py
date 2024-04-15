@@ -1,4 +1,5 @@
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter
+import json
+from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter, Form
 from typing import Annotated
 from fastapi.responses import JSONResponse
 from pydna.dseqrecord import Dseqrecord
@@ -157,6 +158,7 @@ async def read_from_file(
         None,
         description='Format of the sequence file. Unless specified, it will be guessed from the extension',
     ),
+    info_str: str = Form(''),
     index_in_file: int = Query(
         None,
         description='The index of the sequence in the file for multi-sequence files',
@@ -195,12 +197,19 @@ async def read_from_file(
     # The common part
     parent_source = UploadedFileSource(file_format=file_format, file_name=file.filename)
     out_sources = list()
+    info = json.loads(info_str) if info_str else dict()
     for i in range(len(dseqs)):
         new_source = parent_source.model_copy()
         new_source.index_in_file = i
+        new_source.info = info
         out_sources.append(new_source)
 
     out_sequences = [format_sequence_genbank(s) for s in dseqs]
+
+    if index_in_file is not None:
+        if index_in_file >= len(out_sources):
+            raise HTTPException(404, 'The index_in_file is out of range.')
+        return {'sequences': [out_sequences[index_in_file]], 'sources': [out_sources[index_in_file]]}
 
     return {'sequences': out_sequences, 'sources': out_sources}
 
@@ -301,12 +310,15 @@ async def genome_coordinates(
         raise HTTPException(422, 'gene_id is set, but not locus_tag')
 
     # We get the assembly accession (if it exists), and if the user provided one we validate it
-    assembly_accession = ncbi_requests.get_assembly_accession_from_sequence_accession(source.sequence_accession)
+    assembly_accessions = ncbi_requests.get_assembly_accession_from_sequence_accession(source.sequence_accession)
+
     if source.assembly_accession is not None:
-        if source.assembly_accession != assembly_accession:
+        if source.assembly_accession not in assembly_accessions:
             raise HTTPException(422, 'assembly_accession does not match the one from the sequence_accession')
 
-    source.assembly_accession = assembly_accession
+    # TODO: this could also be not set if there is more than one assembly linked to the sequence
+    if len(assembly_accessions):
+        source.assembly_accession = assembly_accessions[0]
 
     seq = ncbi_requests.get_genbank_sequence_subset(
         source.sequence_accession, source.start, source.stop, source.strand
@@ -327,7 +339,7 @@ async def genome_coordinates(
 )
 async def manually_typed(source: ManuallyTypedSource):
     """Return the sequence from a manually typed sequence"""
-    seq = Dseqrecord(source.user_input)
+    seq = Dseqrecord(source.user_input, circular=source.circular)
     return {'sequences': [format_sequence_genbank(seq)], 'sources': [source]}
 
 
@@ -461,7 +473,6 @@ async def pcr(
 ):
 
     dseq = read_dsrecord_from_json(sequences[0])
-    print(dseq)
     forward_primer = next((Dseqrecord(Dseq(p.sequence)) for p in primers if p.id == source.forward_primer), None)
     reverse_primer = next((Dseqrecord(Dseq(p.sequence)) for p in primers if p.id == source.reverse_primer), None)
     if forward_primer is None or reverse_primer is None:

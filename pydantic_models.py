@@ -117,6 +117,7 @@ class ManuallyTypedSource(Source):
     user_input: Annotated[str, Field(pattern=r'^[acgtACGT]+$')] = Field(
         ..., description='The sequence typed by the user'
     )
+    circular: Optional[bool] = Field(False, description='Whether the sequence is circular or not')
 
 
 class UploadedFileSource(Source):
