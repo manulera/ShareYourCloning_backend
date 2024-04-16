@@ -13,6 +13,7 @@ from dna_functions import (
     format_sequence_genbank,
     read_dsrecord_from_json,
     request_from_addgene,
+    oligo_hybridization_overhangs,
 )
 from pydantic_models import (
     PCRSource,
@@ -29,7 +30,7 @@ from pydantic_models import (
     AssemblySource,
     GenomeCoordinatesSource,
     ManuallyTypedSource,
-    TemplatelessPCRSource,
+    OligoHybridizationSource,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
@@ -41,7 +42,6 @@ from assembly2 import (
     assemble,
     sticky_end_sub_strings,
     PCRAssembly,
-    TemplatelessPCRAssembly,
     gibson_overlap,
     filter_linear_subassemblies,
     restriction_ligation_overlap,
@@ -524,55 +524,61 @@ async def pcr(
 
 
 @router.post(
-    '/templateless_pcr',
+    '/oligo_hybridization',
     response_model=create_model(
-        'TemplatelessPCRResponse', sources=(list[TemplatelessPCRSource], ...), sequences=(list[SequenceEntity], ...)
+        'OligoHybridizationResponse',
+        sources=(list[OligoHybridizationSource], ...),
+        sequences=(list[SequenceEntity], ...),
     ),
+    openapi_extra={
+        'requestBody': {'content': {'application/json': {'examples': request_examples.oligo_hybridization_examples}}}
+    },
 )
-async def templateless_pcr(
-    source: TemplatelessPCRSource,
-    # sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+async def oligo_hybridization(
+    source: OligoHybridizationSource,
     primers: conlist(PrimerModel, min_length=1, max_length=2),
     minimal_annealing: int = Query(20, description='The minimal annealing length for each primer.'),
 ):
+    watson_seq = next((p.sequence for p in primers if p.id == source.forward_oligo), None)
+    crick_seq = next((p.sequence for p in primers if p.id == source.reverse_oligo), None)
 
-    forward_primer = next((Dseqrecord(Dseq(p.sequence)) for p in primers if p.id == source.forward_primer), None)
-    reverse_primer = next((Dseqrecord(Dseq(p.sequence)) for p in primers if p.id == source.reverse_primer), None)
+    if watson_seq is None or crick_seq is None:
+        raise HTTPException(404, 'Invalid oligo id.')
 
-    if forward_primer is None or reverse_primer is None:
-        raise HTTPException(404, 'Invalid primer id.')
+    # The overhang is provided
+    if source.overhang_crick_3prime is not None:
+        ovhg_watson = len(watson_seq) - len(crick_seq) + source.overhang_crick_3prime
+        minimal_annealing = len(watson_seq)
+        if source.overhang_crick_3prime < 0:
+            minimal_annealing += source.overhang_crick_3prime
+        if ovhg_watson > 0:
+            minimal_annealing -= ovhg_watson
 
-    if source.assembly is not None:
-        minimal_annealing = source.minimal_overlap()
+    possible_overhangs = oligo_hybridization_overhangs(watson_seq, crick_seq, minimal_annealing)
 
-    fragments = [forward_primer, reverse_primer]
+    if len(possible_overhangs) == 0:
+        raise HTTPException(400, 'No pair of annealing oligos was found. Try changing the annealing settings.')
 
-    asm = TemplatelessPCRAssembly((forward_primer, reverse_primer), limit=minimal_annealing)
-    try:
-        possible_assemblies = asm.get_linear_assemblies()
-    except ValueError as e:
-        raise HTTPException(400, *e.args)
+    if source.overhang_crick_3prime is not None:
+        if source.overhang_crick_3prime not in possible_overhangs:
+            raise HTTPException(400, 'The provided overhang is not compatible with the primers.')
 
-    out_sources = [
-        TemplatelessPCRSource.from_assembly(
-            id=source.id,
-            assembly=a,
-            forward_primer=source.forward_primer,
-            reverse_primer=source.reverse_primer,
+        return {
+            'sources': [source],
+            'sequences': [
+                format_sequence_genbank(Dseqrecord(Dseq(watson_seq, crick_seq, source.overhang_crick_3prime)))
+            ],
+        }
+
+    out_sources = list()
+    out_sequences = list()
+    for overhang in possible_overhangs:
+        new_source = source.model_copy()
+        new_source.overhang_crick_3prime = overhang
+        out_sources.append(new_source)
+        out_sequences.append(
+            format_sequence_genbank(Dseqrecord(Dseq(watson_seq, crick_seq, source.overhang_crick_3prime)))
         )
-        for a in possible_assemblies
-    ]
-
-    # If a specific assembly is requested
-    if source.assembly is not None:
-        return format_known_assembly_response(source, out_sources, fragments)
-
-    if len(possible_assemblies) == 0:
-        raise HTTPException(400, 'No pair of annealing primers was found. Try changing the annealing settings.')
-
-    out_sequences = [
-        format_sequence_genbank(assemble(fragments, a, s.circular)) for s, a in zip(out_sources, possible_assemblies)
-    ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
 

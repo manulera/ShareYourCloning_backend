@@ -6,6 +6,8 @@ from Bio.SeqFeature import SeqFeature, Location
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
 from Bio.Restriction.Restriction import RestrictionType
 from typing import Annotated
+from pydna.dseqrecord import Dseqrecord
+from pydna.dseq import Dseq
 
 
 class SourceType(str, Enum):
@@ -19,7 +21,7 @@ class SourceType(str, Enum):
     restriction_and_ligation = 'restriction_and_ligation'
     genome_coordinates = 'genome_coordinates'
     manually_typed = 'manually_typed'
-    templateless_PCR = 'templateless_PCR'
+    oligonucleotide_hybridization = 'oligonucleotide_hybridization'
 
 
 class SequenceFileFormat(str, Enum):
@@ -329,30 +331,14 @@ class RestrictionAndLigationSource(AssemblySource):
         )
 
 
-class TemplatelessPCRSource(AssemblySource):
-    """Documents a Templateless PCR, and the selection of one of the products."""
+class OligoHybridizationSource(Source):
+    """Documents an oligonucleotide hybridization, optionally can fill in with PCR"""
 
-    type: SourceType = SourceType('templateless_PCR')
-    circular: bool = False
-    forward_primer: int = Field(..., description='The forward primer')
-    reverse_primer: int = Field(..., description='The reverse primer')
-
-    # Templateless PCR does not take any inputs
+    type: SourceType = SourceType('oligonucleotide_hybridization')
     input: conlist(int, max_length=0) = []
+    forward_oligo: int = None
+    reverse_oligo: int = None
+    overhang_crick_3prime: Optional[int] = None
 
-    def from_assembly(
-        assembly: list[tuple[int, int, Location, Location]],
-        id: int,
-        forward_primer: int,
-        reverse_primer: int,
-    ) -> 'TemplatelessPCRSource':
-        """Creates a TemplatelessPCRSource from an assembly and id"""
-        return TemplatelessPCRSource(
-            id=id,
-            assembly=[
-                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
-                for part in assembly
-            ],
-            forward_primer=forward_primer,
-            reverse_primer=reverse_primer,
-        )
+    def get_dseqrecord(self, watson_seq, crick_seq) -> Dseqrecord:
+        return Dseqrecord(Dseq(watson_seq, crick_seq, self.overhang_crick_3prime))

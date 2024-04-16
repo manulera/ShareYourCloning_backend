@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 import regex
 from Bio.SeqFeature import SimpleLocation, Location, CompoundLocation
 from pydna.utils import shift_location
+from pydna.common_sub_strings import common_sub_strings
 
 
 def sum_is_sticky(three_prime_end: tuple[str, str], five_prime_end: tuple[str, str], partial: bool = False) -> int:
@@ -200,3 +201,13 @@ def perform_homologous_recombination(template: Dseqrecord, insert: Dseqrecord, l
     if template.circular:
         return (template[edges[1] : edges[0]] + insert).looped()
     return template[0 : edges[0]] + insert + template[edges[1] :]
+
+
+def seq_overlap_length(dseq: Dseq) -> int:
+    return len(dseq) - abs(dseq.ovhg) - abs(dseq.watson_ovhg())
+
+
+def oligo_hybridization_overhangs(fwd_oligo_seq: str, rvs_oligo_seq: str, minimal_annealing: int) -> list[int]:
+    matches = common_sub_strings(fwd_oligo_seq.lower(), reverse_complement(rvs_oligo_seq.lower()), minimal_annealing)
+    # Return possible overhangs
+    return [start_on_rvs - start_on_fwd for start_on_fwd, start_on_rvs, length in matches]
