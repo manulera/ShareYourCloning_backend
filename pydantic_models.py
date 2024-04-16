@@ -6,8 +6,6 @@ from Bio.SeqFeature import SeqFeature, Location
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
 from Bio.Restriction.Restriction import RestrictionType
 from typing import Annotated
-from pydna.dseqrecord import Dseqrecord
-from pydna.dseq import Dseq
 
 
 class SourceType(str, Enum):
@@ -339,6 +337,3 @@ class OligoHybridizationSource(Source):
     forward_oligo: int = None
     reverse_oligo: int = None
     overhang_crick_3prime: Optional[int] = None
-
-    def get_dseqrecord(self, watson_seq, crick_seq) -> Dseqrecord:
-        return Dseqrecord(Dseq(watson_seq, crick_seq, self.overhang_crick_3prime))

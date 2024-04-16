@@ -9,7 +9,7 @@ from pydna.parsers import parse as pydna_parse
 import requests
 from bs4 import BeautifulSoup
 import regex
-from Bio.SeqFeature import SimpleLocation, Location, CompoundLocation
+from Bio.SeqFeature import SimpleLocation, Location
 from pydna.utils import shift_location
 from pydna.common_sub_strings import common_sub_strings
 
@@ -178,13 +178,6 @@ def find_sequence_regex(pattern: str, seq: str, is_circular: bool) -> list[Locat
     )
 
 
-def location_edges(location: Location):
-    if isinstance(location, SimpleLocation):
-        return location.start, location.end
-    if isinstance(location, CompoundLocation):
-        return location.parts[0].start, location.parts[-1].end
-
-
 def get_homologous_recombination_locations(
     template: Dseqrecord, insert: Dseqrecord, minimal_homology
 ) -> list[Location]:
@@ -196,15 +189,9 @@ def get_homologous_recombination_locations(
     return locations
 
 
-def perform_homologous_recombination(template: Dseqrecord, insert: Dseqrecord, location: Location):
-    edges = location_edges(location)
-    if template.circular:
-        return (template[edges[1] : edges[0]] + insert).looped()
-    return template[0 : edges[0]] + insert + template[edges[1] :]
-
-
-def seq_overlap_length(dseq: Dseq) -> int:
-    return len(dseq) - abs(dseq.ovhg) - abs(dseq.watson_ovhg())
+# Could be useful at some point
+# def seq_overlap_length(dseq: Dseq) -> int:
+#     return len(dseq) - abs(dseq.ovhg) - abs(dseq.watson_ovhg())
 
 
 def oligo_hybridization_overhangs(fwd_oligo_seq: str, rvs_oligo_seq: str, minimal_annealing: int) -> list[int]:

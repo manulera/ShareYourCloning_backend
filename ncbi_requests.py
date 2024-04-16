@@ -15,7 +15,7 @@ def get_assembly_accession_from_sequence_accession(sequence_accession: str) -> l
         raise HTTPException(404, 'sequence accession not found')
     assembly_accessions = []
     # sequence_accessions is associated with any assembly
-    if 'error' in data:
+    if 'error' in data:  # pragma: no cover
         raise HTTPException(503, f'failed to access NCBI: {data["error"]}')
     if 'linksetdbs' in data['linksets'][0]:
         links = data['linksets'][0]['linksetdbs'][0]['links']
@@ -25,7 +25,7 @@ def get_assembly_accession_from_sequence_accession(sequence_accession: str) -> l
             data = resp.json()
         except JSONDecodeError:
             raise HTTPException(503, 'Error accessing assembly id')
-        if 'error' in data:
+        if 'error' in data:  # pragma: no cover
             raise HTTPException(503, f'failed to access NCBI: {data["error"]}')
         assembly_accessions.extend(
             data['result'][assembly_id]['assemblyaccession']
