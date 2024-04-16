@@ -4,6 +4,7 @@ description = "Backend of ShareYourCloning, a web application to generate molecu
 license = "MIT"
 name = "shareyourcloning_backend"
 version = "0.1.0"
+package-mode = false
 
 [tool.poetry.dependencies]
 beautifulsoup4 = "^4.11.1"
