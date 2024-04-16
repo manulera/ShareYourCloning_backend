@@ -22,7 +22,7 @@ from pydna.dseqrecord import Dseqrecord
 import unittest
 from pydna.dseq import Dseq
 from request_examples import genome_region_examples
-
+import json
 
 client = TestClient(app)
 
@@ -91,6 +91,37 @@ class ReadFileTest(unittest.TestCase):
 
             self.assertEqual(response.status_code, 422)
             self.assertTrue(example['error_message'] in response.json()['detail'])
+
+    def test_file_index_known(self):
+        """Test that if the index in file is specified it works."""
+
+        with open('./examples/sequences/dummy_multi_fasta.fasta', 'rb') as f:
+            response = client.post('/read_from_file?index_in_file=1', files={'file': f})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        sources = [UploadedFileSource.model_validate(s) for s in payload['sources']]
+
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(len(resulting_sequences), 1)
+
+    def test_info_dict(self):
+        """Test that the info dict can be submitted in the form"""
+
+        info_dict = {'a': 'b'}
+        info_str = json.dumps(info_dict)
+
+        with open('./examples/sequences/dummy_multi_fasta.fasta', 'rb') as f:
+            response = client.post('/read_from_file?index_in_file=1',files={'file': f}, data={'info_str': info_str})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        source = next(UploadedFileSource.model_validate(s) for s in payload['sources'])
+
+        self.assertEqual(source.info, info_dict)
 
 
 class GenBankTest(unittest.TestCase):
