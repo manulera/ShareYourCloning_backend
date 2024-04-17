@@ -20,6 +20,7 @@ class SourceType(str, Enum):
     genome_coordinates = 'genome_coordinates'
     manually_typed = 'manually_typed'
     oligonucleotide_hybridization = 'oligonucleotide_hybridization'
+    polymerase_extension = 'polymerase_extension'
 
 
 class SequenceFileFormat(str, Enum):
@@ -337,3 +338,8 @@ class OligoHybridizationSource(Source):
     forward_oligo: int = None
     reverse_oligo: int = None
     overhang_crick_3prime: Optional[int] = None
+
+
+class PolymeraseExtensionSource(Source):
+    type: SourceType = SourceType('polymerase_extension')
+    input: conlist(int, min_length=1, max_length=1)

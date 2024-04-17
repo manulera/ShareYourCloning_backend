@@ -17,6 +17,7 @@ from pydantic_models import (
     ManuallyTypedSource,
     GenomeCoordinatesSource,
     OligoHybridizationSource,
+    PolymeraseExtensionSource,
 )
 from pydna.dseqrecord import Dseqrecord
 import unittest
@@ -1279,6 +1280,53 @@ class GenomeRegionTest(unittest.TestCase):
         viral_source.strand = 1
         response = client.post('/genome_coordinates', json=viral_source.model_dump())
         self.assertStatusCode(response.status_code, 400)
+
+
+class PolymeraseExtensionTest(unittest.TestCase):
+
+    def test_polymerase_extension(self):
+        dseq = Dseq.from_full_sequence_and_overhangs('ACGTT', 1, 1)
+        template = Dseqrecord(dseq, circular=False)
+        json_template = format_sequence_genbank(template)
+        json_template.id = 1
+
+        source = PolymeraseExtensionSource(
+            id=2,
+            input=[1],
+        )
+
+        data = {'source': source.model_dump(), 'sequences': [json_template.model_dump()]}
+        response = client.post('/polymerase_extension', json=data)
+        payload = response.json()
+        self.assertEqual(response.status_code, 200)
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+        self.assertEqual(len(sequences), 1)
+        self.assertEqual(sequences[0].seq, dseq.fill_in())
+        response_source = PolymeraseExtensionSource.model_validate(payload['sources'][0])
+        self.assertEqual(response_source, source)
+
+    def test_exceptions(self):
+
+        # Sequence without overhangs
+        cases = [
+            (Dseqrecord('ACGTT'), 400, 1),  # No overhangs
+            (Dseqrecord('ACGTT', circular=True), 400, 1),  # circular
+            (Dseqrecord(Dseq.from_full_sequence_and_overhangs('ACGTT', 1, 1)), 404, 3),  # wrong id
+        ]
+
+        for template, status_code, id in cases:
+            json_template = format_sequence_genbank(template)
+            json_template.id = id
+
+            source = PolymeraseExtensionSource(
+                id=2,
+                input=[1],
+            )
+
+            data = {'source': source.model_dump(), 'sequences': [json_template.model_dump()]}
+            response = client.post('/polymerase_extension', json=data)
+            self.assertEqual(response.status_code, status_code)
 
 
 if __name__ == '__main__':

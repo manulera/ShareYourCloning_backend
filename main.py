@@ -31,6 +31,7 @@ from pydantic_models import (
     GenomeCoordinatesSource,
     ManuallyTypedSource,
     OligoHybridizationSource,
+    PolymeraseExtensionSource,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
@@ -581,6 +582,36 @@ async def oligo_hybridization(
         )
 
     return {'sources': out_sources, 'sequences': out_sequences}
+
+
+@router.post(
+    '/polymerase_extension',
+    response_model=create_model(
+        'PolymeraseExtensionResponse',
+        sources=(list[PolymeraseExtensionSource], ...),
+        sequences=(list[SequenceEntity], ...),
+    ),
+)
+async def polymerase_extension(
+    source: PolymeraseExtensionSource,
+    sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+):
+    """Return the sequence from a polymerase extension reaction"""
+
+    if source.input[0] != sequences[0].id:
+        raise HTTPException(404, 'The provided input does not match the sequence id.')
+
+    dseq = read_dsrecord_from_json(sequences[0])
+
+    if dseq.circular:
+        raise HTTPException(400, 'The sequence must be linear.')
+
+    if dseq.seq.ovhg == dseq.seq.watson_ovhg() == 0:
+        raise HTTPException(400, 'The sequence must have an overhang.')
+
+    out_sequence = Dseqrecord(dseq.seq.fill_in(), features=dseq.features)
+
+    return {'sequences': [format_sequence_genbank(out_sequence)], 'sources': [source]}
 
 
 @router.post(
