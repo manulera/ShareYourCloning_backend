@@ -1,4 +1,5 @@
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter
+import json
+from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter, Form
 from typing import Annotated
 from fastapi.responses import JSONResponse
 from pydna.dseqrecord import Dseqrecord
@@ -12,6 +13,7 @@ from dna_functions import (
     format_sequence_genbank,
     read_dsrecord_from_json,
     request_from_addgene,
+    oligonucleotide_hybridization_overhangs,
 )
 from pydantic_models import (
     PCRSource,
@@ -28,6 +30,8 @@ from pydantic_models import (
     AssemblySource,
     GenomeCoordinatesSource,
     ManuallyTypedSource,
+    OligoHybridizationSource,
+    PolymeraseExtensionSource,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
@@ -155,6 +159,7 @@ async def read_from_file(
         None,
         description='Format of the sequence file. Unless specified, it will be guessed from the extension',
     ),
+    info_str: str = Form(''),
     index_in_file: int = Query(
         None,
         description='The index of the sequence in the file for multi-sequence files',
@@ -193,12 +198,19 @@ async def read_from_file(
     # The common part
     parent_source = UploadedFileSource(file_format=file_format, file_name=file.filename)
     out_sources = list()
+    info = json.loads(info_str) if info_str else dict()
     for i in range(len(dseqs)):
         new_source = parent_source.model_copy()
         new_source.index_in_file = i
+        new_source.info = info
         out_sources.append(new_source)
 
     out_sequences = [format_sequence_genbank(s) for s in dseqs]
+
+    if index_in_file is not None:
+        if index_in_file >= len(out_sources):
+            raise HTTPException(404, 'The index_in_file is out of range.')
+        return {'sequences': [out_sequences[index_in_file]], 'sources': [out_sources[index_in_file]]}
 
     return {'sequences': out_sequences, 'sources': out_sources}
 
@@ -299,12 +311,15 @@ async def genome_coordinates(
         raise HTTPException(422, 'gene_id is set, but not locus_tag')
 
     # We get the assembly accession (if it exists), and if the user provided one we validate it
-    assembly_accession = ncbi_requests.get_assembly_accession_from_sequence_accession(source.sequence_accession)
+    assembly_accessions = ncbi_requests.get_assembly_accession_from_sequence_accession(source.sequence_accession)
+
     if source.assembly_accession is not None:
-        if source.assembly_accession != assembly_accession:
+        if source.assembly_accession not in assembly_accessions:
             raise HTTPException(422, 'assembly_accession does not match the one from the sequence_accession')
 
-    source.assembly_accession = assembly_accession
+    # TODO: this could also be not set if there is more than one assembly linked to the sequence
+    if len(assembly_accessions):
+        source.assembly_accession = assembly_accessions[0]
 
     seq = ncbi_requests.get_genbank_sequence_subset(
         source.sequence_accession, source.start, source.stop, source.strand
@@ -325,7 +340,7 @@ async def genome_coordinates(
 )
 async def manually_typed(source: ManuallyTypedSource):
     """Return the sequence from a manually typed sequence"""
-    seq = Dseqrecord(source.user_input)
+    seq = Dseqrecord(source.user_input, circular=source.circular)
     return {'sequences': [format_sequence_genbank(seq)], 'sources': [source]}
 
 
@@ -507,6 +522,98 @@ async def pcr(
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
+
+
+@router.post(
+    '/oligonucleotide_hybridization',
+    response_model=create_model(
+        'OligoHybridizationResponse',
+        sources=(list[OligoHybridizationSource], ...),
+        sequences=(list[SequenceEntity], ...),
+    ),
+    openapi_extra={
+        'requestBody': {
+            'content': {'application/json': {'examples': request_examples.oligonucleotide_hybridization_examples}}
+        }
+    },
+)
+async def oligonucleotide_hybridization(
+    source: OligoHybridizationSource,
+    primers: conlist(PrimerModel, min_length=1, max_length=2),
+    minimal_annealing: int = Query(20, description='The minimal annealing length for each primer.'),
+):
+    watson_seq = next((p.sequence for p in primers if p.id == source.forward_oligo), None)
+    crick_seq = next((p.sequence for p in primers if p.id == source.reverse_oligo), None)
+
+    if watson_seq is None or crick_seq is None:
+        raise HTTPException(404, 'Invalid oligo id.')
+
+    # The overhang is provided
+    if source.overhang_crick_3prime is not None:
+        ovhg_watson = len(watson_seq) - len(crick_seq) + source.overhang_crick_3prime
+        minimal_annealing = len(watson_seq)
+        if source.overhang_crick_3prime < 0:
+            minimal_annealing += source.overhang_crick_3prime
+        if ovhg_watson > 0:
+            minimal_annealing -= ovhg_watson
+
+    possible_overhangs = oligonucleotide_hybridization_overhangs(watson_seq, crick_seq, minimal_annealing)
+
+    if len(possible_overhangs) == 0:
+        raise HTTPException(400, 'No pair of annealing oligos was found. Try changing the annealing settings.')
+
+    if source.overhang_crick_3prime is not None:
+        if source.overhang_crick_3prime not in possible_overhangs:
+            raise HTTPException(400, 'The provided overhang is not compatible with the primers.')
+
+        return {
+            'sources': [source],
+            'sequences': [
+                format_sequence_genbank(Dseqrecord(Dseq(watson_seq, crick_seq, source.overhang_crick_3prime)))
+            ],
+        }
+
+    out_sources = list()
+    out_sequences = list()
+    for overhang in possible_overhangs:
+        new_source = source.model_copy()
+        new_source.overhang_crick_3prime = overhang
+        out_sources.append(new_source)
+        out_sequences.append(
+            format_sequence_genbank(Dseqrecord(Dseq(watson_seq, crick_seq, source.overhang_crick_3prime)))
+        )
+
+    return {'sources': out_sources, 'sequences': out_sequences}
+
+
+@router.post(
+    '/polymerase_extension',
+    response_model=create_model(
+        'PolymeraseExtensionResponse',
+        sources=(list[PolymeraseExtensionSource], ...),
+        sequences=(list[SequenceEntity], ...),
+    ),
+)
+async def polymerase_extension(
+    source: PolymeraseExtensionSource,
+    sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+):
+    """Return the sequence from a polymerase extension reaction"""
+
+    if source.input[0] != sequences[0].id:
+        raise HTTPException(404, 'The provided input does not match the sequence id.')
+
+    dseq = read_dsrecord_from_json(sequences[0])
+
+    if dseq.circular:
+        raise HTTPException(400, 'The sequence must be linear.')
+
+    if dseq.seq.ovhg == dseq.seq.watson_ovhg() == 0:
+        raise HTTPException(400, 'The sequence must have an overhang.')
+
+    out_sequence = Dseqrecord(dseq.seq.fill_in(), features=dseq.features)
+
+    return {'sequences': [format_sequence_genbank(out_sequence)], 'sources': [source]}
 
 
 @router.post(

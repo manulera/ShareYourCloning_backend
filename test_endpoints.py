@@ -16,12 +16,15 @@ from pydantic_models import (
     RestrictionAndLigationSource,
     ManuallyTypedSource,
     GenomeCoordinatesSource,
+    OligoHybridizationSource,
+    PolymeraseExtensionSource,
 )
 from pydna.dseqrecord import Dseqrecord
 import unittest
 from pydna.dseq import Dseq
-from request_examples import genome_region_examples
-
+import request_examples
+import json
+import copy
 
 client = TestClient(app)
 
@@ -90,6 +93,37 @@ class ReadFileTest(unittest.TestCase):
 
             self.assertEqual(response.status_code, 422)
             self.assertTrue(example['error_message'] in response.json()['detail'])
+
+    def test_file_index_known(self):
+        """Test that if the index in file is specified it works."""
+
+        with open('./examples/sequences/dummy_multi_fasta.fasta', 'rb') as f:
+            response = client.post('/read_from_file?index_in_file=1', files={'file': f})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        sources = [UploadedFileSource.model_validate(s) for s in payload['sources']]
+
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(len(resulting_sequences), 1)
+
+    def test_info_dict(self):
+        """Test that the info dict can be submitted in the form"""
+
+        info_dict = {'a': 'b'}
+        info_str = json.dumps(info_dict)
+
+        with open('./examples/sequences/dummy_multi_fasta.fasta', 'rb') as f:
+            response = client.post('/read_from_file?index_in_file=1', files={'file': f}, data={'info_str': info_str})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        source = next(UploadedFileSource.model_validate(s) for s in payload['sources'])
+
+        self.assertEqual(source.info, info_dict)
 
 
 class GenBankTest(unittest.TestCase):
@@ -295,7 +329,7 @@ class StickyLigationTest(unittest.TestCase):
 
         self.assertEqual(len(resulting_sequences[0]), len(initial_sequence))
 
-    def test_circularisation(self):
+    def test_circularization(self):
         enzyme = CommOnly.format('EcoRI')
         fragment = Dseqrecord('AGAATTC', circular=True).cut(enzyme)[0]
         json_seqs = [format_sequence_genbank(fragment)]
@@ -341,7 +375,7 @@ class BluntLigationTest(unittest.TestCase):
         self.assertEqual(len(resulting_sequences2), 1)
         self.assertEqual(resulting_sequences2[0].seq, resulting_sequences[0].seq)
 
-    def test_circularisation(self):
+    def test_circularization(self):
         seqs = [Dseqrecord('ATCC', circular=False)]
         json_seqs = [format_sequence_genbank(seq) for seq in seqs]
         json_seqs[0].id = 1
@@ -799,6 +833,144 @@ class PCRTest(unittest.TestCase):
         self.assertIn('Clashing primers', payload['detail'])
 
 
+# class TemplatelessPCRTest(unittest.TestCase):
+#     def test_templateless(self):
+#         submitted_source = TemplatelessPCRSource(
+#             input=[],
+#             forward_primer=1,
+#             reverse_primer=2,
+#         )
+
+#         # Test case of initial example
+
+#         primer_fwd = PrimerModel(sequence='TTACGTAAAAAA', id=1, name='fwd')
+#         primer_rvs = PrimerModel(sequence='CGTACGTTTTTT', id=2, name='rvs')
+
+#         data = {
+#             'source': submitted_source.model_dump(),
+#             'sequences': [],
+#             'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
+#         }
+
+#         response = client.post('/templateless_pcr', json=data, params={'minimal_annealing': 6})
+#         payload = response.json()
+
+#         sources = [TemplatelessPCRSource.model_validate(s) for s in payload['sources']]
+#         sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+#         assert len(sources) == 1
+#         assert len(sequences) == 1
+
+#         seq1 = sequences[0]
+#         assert str(seq1.seq) == 'TTACGTAAAAAACGTACG'
+
+#         # Test case of fully overlapping primers (it is not particularly special)
+
+#         primer_fwd = PrimerModel(sequence='ACGTACGT', id=1, name='fwd')
+#         primer_rvs = PrimerModel(sequence='ACGTACGT', id=2, name='rvs')
+
+#         data = {
+#             'source': submitted_source.model_dump(),
+#             'sequences': [],
+#             'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
+#         }
+
+#         response = client.post('/templateless_pcr', json=data, params={'minimal_annealing': 8})
+#         payload = response.json()
+
+#         sources = [TemplatelessPCRSource.model_validate(s) for s in payload['sources']]
+#         sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+#         assert len(sources) == 1
+#         assert len(sequences) == 1
+
+#         seq1 = sequences[0]
+#         assert str(seq1.seq) == 'ACGTACGT'
+
+#         # Test several sources
+#         response = client.post('/templateless_pcr', json=data, params={'minimal_annealing': 4})
+#         payload = response.json()
+
+#         sources = [TemplatelessPCRSource.model_validate(s) for s in payload['sources']]
+#         sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+#         assert len(sources) == 2
+#         assert len(sequences) == 2
+
+#         seq1 = sequences[0]
+#         seq2 = sequences[1]
+
+#         assert str(seq1.seq) == 'ACGTACGT'
+#         assert str(seq2.seq) == 'ACGTACGTACGT'
+
+#         # Test overhanging primers (should result in a fragment with overhang, as this would happen in a real PCR)
+#         primer_fwd = PrimerModel(sequence='ACGTACGT', id=1, name='fwd')
+#         primer_rvs = PrimerModel(sequence='ACGTACGTTTT', id=2, name='rvs')
+
+#         data = {
+#             'source': submitted_source.model_dump(),
+#             'sequences': [],
+#             'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
+#         }
+
+#         response = client.post('/templateless_pcr', json=data, params={'minimal_annealing': 8})
+#         payload = response.json()
+
+#         sources = [TemplatelessPCRSource.model_validate(s) for s in payload['sources']]
+#         sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+#         assert len(sources) == 1
+#         assert len(sequences) == 1
+
+#         seq1 = sequences[0]
+
+
+class OligoHybridizationTest(unittest.TestCase):
+
+    def test_hybridization(self):
+        default_example = request_examples.oligonucleotide_hybridization_examples['default']['value']
+        watson_sequence = default_example['primers'][0]['sequence']
+        crick_sequence = default_example['primers'][1]['sequence']
+        response = client.post('/oligonucleotide_hybridization', json=default_example)
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sources']), 1)
+        self.assertEqual(len(payload['sequences']), 1)
+
+        source = OligoHybridizationSource.model_validate(payload['sources'][0])
+        sequence = read_dsrecord_from_json(SequenceEntity.model_validate(payload['sequences'][0]))
+
+        self.assertEqual(source.overhang_crick_3prime, sequence.seq.ovhg)
+        self.assertEqual(sequence.seq.watson, watson_sequence.upper())
+        self.assertEqual(sequence.seq.crick, crick_sequence.upper())
+
+        # The minimal_annealing parameter is ignored if the overhangs are specified
+        modified_example = copy.deepcopy(default_example)
+        modified_example['source']['overhang_crick_3prime'] = source.overhang_crick_3prime
+
+        response = client.post(
+            '/oligonucleotide_hybridization', json=modified_example, params={'minimal_annealing': 60}
+        )
+        payload2 = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload, payload2)
+
+    def test_no_valid_result(self):
+        default_example = request_examples.oligonucleotide_hybridization_examples['default']['value']
+        response = client.post(
+            '/oligonucleotide_hybridization', json=default_example, params={'minimal_annealing': 60}
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_invalid_oligo_id(self):
+        invalid_oligo_example = copy.deepcopy(
+            request_examples.oligonucleotide_hybridization_examples['default']['value']
+        )
+        invalid_oligo_example['source']['forward_oligo'] = 5
+        response = client.post('/oligonucleotide_hybridization', json=invalid_oligo_example)
+        self.assertEqual(response.status_code, 404)
+
+
 class HomologousRecombinationTest(unittest.TestCase):
     def test_homologous_recombination(self):
         template = Dseqrecord('TTTTacgatAAtgctccCCCC', circular=False)
@@ -957,6 +1129,7 @@ class ManuallyTypedTest(unittest.TestCase):
     def test_manually_typed(self):
         """Test the manually_typed endpoint"""
 
+        # Test linear (default)
         source = ManuallyTypedSource(
             user_input='ATGC',
         )
@@ -970,6 +1143,20 @@ class ManuallyTypedTest(unittest.TestCase):
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(len(sources), 1)
         self.assertEqual(str(resulting_sequences[0].seq), 'ATGC')
+        self.assertEqual(sources[0], source)
+
+        # Test circular
+        source.circular = True
+        response = client.post('/manually_typed', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        sources = [ManuallyTypedSource.model_validate(s) for s in payload['sources']]
+
+        self.assertEqual(len(resulting_sequences), 1)
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(str(resulting_sequences[0].seq), 'ATGC')
+        self.assertEqual(resulting_sequences[0].seq.circular, True)
         self.assertEqual(sources[0], source)
 
     # Test that it fails if not acgt or empty
@@ -990,8 +1177,8 @@ class GenomeRegionTest(unittest.TestCase):
             self.assertEqual(response_code, expected)
 
     def test_examples(self):
-        for example_name in genome_region_examples:
-            example = genome_region_examples[example_name]
+        for example_name in request_examples.genome_region_examples:
+            example = request_examples.genome_region_examples[example_name]
             response = client.post('/genome_coordinates', json=example['value'])
             self.assertStatusCode(response.status_code, 200)
             payload = response.json()
@@ -1014,7 +1201,9 @@ class GenomeRegionTest(unittest.TestCase):
 
     def test_exceptions(self):
         # Load first example
-        correct_source = GenomeCoordinatesSource.model_validate(genome_region_examples['full']['value'])
+        correct_source = GenomeCoordinatesSource.model_validate(
+            request_examples.genome_region_examples['full']['value']
+        )
 
         # Ommit assembly accession
         s = correct_source.model_copy()
@@ -1071,7 +1260,9 @@ class GenomeRegionTest(unittest.TestCase):
         self.assertStatusCode(response.status_code, 404)
 
         # Coordinates malformatted
-        viral_source = GenomeCoordinatesSource.model_validate(genome_region_examples['viral_sequence']['value'])
+        viral_source = GenomeCoordinatesSource.model_validate(
+            request_examples.genome_region_examples['viral_sequence']['value']
+        )
         viral_source.start = 10
         viral_source.stop = 1
         response = client.post('/genome_coordinates', json=viral_source.model_dump())
@@ -1095,6 +1286,53 @@ class GenomeRegionTest(unittest.TestCase):
         viral_source.strand = 1
         response = client.post('/genome_coordinates', json=viral_source.model_dump())
         self.assertStatusCode(response.status_code, 400)
+
+
+class PolymeraseExtensionTest(unittest.TestCase):
+
+    def test_polymerase_extension(self):
+        dseq = Dseq.from_full_sequence_and_overhangs('ACGTT', 1, 1)
+        template = Dseqrecord(dseq, circular=False)
+        json_template = format_sequence_genbank(template)
+        json_template.id = 1
+
+        source = PolymeraseExtensionSource(
+            id=2,
+            input=[1],
+        )
+
+        data = {'source': source.model_dump(), 'sequences': [json_template.model_dump()]}
+        response = client.post('/polymerase_extension', json=data)
+        payload = response.json()
+        self.assertEqual(response.status_code, 200)
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+        self.assertEqual(len(sequences), 1)
+        self.assertEqual(sequences[0].seq, dseq.fill_in())
+        response_source = PolymeraseExtensionSource.model_validate(payload['sources'][0])
+        self.assertEqual(response_source, source)
+
+    def test_exceptions(self):
+
+        # Sequence without overhangs
+        cases = [
+            (Dseqrecord('ACGTT'), 400, 1),  # No overhangs
+            (Dseqrecord('ACGTT', circular=True), 400, 1),  # circular
+            (Dseqrecord(Dseq.from_full_sequence_and_overhangs('ACGTT', 1, 1)), 404, 3),  # wrong id
+        ]
+
+        for template, status_code, id in cases:
+            json_template = format_sequence_genbank(template)
+            json_template.id = id
+
+            source = PolymeraseExtensionSource(
+                id=2,
+                input=[1],
+            )
+
+            data = {'source': source.model_dump(), 'sequences': [json_template.model_dump()]}
+            response = client.post('/polymerase_extension', json=data)
+            self.assertEqual(response.status_code, status_code)
 
 
 if __name__ == '__main__':

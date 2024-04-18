@@ -41,3 +41,25 @@ genome_region_examples = {
         },
     },
 }
+
+oligonucleotide_hybridization_examples = {
+    'default': {
+        'summary': 'Typical example',
+        'description': 'blah',
+        'value': {
+            'source': {
+                'id': 1,
+                'kind': 'source',
+                'input': [],
+                'output': 0,
+                'type': 'oligonucleotide_hybridization',
+                'forward_oligo': 2,
+                'reverse_oligo': 3,
+            },
+            'primers': [
+                {'id': 2, 'name': 'primer1', 'sequence': 'aaGCGGCCGCgtagaactttatgtgcttccttacattggt'},
+                {'id': 3, 'name': 'primer2', 'sequence': 'aaGCGGCCGCaccaatgtaaggaagcacataaagttctac'},
+            ],
+        },
+    },
+}

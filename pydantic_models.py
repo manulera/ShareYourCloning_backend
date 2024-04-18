@@ -19,6 +19,8 @@ class SourceType(str, Enum):
     restriction_and_ligation = 'restriction_and_ligation'
     genome_coordinates = 'genome_coordinates'
     manually_typed = 'manually_typed'
+    oligonucleotide_hybridization = 'oligonucleotide_hybridization'
+    polymerase_extension = 'polymerase_extension'
 
 
 class SequenceFileFormat(str, Enum):
@@ -116,6 +118,7 @@ class ManuallyTypedSource(Source):
     user_input: Annotated[str, Field(pattern=r'^[acgtACGT]+$')] = Field(
         ..., description='The sequence typed by the user'
     )
+    circular: Optional[bool] = Field(False, description='Whether the sequence is circular or not')
 
 
 class UploadedFileSource(Source):
@@ -325,3 +328,18 @@ class RestrictionAndLigationSource(AssemblySource):
             circular=circular,
             restriction_enzymes=restriction_enzymes,
         )
+
+
+class OligoHybridizationSource(Source):
+    """Documents an oligonucleotide hybridization, optionally can fill in with PCR"""
+
+    type: SourceType = SourceType('oligonucleotide_hybridization')
+    input: conlist(int, max_length=0) = []
+    forward_oligo: int = None
+    reverse_oligo: int = None
+    overhang_crick_3prime: Optional[int] = None
+
+
+class PolymeraseExtensionSource(Source):
+    type: SourceType = SourceType('polymerase_extension')
+    input: conlist(int, min_length=1, max_length=1)

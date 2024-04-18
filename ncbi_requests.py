@@ -5,7 +5,7 @@ from urllib.error import HTTPError
 from pydna.genbank import Genbank
 
 
-def get_assembly_accession_from_sequence_accession(sequence_accession: str) -> str | None:
+def get_assembly_accession_from_sequence_accession(sequence_accession: str) -> list[str]:
     """Get the assembly accession from a sequence accession"""
     url = f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=nuccore&db=assembly&id={sequence_accession}&idtype=acc&retmode=json'
     resp = requests.get(url)
@@ -13,26 +13,26 @@ def get_assembly_accession_from_sequence_accession(sequence_accession: str) -> s
         data = resp.json()
     except JSONDecodeError:
         raise HTTPException(404, 'sequence accession not found')
-    assembly_accession = None
+    assembly_accessions = []
     # sequence_accessions is associated with any assembly
-    if 'error' in data:
+    if 'error' in data:  # pragma: no cover
         raise HTTPException(503, f'failed to access NCBI: {data["error"]}')
     if 'linksetdbs' in data['linksets'][0]:
-        links = assembly_id = data['linksets'][0]['linksetdbs'][0]['links']
-        if len(links) > 1:
-            # raise not implemented
-            return None
-        assembly_id = links[0]
-        url = f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=assembly&retmode=json&id={assembly_id}'
+        links = data['linksets'][0]['linksetdbs'][0]['links']
+        url = f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=assembly&retmode=json&id={",".join(links)}'
         resp = requests.get(url)
         try:
             data = resp.json()
         except JSONDecodeError:
             raise HTTPException(503, 'Error accessing assembly id')
-        if 'error' in data:
+        if 'error' in data:  # pragma: no cover
             raise HTTPException(503, f'failed to access NCBI: {data["error"]}')
-        assembly_accession = data['result'][assembly_id]['assemblyaccession']
-    return assembly_accession
+        assembly_accessions.extend(
+            data['result'][assembly_id]['assemblyaccession']
+            for assembly_id in links
+            if 'assemblyaccession' in data['result'][assembly_id]
+        )
+    return assembly_accessions
 
 
 def get_annotation_from_locus_tag(locus_tag: str, assembly_accession: str) -> dict:
@@ -57,7 +57,7 @@ def get_annotation_from_locus_tag(locus_tag: str, assembly_accession: str) -> di
 
 def get_genbank_sequence_subset(sequence_accession, start, stop, strand):
     gb_strand = 1 if strand == 1 else 2
-    gb = Genbank("example@gmail.com")
+    gb = Genbank('example@gmail.com')
     try:
         return gb.nucleotide(sequence_accession, start, stop, gb_strand)
     except HTTPError as e:
