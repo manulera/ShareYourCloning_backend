@@ -928,10 +928,10 @@ class PCRTest(unittest.TestCase):
 class OligoHybridizationTest(unittest.TestCase):
 
     def test_hybridization(self):
-        default_example = request_examples.oligo_hybridization_examples['default']['value']
+        default_example = request_examples.oligonucleotide_hybridization_examples['default']['value']
         watson_sequence = default_example['primers'][0]['sequence']
         crick_sequence = default_example['primers'][1]['sequence']
-        response = client.post('/oligo_hybridization', json=default_example)
+        response = client.post('/oligonucleotide_hybridization', json=default_example)
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(len(payload['sources']), 1)
@@ -948,20 +948,26 @@ class OligoHybridizationTest(unittest.TestCase):
         modified_example = copy.deepcopy(default_example)
         modified_example['source']['overhang_crick_3prime'] = source.overhang_crick_3prime
 
-        response = client.post('/oligo_hybridization', json=modified_example, params={'minimal_annealing': 60})
+        response = client.post(
+            '/oligonucleotide_hybridization', json=modified_example, params={'minimal_annealing': 60}
+        )
         payload2 = response.json()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload, payload2)
 
     def test_no_valid_result(self):
-        default_example = request_examples.oligo_hybridization_examples['default']['value']
-        response = client.post('/oligo_hybridization', json=default_example, params={'minimal_annealing': 60})
+        default_example = request_examples.oligonucleotide_hybridization_examples['default']['value']
+        response = client.post(
+            '/oligonucleotide_hybridization', json=default_example, params={'minimal_annealing': 60}
+        )
         self.assertEqual(response.status_code, 400)
 
     def test_invalid_oligo_id(self):
-        invalid_oligo_example = copy.deepcopy(request_examples.oligo_hybridization_examples['default']['value'])
+        invalid_oligo_example = copy.deepcopy(
+            request_examples.oligonucleotide_hybridization_examples['default']['value']
+        )
         invalid_oligo_example['source']['forward_oligo'] = 5
-        response = client.post('/oligo_hybridization', json=invalid_oligo_example)
+        response = client.post('/oligonucleotide_hybridization', json=invalid_oligo_example)
         self.assertEqual(response.status_code, 404)
 
 

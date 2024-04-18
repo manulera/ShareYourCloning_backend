@@ -42,7 +42,7 @@ genome_region_examples = {
     },
 }
 
-oligo_hybridization_examples = {
+oligonucleotide_hybridization_examples = {
     'default': {
         'summary': 'Typical example',
         'description': 'blah',

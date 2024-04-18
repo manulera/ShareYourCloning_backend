@@ -13,7 +13,7 @@ from dna_functions import (
     format_sequence_genbank,
     read_dsrecord_from_json,
     request_from_addgene,
-    oligo_hybridization_overhangs,
+    oligonucleotide_hybridization_overhangs,
 )
 from pydantic_models import (
     PCRSource,
@@ -525,17 +525,19 @@ async def pcr(
 
 
 @router.post(
-    '/oligo_hybridization',
+    '/oligonucleotide_hybridization',
     response_model=create_model(
         'OligoHybridizationResponse',
         sources=(list[OligoHybridizationSource], ...),
         sequences=(list[SequenceEntity], ...),
     ),
     openapi_extra={
-        'requestBody': {'content': {'application/json': {'examples': request_examples.oligo_hybridization_examples}}}
+        'requestBody': {
+            'content': {'application/json': {'examples': request_examples.oligonucleotide_hybridization_examples}}
+        }
     },
 )
-async def oligo_hybridization(
+async def oligonucleotide_hybridization(
     source: OligoHybridizationSource,
     primers: conlist(PrimerModel, min_length=1, max_length=2),
     minimal_annealing: int = Query(20, description='The minimal annealing length for each primer.'),
@@ -555,7 +557,7 @@ async def oligo_hybridization(
         if ovhg_watson > 0:
             minimal_annealing -= ovhg_watson
 
-    possible_overhangs = oligo_hybridization_overhangs(watson_seq, crick_seq, minimal_annealing)
+    possible_overhangs = oligonucleotide_hybridization_overhangs(watson_seq, crick_seq, minimal_annealing)
 
     if len(possible_overhangs) == 0:
         raise HTTPException(400, 'No pair of annealing oligos was found. Try changing the annealing settings.')
