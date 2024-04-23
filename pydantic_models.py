@@ -15,6 +15,7 @@ class SourceType(str, Enum):
     ligation = 'ligation'
     PCR = 'PCR'
     homologous_recombination = 'homologous_recombination'
+    crispr = 'crispr'
     gibson_assembly = 'gibson_assembly'
     restriction_and_ligation = 'restriction_and_ligation'
     genome_coordinates = 'genome_coordinates'
@@ -300,6 +301,34 @@ class GibsonAssemblySource(AssemblySource):
                 for part in assembly
             ],
             input=input,
+            circular=circular,
+        )
+
+
+class CrisprSource(AssemblySource):
+
+    # TODO: For now this is just a copy of HomologousRecombinationSource
+    type: SourceType = SourceType('crispr')
+    input: conlist(int, min_length=2, max_length=2)
+    guide: int = Field(..., description='The CRISPR guide')
+    circular: bool = False
+
+    def from_assembly(
+        assembly: list[tuple[int, int, Location, Location]],
+        input: list[int],
+        id: int,
+        guide: int,
+        circular: bool,
+    ) -> 'CrisprSource':
+        'Creates a CrisprSource from an assembly, input, guide and id'
+        return CrisprSource(
+            id=id,
+            assembly=[
+                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
+                for part in assembly
+            ],
+            input=input,
+            guide=guide,
             circular=circular,
         )
 

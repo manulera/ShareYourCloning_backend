@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi.responses import JSONResponse
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
+from pydna.crispr import cas9
 from pydantic import conlist, create_model
 from pydna.parsers import parse as pydna_parse
 from Bio.SeqIO import read as seqio_read
@@ -25,6 +26,7 @@ from pydantic_models import (
     LigationSource,
     UploadedFileSource,
     HomologousRecombinationSource,
+    CrisprSource,
     GibsonAssemblySource,
     RestrictionAndLigationSource,
     AssemblySource,
@@ -330,6 +332,78 @@ async def genome_coordinates(
         raise HTTPException(400, 'coordinates fall outside the sequence')
 
     return {'sequences': [format_sequence_genbank(seq)], 'sources': [source.model_copy()]}
+
+
+@router.post(
+    '/crispr',
+    response_model=create_model(
+        'CrisprResponse',
+        sources=(list[CrisprSource], ...),
+        sequences=(list[SequenceEntity], ...),
+    ),
+)
+async def crispr(
+    source: CrisprSource,
+    guide: PrimerModel,
+    sequences: conlist(SequenceEntity, min_length=2, max_length=2),
+    minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.'),
+):
+    """Return the sequence after performing CRISPR editing by Homology directed repair
+    TODO: Support repair through NHEJ
+    TODO: Check support for circular DNA targets
+    """
+    template, insert = [
+        next((read_dsrecord_from_json(seq) for seq in sequences if seq.id == id), None) for id in source.input
+    ]
+    guide = guide.sequence
+
+    # TODO: check input method for guide (currently as a primer)
+    # TODO: support user input PAM
+
+    # Check cutsites from guide provided by user
+    enzyme = cas9(guide)
+    possible_cuts = template.seq.get_cutsites(enzyme)
+
+    if not possible_cuts:
+        raise HTTPException(400, 'Could not find Cas9 cutsite in the target sequence using the provided guide')
+
+    # Check if homologous recombination is possible
+    fragments = [template, insert]
+    asm = Assembly(fragments, minimal_homology, use_all_fragments=True)
+    possible_assemblies = [a for a in asm.get_insertion_assemblies() if a[0][0] == 1]
+
+    if not possible_assemblies:
+        raise HTTPException(400, 'Repair fragment cannot be inserted in the target sequence')
+
+    valid_assemblies = []
+    for a in possible_assemblies:
+        hr_start = int(a[0][2].start)
+        hr_end = int(a[1][3].end)
+
+        # Check if Cas9 cut is within the homologous recombination region
+        reparable_cuts = [c for c in possible_cuts if c[0][0] > hr_start and c[0][0] <= hr_end]
+        if reparable_cuts:
+            valid_assemblies.append(a)
+
+    if len(valid_assemblies) == 0:
+        raise HTTPException(
+            400, 'A Cas9 cutsite was found, but it cannot be repaired using the provided repair fragment'
+        )
+
+    out_sources = [
+        CrisprSource.from_assembly(id=source.id, input=source.input, assembly=a, guide=source.guide, circular=False)
+        for a in valid_assemblies
+    ]
+
+    # If a specific assembly is requested
+    if source.assembly is not None:
+        return format_known_assembly_response(source, out_sources, [template, insert])
+
+    # Manu wrote the "raise" clause for not finding a valid assembly here, reason?
+
+    out_sequences = [format_sequence_genbank(assemble([template, insert], a, False)) for a in valid_assemblies]
+
+    return {'sources': out_sources, 'sequences': out_sequences}
 
 
 @router.post(
