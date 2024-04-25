@@ -18,6 +18,7 @@ from pydantic_models import (
     GenomeCoordinatesSource,
     OligoHybridizationSource,
     PolymeraseExtensionSource,
+    CrisprSource,
 )
 from pydna.dseqrecord import Dseqrecord
 import unittest
@@ -1333,6 +1334,112 @@ class PolymeraseExtensionTest(unittest.TestCase):
             data = {'source': source.model_dump(), 'sequences': [json_template.model_dump()]}
             response = client.post('/polymerase_extension', json=data)
             self.assertEqual(response.status_code, status_code)
+
+
+class CrisprTest(unittest.TestCase):
+
+    def test_crispr(self):
+
+        template = Dseqrecord('aaccggttcaatgcaaacagtaatgatggatgacattcaaagcac')
+        json_template = format_sequence_genbank(template)
+        json_template.id = 1
+
+        insert = Dseqrecord('aaccggttAAAAAAAAAttcaaagcac')
+        json_insert = format_sequence_genbank(insert)
+        json_insert.id = 2
+
+        guide = PrimerModel(sequence='ttcaatgcaaacagtaatga', id=3, name='guide_1')
+        source = CrisprSource(
+            input=[1, 2],
+            guides=[3],
+        )
+        data = {
+            'source': source.model_dump(),
+            'sequences': [json_template.model_dump(), json_insert.model_dump()],
+            'guides': [guide.model_dump()],
+        }
+        params = {'minimal_homology': 8}
+
+        response = client.post('/crispr', json=data, params=params)
+
+        payload = response.json()
+        self.assertEqual(response.status_code, 200)
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        sources = [CrisprSource.model_validate(s) for s in payload['sources']]
+
+        self.assertEqual(len(resulting_sequences), 1)
+        self.assertEqual(len(sources), 1)
+
+        self.assertEqual(str(resulting_sequences[0].seq), 'aaccggttAAAAAAAAAttcaaagcac'.upper())
+
+    def test_errors(self):
+
+        # Wrong guide
+        template = Dseqrecord('aaccggttcaatgcaaacagtaatgatggatgacattcaaagcac')
+        json_template = format_sequence_genbank(template)
+        json_template.id = 1
+
+        insert = Dseqrecord('aaccggttAAAAAAAAAttcaaagcac')
+        json_insert = format_sequence_genbank(insert)
+        json_insert.id = 2
+
+        guide = PrimerModel(sequence='AAAAAAAA', id=3, name='guide_1')
+
+        source = CrisprSource(
+            input=[1, 2],
+            guides=[3],
+        )
+
+        data = {
+            'source': source.model_dump(),
+            'sequences': [json_template.model_dump(), json_insert.model_dump()],
+            'guides': [guide.model_dump()],
+        }
+
+        params = {'minimal_homology': 8}
+
+        response = client.post('/crispr', json=data, params=params)
+
+        payload = response.json()
+        self.assertEqual(response.status_code, 400)
+
+        self.assertIn('Could not find Cas9 cutsite in the target sequence using the guide: guide_1', payload['detail'])
+
+        # Wrong and right guide
+        guide2 = PrimerModel(sequence='ttcaatgcaaacagtaatga', id=4, name='guide_2')
+        data['guides'] = [guide.model_dump(), guide2.model_dump()]
+
+        response = client.post('/crispr', json=data, params=params)
+        payload = response.json()
+        self.assertEqual(response.status_code, 400)
+
+        self.assertIn('Could not find Cas9 cutsite in the target sequence using the guide: guide_1', payload['detail'])
+
+        # Homology too short
+        data['guides'] = [guide2.model_dump()]
+        response = client.post('/crispr', json=data)
+        payload = response.json()
+        self.assertEqual(response.status_code, 400)
+
+        # cut outside of homology
+
+        template2 = Dseqrecord('aaccggttcaatgcaaacagtaatgatggatgacattcaaagcacaaaAAAGAGAGACAGGTTTTGAGtgg')
+        json_template2 = format_sequence_genbank(template2)
+        json_template2.id = 1
+
+        guide_outside = PrimerModel(sequence='AAAGAGAGACAGGTTTTGAG', id=3, name='guide_outside')
+        data = {
+            'source': source.model_dump(),
+            'sequences': [json_template2.model_dump(), json_insert.model_dump()],
+            'guides': [guide_outside.model_dump()],
+        }
+
+        response = client.post('/crispr', json=data, params=params)
+        payload = response.json()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            payload['detail'], 'A Cas9 cutsite was found, but it cannot be repaired using the provided repair fragment'
+        )
 
 
 if __name__ == '__main__':
