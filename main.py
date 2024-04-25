@@ -344,7 +344,7 @@ async def genome_coordinates(
 )
 async def crispr(
     source: CrisprSource,
-    guide: PrimerModel,
+    guides: list[PrimerModel],
     sequences: conlist(SequenceEntity, min_length=2, max_length=2),
     minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.'),
 ):
@@ -355,17 +355,20 @@ async def crispr(
     template, insert = [
         next((read_dsrecord_from_json(seq) for seq in sequences if seq.id == id), None) for id in source.input
     ]
-    guide = guide.sequence
 
     # TODO: check input method for guide (currently as a primer)
     # TODO: support user input PAM
 
     # Check cutsites from guide provided by user
-    enzyme = cas9(guide)
-    possible_cuts = template.seq.get_cutsites(enzyme)
-
-    if not possible_cuts:
-        raise HTTPException(400, 'Could not find Cas9 cutsite in the target sequence using the provided guide')
+    guide_cuts = []
+    for guide in guides:
+        enzyme = cas9(guide.sequence)
+        possible_cuts = template.seq.get_cutsites(enzyme)
+        if len(possible_cuts) == 0:
+            raise HTTPException(
+                400, f'Could not find Cas9 cutsite in the target sequence using the guide: {guide.name}'
+            )
+        guide_cuts.append(possible_cuts)
 
     # Check if homologous recombination is possible
     fragments = [template, insert]
@@ -376,22 +379,32 @@ async def crispr(
         raise HTTPException(400, 'Repair fragment cannot be inserted in the target sequence')
 
     valid_assemblies = []
+    # Check if Cas9 cut is within the homologous recombination region
     for a in possible_assemblies:
         hr_start = int(a[0][2].start)
         hr_end = int(a[1][3].end)
 
-        # Check if Cas9 cut is within the homologous recombination region
-        reparable_cuts = [c for c in possible_cuts if c[0][0] > hr_start and c[0][0] <= hr_end]
-        if reparable_cuts:
-            valid_assemblies.append(a)
+        for cuts in guide_cuts:
+            reparable_cuts = [c for c in cuts if c[0][0] > hr_start and c[0][0] <= hr_end]
+            if len(reparable_cuts):
+                valid_assemblies.append(a)
+            if len(reparable_cuts) != len(cuts):
+                # TODO: warning a cutsite falls outside
+                pass
 
     if len(valid_assemblies) == 0:
         raise HTTPException(
             400, 'A Cas9 cutsite was found, but it cannot be repaired using the provided repair fragment'
         )
+    elif len(valid_assemblies) != len(possible_assemblies):
+        # TODO: warning that some assemblies were discarded
+        pass
+
+    # TODO: double check that this works for circular DNA -> for now get_insertion_assemblies() is only
+    # meant for linear DNA
 
     out_sources = [
-        CrisprSource.from_assembly(id=source.id, input=source.input, assembly=a, guide=source.guide, circular=False)
+        CrisprSource.from_assembly(id=source.id, input=source.input, assembly=a, guides=source.guides, circular=False)
         for a in valid_assemblies
     ]
 
@@ -399,10 +412,7 @@ async def crispr(
     if source.assembly is not None:
         return format_known_assembly_response(source, out_sources, [template, insert])
 
-    # Manu wrote the "raise" clause for not finding a valid assembly here, reason?
-
     out_sequences = [format_sequence_genbank(assemble([template, insert], a, False)) for a in valid_assemblies]
-
     return {'sources': out_sources, 'sequences': out_sequences}
 
 
@@ -719,6 +729,10 @@ async def homologous_recombination(
 
     # The condition is that the first and last fragments are the template
     possible_assemblies = [a for a in asm.get_insertion_assemblies() if a[0][0] == 1]
+
+    if len(possible_assemblies) == 0:
+        raise HTTPException(400, 'No homologous recombination was found.')
+
     out_sources = [
         HomologousRecombinationSource.from_assembly(id=source.id, input=source.input, assembly=a, circular=False)
         for a in possible_assemblies
@@ -727,9 +741,6 @@ async def homologous_recombination(
     # If a specific assembly is requested
     if source.assembly is not None:
         return format_known_assembly_response(source, out_sources, [template, insert])
-
-    if len(possible_assemblies) == 0:
-        raise HTTPException(400, 'No homologous recombination was found.')
 
     out_sequences = [format_sequence_genbank(assemble([template, insert], a, False)) for a in possible_assemblies]
 

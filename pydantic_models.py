@@ -310,14 +310,14 @@ class CrisprSource(AssemblySource):
     # TODO: For now this is just a copy of HomologousRecombinationSource
     type: SourceType = SourceType('crispr')
     input: conlist(int, min_length=2, max_length=2)
-    guide: int = Field(..., description='The CRISPR guide')
+    guides: list[int] = Field(..., description='The CRISPR guides')
     circular: bool = False
 
     def from_assembly(
         assembly: list[tuple[int, int, Location, Location]],
         input: list[int],
         id: int,
-        guide: int,
+        guides: list[int],
         circular: bool,
     ) -> 'CrisprSource':
         'Creates a CrisprSource from an assembly, input, guide and id'
@@ -328,7 +328,7 @@ class CrisprSource(AssemblySource):
                 for part in assembly
             ],
             input=input,
-            guide=guide,
+            guides=guides,
             circular=circular,
         )
 
