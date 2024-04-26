@@ -377,7 +377,7 @@ class OligoHybridizationSource(Source):
     input: conlist(int, max_length=0) = []
     forward_oligo: int = None
     reverse_oligo: int = None
-    overhang_crick_3prime: Optional[int] = 0
+    overhang_crick_3prime: Optional[int] = None
 
 
 class PolymeraseExtensionSource(Source):
