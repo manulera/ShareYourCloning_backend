@@ -424,7 +424,14 @@ async def crispr(
 )
 async def manually_typed(source: ManuallyTypedSource):
     """Return the sequence from a manually typed sequence"""
-    seq = Dseqrecord(source.user_input, circular=source.circular)
+    if source.circular:
+        seq = Dseqrecord(source.user_input, circular=source.circular)
+    else:
+        seq = Dseqrecord(
+            Dseq.from_full_sequence_and_overhangs(
+                source.user_input, source.overhang_crick_3prime, source.overhang_watson_3prime
+            )
+        )
     return {'sequences': [format_sequence_genbank(seq)], 'sources': [source]}
 
 

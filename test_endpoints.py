@@ -1193,6 +1193,28 @@ class ManuallyTypedTest(unittest.TestCase):
         self.assertEqual(resulting_sequences[0].seq.circular, True)
         self.assertEqual(sources[0], source)
 
+        # Test overhangs
+        source = ManuallyTypedSource(
+            user_input='ATGC',
+            overhang_crick_3prime=1,
+            overhang_watson_3prime=2,
+        )
+
+        response = client.post('/manually_typed', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+        self.assertEqual(len(resulting_sequences), 1)
+        self.assertEqual(resulting_sequences[0].seq, Dseq.from_full_sequence_and_overhangs('ATGC', 1, 2))
+
+        # Test that if overhangs are set, it cannot be circular
+        wrong_source = source.model_dump()
+        wrong_source['circular'] = True
+
+        response = client.post('/manually_typed', json=wrong_source)
+        self.assertEqual(response.status_code, 422)
+
     # Test that it fails if not acgt or empty
     def test_manually_typed_fail(self):
 
