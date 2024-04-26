@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from pydantic.types import conlist
 from enum import Enum
 from typing import Optional
@@ -120,6 +120,17 @@ class ManuallyTypedSource(Source):
         ..., description='The sequence typed by the user'
     )
     circular: Optional[bool] = Field(False, description='Whether the sequence is circular or not')
+
+    overhang_crick_3prime: Optional[int] = 0
+    overhang_watson_3prime: Optional[int] = 0
+
+    @model_validator(mode='after')
+    def validate_circularity(self):
+        # Do the validation instead of printing
+        if self.circular:
+            assert self.overhang_crick_3prime == 0, 'Circular sequences cannot have overhangs.'
+            assert self.overhang_watson_3prime == 0, 'Circular sequences cannot have overhangs.'
+        return self
 
 
 class UploadedFileSource(Source):

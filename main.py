@@ -71,7 +71,7 @@ else:
 # allow for the draft websites to also work in netlify.
 # TODO make this conditional to dev / prod using settings
 
-origins = ['http://localhost:3000', 'https://shareyourcloning.netlify.app']
+origins = ['http://localhost:3000', 'https://shareyourcloning.netlify.app', 'http://localhost:5173']
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -424,7 +424,14 @@ async def crispr(
 )
 async def manually_typed(source: ManuallyTypedSource):
     """Return the sequence from a manually typed sequence"""
-    seq = Dseqrecord(source.user_input, circular=source.circular)
+    if source.circular:
+        seq = Dseqrecord(source.user_input, circular=source.circular)
+    else:
+        seq = Dseqrecord(
+            Dseq.from_full_sequence_and_overhangs(
+                source.user_input, source.overhang_crick_3prime, source.overhang_watson_3prime
+            )
+        )
     return {'sequences': [format_sequence_genbank(seq)], 'sources': [source]}
 
 
@@ -582,6 +589,12 @@ async def pcr(
         possible_assemblies = asm.get_linear_assemblies()
     except ValueError as e:
         raise HTTPException(400, *e.args)
+
+    # TODO: this might belong elsewhere
+    # In the case where both primers are identical, remove
+    # duplicate assemblies that represent just reverse complement
+    if source.forward_primer == source.reverse_primer:
+        possible_assemblies = [a for a in possible_assemblies if a[0][1] != -2]
 
     out_sources = [
         PCRSource.from_assembly(

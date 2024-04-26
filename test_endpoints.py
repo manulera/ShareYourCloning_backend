@@ -749,6 +749,39 @@ class PCRTest(unittest.TestCase):
         self.assertEqual(source1, source2)
         self.assertEqual(str(dseq2.seq), 'ACGTACGTAAAAAAGCGCGCGC')
 
+    def test_same_primer_twice(self):
+        """
+        Special case where you want only one sequence to be returned, since otherwise
+        the same sequence is returned as a forward and reverse complement.
+        """
+        template = Dseqrecord(Dseq('TTTTACGTACGTAAAAAAACGTACGTTTTTT'))
+
+        json_seq = format_sequence_genbank(template)
+        json_seq.id = 1
+
+        submitted_source = PCRSource(
+            input=[1],
+            forward_primer=2,
+            reverse_primer=2,
+        )
+
+        primer_fwd = PrimerModel(sequence='ACGTACGT', id=2, name='forward')
+
+        data = {
+            'source': submitted_source.model_dump(),
+            'sequences': [json_seq.model_dump()],
+            'primers': [primer_fwd.model_dump()],
+        }
+
+        response = client.post('/pcr', json=data, params={'minimal_annealing': 8})
+        payload = response.json()
+        self.assertEqual(response.status_code, 200)
+
+        sources = [PCRSource.model_validate(s) for s in payload['sources']]
+        sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(len(sequences), 1)
+
     def test_wrong_primers(self):
 
         template = Dseqrecord(Dseq('TTTTACGTACGTAAAAAAGCGCGCGCTTTTT'))
@@ -1159,6 +1192,28 @@ class ManuallyTypedTest(unittest.TestCase):
         self.assertEqual(str(resulting_sequences[0].seq), 'ATGC')
         self.assertEqual(resulting_sequences[0].seq.circular, True)
         self.assertEqual(sources[0], source)
+
+        # Test overhangs
+        source = ManuallyTypedSource(
+            user_input='ATGC',
+            overhang_crick_3prime=1,
+            overhang_watson_3prime=2,
+        )
+
+        response = client.post('/manually_typed', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
+
+        self.assertEqual(len(resulting_sequences), 1)
+        self.assertEqual(resulting_sequences[0].seq, Dseq.from_full_sequence_and_overhangs('ATGC', 1, 2))
+
+        # Test that if overhangs are set, it cannot be circular
+        wrong_source = source.model_dump()
+        wrong_source['circular'] = True
+
+        response = client.post('/manually_typed', json=wrong_source)
+        self.assertEqual(response.status_code, 422)
 
     # Test that it fails if not acgt or empty
     def test_manually_typed_fail(self):
