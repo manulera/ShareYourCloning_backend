@@ -677,7 +677,7 @@ async def oligonucleotide_hybridization(
         new_source.overhang_crick_3prime = overhang
         out_sources.append(new_source)
         out_sequences.append(
-            format_sequence_genbank(Dseqrecord(Dseq(watson_seq, crick_seq, source.overhang_crick_3prime)))
+            format_sequence_genbank(Dseqrecord(Dseq(watson_seq, crick_seq, new_source.overhang_crick_3prime)))
         )
 
     return {'sources': out_sources, 'sequences': out_sequences}
