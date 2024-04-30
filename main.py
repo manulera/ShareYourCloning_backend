@@ -376,7 +376,7 @@ async def crispr(
     possible_assemblies = [a for a in asm.get_insertion_assemblies() if a[0][0] == 1]
 
     if not possible_assemblies:
-        raise HTTPException(400, 'Repair fragment cannot be inserted in the target sequence')
+        raise HTTPException(400, 'Repair fragment cannot be inserted in the target sequence through homology')
 
     valid_assemblies = []
     # Check if Cas9 cut is within the homologous recombination region
@@ -394,7 +394,7 @@ async def crispr(
 
     if len(valid_assemblies) == 0:
         raise HTTPException(
-            400, 'A Cas9 cutsite was found, but it cannot be repaired using the provided repair fragment'
+            400, 'A Cas9 cutsite was found, and a homologous recombination region, but they do not overlap.'
         )
     elif len(valid_assemblies) != len(possible_assemblies):
         # TODO: warning that some assemblies were discarded
@@ -677,7 +677,7 @@ async def oligonucleotide_hybridization(
         new_source.overhang_crick_3prime = overhang
         out_sources.append(new_source)
         out_sequences.append(
-            format_sequence_genbank(Dseqrecord(Dseq(watson_seq, crick_seq, source.overhang_crick_3prime)))
+            format_sequence_genbank(Dseqrecord(Dseq(watson_seq, crick_seq, new_source.overhang_crick_3prime)))
         )
 
     return {'sources': out_sources, 'sequences': out_sequences}
@@ -807,7 +807,10 @@ async def gibson_assembly(
         return format_known_assembly_response(source, out_sources, fragments)
 
     if len(out_sources) == 0:
-        raise HTTPException(400, 'No terminal homology was found.')
+        raise HTTPException(
+            400,
+            f'No {"circular " if circular_only else ""}assembly with at least {minimal_homology} bps of homology was found.',
+        )
 
     out_sequences = [
         format_sequence_genbank(assemble(fragments, s.get_assembly_plan(), s.circular)) for s in out_sources

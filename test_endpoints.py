@@ -1087,6 +1087,22 @@ class GibsonAssemblyTest(unittest.TestCase):
         self.assertEqual(len(sequences), 1)
         self.assertEqual(str(sequences[0].seq), 'AGAGACCaaa'.upper())
 
+    def test_circular_constrain(self):
+        # A circular one
+        fragments = [Dseqrecord('TTTTacgatAAtgctccCCCC', circular=False), Dseqrecord('CCCCtcatGGGG', circular=False)]
+        json_fragments = [format_sequence_genbank(f) for f in fragments]
+        for i, f in enumerate(json_fragments):
+            f.id = i + 1
+
+        source = GibsonAssemblySource(
+            input=[1, 2],
+        )
+
+        data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
+        response = client.post('/gibson_assembly', json=data, params={'minimal_homology': 4, 'circular_only': True})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()['detail'], 'No circular assembly with at least 4 bps of homology was found.')
+
 
 class RestrictionAndLigationTest(unittest.TestCase):
     def test_restriction_and_ligation(self):
@@ -1493,7 +1509,8 @@ class CrisprTest(unittest.TestCase):
         payload = response.json()
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
-            payload['detail'], 'A Cas9 cutsite was found, but it cannot be repaired using the provided repair fragment'
+            payload['detail'],
+            'A Cas9 cutsite was found, and a homologous recombination region, but they do not overlap.',
         )
 
 
