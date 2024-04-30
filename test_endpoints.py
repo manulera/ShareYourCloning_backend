@@ -1493,7 +1493,8 @@ class CrisprTest(unittest.TestCase):
         payload = response.json()
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
-            payload['detail'], 'A Cas9 cutsite was found, but it cannot be repaired using the provided repair fragment'
+            payload['detail'],
+            'A Cas9 cutsite was found, and a homologous recombination region, but they do not overlap.',
         )
 
 

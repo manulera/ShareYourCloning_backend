@@ -50,7 +50,6 @@ from assembly2 import (
     restriction_ligation_overlap,
     SingleFragmentAssembly,
     blunt_overlap,
-    assembly2str,
 )
 import request_examples
 import ncbi_requests
@@ -374,8 +373,6 @@ async def crispr(
     # Check if homologous recombination is possible
     fragments = [template, insert]
     asm = Assembly(fragments, minimal_homology, use_all_fragments=True)
-    for a in asm.get_insertion_assemblies():
-        print(assembly2str(a))
     possible_assemblies = [a for a in asm.get_insertion_assemblies() if a[0][0] == 1]
 
     if not possible_assemblies:
