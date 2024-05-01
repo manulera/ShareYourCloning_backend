@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Optional
 from Bio.SeqFeature import SeqFeature, Location
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
-from Bio.Restriction.Restriction import RestrictionType
+from Bio.Restriction.Restriction import RestrictionType, RestrictionBatch
 from typing import Annotated
 from shareyourcloning_linkml.datamodel import (
     OligoHybridizationSource as _OligoHybridizationSource,
@@ -14,7 +14,10 @@ from shareyourcloning_linkml.datamodel import (
     ManuallyTypedSource as _ManuallyTypedSource,
     UploadedFileSource as _UploadedFileSource,
     SequenceFileFormat as _SequenceFileFormat,
+    RestrictionEnzymeDigestionSource as _RestrictionEnzymeDigestionSource,
+    RestrictionSequenceCut as _RestrictionSequenceCut,
 )
+
 
 SequenceFileFormat = _SequenceFileFormat
 
@@ -151,42 +154,57 @@ class GenomeCoordinatesSource(_GenomeCoordinatesSource):
     pass
 
 
-class SequenceCut(Source):
-    """A class to represent a cut in a sequence"""
+class RestrictionSequenceCut(_RestrictionSequenceCut):
 
-    left_edge: Optional[tuple[int, int]] = Field(
-        None, description='The left edge of the cut, in the format (cut_watson, ovhg)'
-    )
-    right_edge: Optional[tuple[int, int]] = Field(
-        None, description='The right edge of the cut, in the format (cut_watson, ovhg)'
-    )
+    @classmethod
+    def from_cutsite_tuple(cls, cutsite_tuple: tuple[tuple[int, int], RestrictionType]) -> 'RestrictionSequenceCut':
+        cut_watson, ovhg = cutsite_tuple[0]
+        enzyme = str(cutsite_tuple[1])
+
+        return cls(
+            cut_watson=cut_watson,
+            overhang=ovhg,
+            restriction_enzyme=enzyme,
+        )
+
+    def to_cutsite_tuple(self) -> tuple[tuple[int, int], RestrictionType]:
+        restriction_enzyme = RestrictionBatch(first=[self.restriction_enzyme]).pop()
+        return ((self.cut_watson, self.overhang), restriction_enzyme)
 
 
-class RestrictionEnzymeDigestionSource(SequenceCut):
+class RestrictionEnzymeDigestionSource(_RestrictionEnzymeDigestionSource):
     """Documents a restriction enzyme digestion, and the selection of one of the fragments."""
 
-    type: SourceType = SourceType('restriction')
+    # TODO: maybe a better way? They have to be redefined here because
+    # we have overriden the original class
 
-    # The order of the enzymes in the list corresponds to the fragment_boundaries.
-    # For instance, if a fragment 5' is cut with EcoRI and the 3' with BamHI,
-    # restriction_enzymes = ['EcoRI', 'BamHI']
-    restriction_enzymes: conlist(str | None, min_length=1) = Field(
-        ...,
-        description='Enzymes associated with the left and right sides of the cut. It can contain None to represent the edge the sequence in linear sequences.',
-    )
+    left_edge: Optional[RestrictionSequenceCut] = Field(None)
+    right_edge: Optional[RestrictionSequenceCut] = Field(None)
 
+    @classmethod
     def from_cutsites(
+        cls,
         left: tuple[tuple[int, int], RestrictionType],
         right: tuple[tuple[int, int], RestrictionType],
         input: list[int],
         id: int,
     ) -> 'RestrictionEnzymeDigestionSource':
-        return RestrictionEnzymeDigestionSource(
-            restriction_enzymes=[None if left is None else str(left[1]), None if right is None else str(right[1])],
-            left_edge=None if left is None else left[0],
-            right_edge=None if right is None else right[0],
+        return cls(
+            id=id,
+            left_edge=None if left is None else RestrictionSequenceCut.from_cutsite_tuple(left),
+            right_edge=None if right is None else RestrictionSequenceCut.from_cutsite_tuple(right),
             input=input,
         )
+
+    # TODO could be made into a computed field?
+    def get_enzymes(self) -> list[str]:
+        """Returns the enzymes used in the digestion"""
+        out = list()
+        if self.left_edge is not None:
+            out.append(self.left_edge.restriction_enzyme)
+        if self.right_edge is not None:
+            out.append(self.right_edge.restriction_enzyme)
+        return out
 
 
 class AssemblySource(Source):

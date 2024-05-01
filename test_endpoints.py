@@ -393,21 +393,21 @@ class RestrictionTest(unittest.TestCase):
 
         # One enzyme
         source = RestrictionEnzymeDigestionSource(
+            id=0,
             input=[1],
-            restriction_enzymes=['helloworld'],
         )
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
-        response = client.post('/restriction', json=data)
+        response = client.post('/restriction', json=data, params={'restriction_enzymes': ['helloworld']})
         self.assertEqual(response.status_code, 404)
         self.assertTrue(response.json()['detail'] == 'These enzymes do not exist: helloworld')
 
         # More than one
         source = RestrictionEnzymeDigestionSource(
+            id=0,
             input=[1],
-            restriction_enzymes=['helloworld', 'byebye'],
         )
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
-        response = client.post('/restriction', json=data)
+        response = client.post('/restriction', json=data, params={'restriction_enzymes': ['helloworld', 'byebye']})
         self.assertEqual(response.status_code, 404)
         self.assertIn('byebye', response.json()['detail'])
         self.assertIn('helloworld', response.json()['detail'])
@@ -419,31 +419,31 @@ class RestrictionTest(unittest.TestCase):
 
         # See if we get the right responses
         source = RestrictionEnzymeDigestionSource(
+            id=0,
             input=[1],
-            restriction_enzymes=['FbaI'],
         )
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
-        response = client.post('/restriction', json=data)
+        response = client.post('/restriction', json=data, params={'restriction_enzymes': ['FbaI']})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()['detail'], 'These enzymes do not cut: FbaI')
 
         # Returns when one does not cut
         source = RestrictionEnzymeDigestionSource(
+            id=0,
             input=[1],
-            restriction_enzymes=['EcoRI', 'BamHI'],
         )
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
-        response = client.post('/restriction', json=data)
+        response = client.post('/restriction', json=data, params={'restriction_enzymes': ['EcoRI', 'BamHI']})
         self.assertEqual(response.status_code, 400)
         self.assertTrue(response.json()['detail'] == 'These enzymes do not cut: BamHI')
 
         # Returns all that don't cut
         source = RestrictionEnzymeDigestionSource(
+            id=0,
             input=[1],
-            restriction_enzymes=['EcoRI', 'BamHI', 'FbaI'],
         )
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
-        response = client.post('/restriction', json=data)
+        response = client.post('/restriction', json=data, params={'restriction_enzymes': ['BamHI', 'FbaI']})
         self.assertEqual(response.status_code, 400)
         self.assertIn('BamHI', response.json()['detail'])
         self.assertIn('FbaI', response.json()['detail'])
@@ -456,11 +456,11 @@ class RestrictionTest(unittest.TestCase):
 
         # See if we get the right responses
         source = RestrictionEnzymeDigestionSource(
+            id=0,
             input=[1],
-            restriction_enzymes=['EcoRI'],
         )
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
-        response = client.post('/restriction', json=data)
+        response = client.post('/restriction', json=data, params={'restriction_enzymes': ['EcoRI']})
         payload = response.json()
 
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
@@ -472,14 +472,14 @@ class RestrictionTest(unittest.TestCase):
 
         # The edges of the fragments are correct:
         self.assertEqual(sources[0].left_edge, None)
-        self.assertEqual(sources[0].right_edge, (7, -4))
+        self.assertEqual(sources[0].right_edge.to_cutsite_tuple()[0], (7, -4))
 
-        self.assertEqual(sources[1].left_edge, (7, -4))
+        self.assertEqual(sources[1].left_edge.to_cutsite_tuple()[0], (7, -4))
         self.assertEqual(sources[1].right_edge, None)
 
         # The enzyme names are correctly returned:
-        self.assertEqual(sources[0].restriction_enzymes, [None, 'EcoRI'])
-        self.assertEqual(sources[1].restriction_enzymes, ['EcoRI', None])
+        self.assertEqual(sources[0].get_enzymes(), [None, 'EcoRI'])
+        self.assertEqual(sources[1].get_enzymes(), ['EcoRI', None])
 
         # Now we specify the output
         source = RestrictionEnzymeDigestionSource(

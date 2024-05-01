@@ -459,14 +459,19 @@ async def get_restriction_enzyme_list():
     ),
 )
 async def restriction(
-    source: RestrictionEnzymeDigestionSource, sequences: conlist(SequenceEntity, min_length=1, max_length=1)
+    source: RestrictionEnzymeDigestionSource,
+    sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+    restriction_enzymes: Annotated[list[str] | None, Query()] = None,
 ):
+    # There should be 1 or 2 enzymes in the request
+    if len(restriction_enzymes) < 1 or len(restriction_enzymes) > 2:
+        raise HTTPException(422, 'There should be 1 or 2 restriction enzymes in the request.')
 
     # TODO: this could be moved to the class
-    invalid_enzymes = get_invalid_enzyme_names(source.restriction_enzymes)
+    invalid_enzymes = get_invalid_enzyme_names(restriction_enzymes)
     if len(invalid_enzymes):
         raise HTTPException(404, 'These enzymes do not exist: ' + ', '.join(invalid_enzymes))
-    enzymes = RestrictionBatch(first=[e for e in source.restriction_enzymes if e is not None])
+    enzymes = RestrictionBatch(first=[e for e in restriction_enzymes if e is not None])
 
     seqr = read_dsrecord_from_json(sequences[0])
     # TODO: return error if the id of the sequence does not correspond
@@ -475,19 +480,13 @@ async def restriction(
     cutsite_pairs = seqr.seq.get_cutsite_pairs(cutsites)
     sources = [RestrictionEnzymeDigestionSource.from_cutsites(*p, source.input, source.id) for p in cutsite_pairs]
 
-    all_enzymes = set(enzyme for s in sources for enzyme in s.restriction_enzymes)
-    enzymes_not_cutting = set(source.restriction_enzymes) - set(all_enzymes)
+    all_enzymes = set(enzyme for s in sources for enzyme in s.get_enzymes())
+    enzymes_not_cutting = set(restriction_enzymes) - set(all_enzymes)
     if len(enzymes_not_cutting):
         raise HTTPException(400, 'These enzymes do not cut: ' + ', '.join(enzymes_not_cutting))
 
     # If the output is known
     if source.left_edge is not None or source.right_edge is not None:
-        # TODO: this could be moved to the class
-        if len(source.restriction_enzymes) != 2:
-            raise HTTPException(
-                400,
-                'If either `left_edge` or `right_edge` is provided, the length of `restriction_enzymes` must be 2.',
-            )
 
         for i, s in enumerate(sources):
             if s == source:
