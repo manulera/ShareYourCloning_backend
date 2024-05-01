@@ -19,6 +19,7 @@ from pydantic_models import (
     OligoHybridizationSource,
     PolymeraseExtensionSource,
     CrisprSource,
+    AddgeneIDSource,
 )
 from pydna.dseqrecord import Dseqrecord
 import unittest
@@ -137,7 +138,7 @@ class GenBankTest(unittest.TestCase):
             repository_name='genbank',
             repository_id='NM_001018957.2',
         )
-        response = client.post('/repository_id', json=source.model_dump())
+        response = client.post('/repository_id/genbank', json=source.model_dump())
         self.assertEqual(response.status_code, 200)
 
     def test_request_wrong_id(self):
@@ -147,7 +148,7 @@ class GenBankTest(unittest.TestCase):
             repository_name='genbank',
             repository_id='wrong_id',
         )
-        response = client.post('/repository_id', json=source.model_dump())
+        response = client.post('/repository_id/genbank', json=source.model_dump())
         self.assertEqual(response.status_code, 404)
 
 
@@ -167,59 +168,59 @@ class AddGeneTest(unittest.TestCase):
             },
         ]
         for example in examples:
-            source = RepositoryIdSource(
+            source = AddgeneIDSource(
                 id=1,
                 repository_name='addgene',
                 repository_id=example['id'],
             )
 
-            response = client.post('/repository_id', json=source.model_dump())
+            response = client.post('/repository_id/addgene', json=source.model_dump())
             self.assertEqual(response.status_code, 200)
             payload = response.json()
             resulting_sequences = [
                 read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']
             ]
-            sources = [RepositoryIdSource.model_validate(s) for s in payload['sources']]
+            sources = [AddgeneIDSource.model_validate(s) for s in payload['sources']]
 
             self.assertEqual(len(resulting_sequences), 1)
             self.assertEqual(len(sources), 1)
-            self.assertEqual(sources[0].info['type'], example['type'])
-            self.assertEqual(sources[0].info['url'], example['url'])
+            self.assertEqual(sources[0].addgene_sequence_type, example['type'])
+            self.assertEqual(sources[0].url, example['url'])
 
             # We get the same response when making the response with the url
-            response2 = client.post('/repository_id', json=payload['sources'][0])
+            response2 = client.post('/repository_id/addgene', json=payload['sources'][0])
             self.assertEqual(response.json(), response2.json())
 
     def test_missing_sequences(self):
         # Non-existing id
-        source = RepositoryIdSource(
+        source = AddgeneIDSource(
             id=1,
             repository_name='addgene',
             repository_id='DUMMYTEST',
         )
 
-        response = client.post('/repository_id', json=source.model_dump())
+        response = client.post('/repository_id/addgene', json=source.model_dump())
         self.assertEqual(response.status_code, 404)
         self.assertIn('wrong addgene id', response.json()['detail'])
 
         # Id that has no full-sequences
-        source = RepositoryIdSource(
+        source = AddgeneIDSource(
             id=1,
             repository_name='addgene',
             repository_id='39291',
         )
-        response = client.post('/repository_id', json=source.model_dump())
+        response = client.post('/repository_id/addgene', json=source.model_dump())
         self.assertEqual(response.status_code, 404)
-        self.assertIn('The requested plasmid does not exist, or does not have', response.json()['detail'])
+        self.assertIn('The requested plasmid does not have full sequences', response.json()['detail'])
 
         # url does not exist
-        source = RepositoryIdSource(
+        source = AddgeneIDSource(
             id=1,
             repository_name='addgene',
             repository_id='39282',
-            info={'url': 'https://media.addgene.org/snapgene-media/wrongggggggg.gbk'},
+            url='https://media.addgene.org/snapgene-media/wrongggggggg.gbk',
         )
-        response = client.post('/repository_id', json=source.model_dump())
+        response = client.post('/repository_id/addgene', json=source.model_dump())
         self.assertEqual(response.status_code, 404)
 
         # TODO url exists but does not match id, or does not match

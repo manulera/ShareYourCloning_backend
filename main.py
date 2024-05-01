@@ -22,6 +22,7 @@ from pydantic_models import (
     SequenceEntity,
     SequenceFileFormat,
     RepositoryIdSource,
+    AddgeneIDSource,
     RestrictionEnzymeDigestionSource,
     LigationSource,
     UploadedFileSource,
@@ -221,49 +222,62 @@ async def read_from_file(
 # directly the object.
 
 
+def repository_id_http_error_handler(exception: HTTPError, source: RepositoryIdSource):
+
+    if exception.code == 500:  # pragma: no cover
+        raise HTTPException(
+            503, f'{source.repository_name} returned: {exception} - {source.repository_name} might be down'
+        )
+    elif exception.code == 400 or exception.code == 404:
+        raise HTTPException(
+            404,
+            f'{source.repository_name} returned: {exception} - Likely you inserted a wrong {source.repository_name} id',
+        )
+
+
+def repository_id_url_error_handler(exception: URLError, source: RepositoryIdSource):
+    raise HTTPException(504, f'Unable to connect to {source.repository_name}: {exception}')
+
+
 @router.post(
-    '/repository_id',
+    '/repository_id/genbank',
     response_model=create_model(
         'RepositoryIdResponse', sources=(list[RepositoryIdSource], ...), sequences=(list[SequenceEntity], ...)
     ),
 )
-async def get_from_repository_id(source: RepositoryIdSource):
-
+def get_from_repository_id_genbank(source: RepositoryIdSource):
     try:
-        if source.repository_name == 'genbank':
-            # This only returns one
-            gb = Genbank('example@gmail.com')
-            seq = Dseqrecord(gb.nucleotide(source.repository_id))
-            dseqs = [seq]
-            sources = [source.model_copy()]
-        elif source.repository_name == 'addgene':
-            # This may return more than one? Not clear
-            dseqs, sources = request_from_addgene(source)
-            # Special addgene exception, they may have only partial sequences
-            if len(dseqs) == 0:
-                raise HTTPException(
-                    404,
-                    f'The requested plasmid does not exist, or does not have full sequences, see https://www.addgene.org/{source.repository_id}/sequences/',
-                )
-        else:
-            raise HTTPException(404, 'wrong ID')
-
-        output_sequences = [format_sequence_genbank(s) for s in dseqs]
-
-        return {'sequences': output_sequences, 'sources': sources}
-
+        gb = Genbank('example@gmail.com')
+        seq = Dseqrecord(gb.nucleotide(source.repository_id))
     except HTTPError as exception:
-        if exception.code == 500:  # pragma: no cover
-            raise HTTPException(
-                503, f'{source.repository_name} returned: {exception} - {source.repository_name} might be down'
-            )
-        elif exception.code == 400 or exception.code == 404:
-            raise HTTPException(
-                404,
-                f'{source.repository_name} returned: {exception} - Likely you inserted a wrong {source.repository_name} id',
-            )
+        repository_id_http_error_handler(exception, source)
     except URLError as exception:
-        raise HTTPException(504, f'Unable to connect to {source.repository_name}: {exception}')
+        repository_id_url_error_handler(exception, source)
+
+    return {'sequences': [format_sequence_genbank(seq)], 'sources': [source.model_copy()]}
+
+
+@router.post(
+    '/repository_id/addgene',
+    response_model=create_model(
+        'AddgeneIdResponse', sources=(list[AddgeneIDSource], ...), sequences=(list[SequenceEntity], ...)
+    ),
+)
+def get_from_repository_id_addgene(source: AddgeneIDSource):
+    try:
+        dseqs, sources = request_from_addgene(source)
+    except HTTPError as exception:
+        repository_id_http_error_handler(exception, source)
+    except URLError as exception:
+        repository_id_url_error_handler(exception, source)
+
+    # Special addgene exception, they may have only partial sequences
+    if len(dseqs) == 0:
+        raise HTTPException(
+            404,
+            f'The requested plasmid does not have full sequences, see https://www.addgene.org/{source.repository_id}/sequences/',
+        )
+    return {'sequences': [format_sequence_genbank(s) for s in dseqs], 'sources': sources}
 
 
 @router.post(

@@ -152,6 +152,17 @@ class RepositoryIdSource(_RepositoryIdSource):
     """Documents a request to a repository"""
 
 
+# TODO: add these to LinkML
+class GenbankIDSource(RepositoryIdSource):
+    repository_name: RepositoryName = RepositoryName('genbank')
+
+
+class AddgeneIDSource(RepositoryIdSource):
+    repository_name: RepositoryName = RepositoryName('addgene')
+    addgene_sequence_type: str = Field('', description='The type of sequence in the addgene repository')
+    url: str = Field('', description='The URL of the sequence in the repository')
+
+
 class GenomeCoordinatesSource(_GenomeCoordinatesSource):
     pass
 

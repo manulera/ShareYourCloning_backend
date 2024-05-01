@@ -4,7 +4,7 @@ from Bio.Restriction.Restriction import RestrictionBatch
 from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from pydantic_models import RepositoryIdSource, GenbankSequence, SequenceEntity
+from pydantic_models import GenbankSequence, SequenceEntity, AddgeneIDSource
 from pydna.parsers import parse as pydna_parse
 import requests
 from bs4 import BeautifulSoup
@@ -92,10 +92,10 @@ def get_sequences_from_gb_file_url(url: str) -> Dseqrecord:
     return pydna_parse(resp.text)
 
 
-def request_from_addgene(source: RepositoryIdSource) -> tuple[list[Dseqrecord], list[RepositoryIdSource]]:
+def request_from_addgene(source: AddgeneIDSource) -> tuple[list[Dseqrecord], list[AddgeneIDSource]]:
     # TODO here maybe it would be good to check that the addgeneID still returns the url requested.
-    if 'url' in source.info:
-        return [get_sequences_from_gb_file_url(source.info['url'])[0]], [source]
+    if source.url:
+        return [get_sequences_from_gb_file_url(source.url)[0]], [source]
 
     url = f'https://www.addgene.org/{source.repository_id}/sequences/'
     resp = requests.get(url)
@@ -118,7 +118,8 @@ def request_from_addgene(source: RepositoryIdSource) -> tuple[list[Dseqrecord], 
         if len(sequence_file_url_dict[_type]) > 0:
             for seq_url in sequence_file_url_dict[_type]:
                 new_source = source.model_copy()
-                new_source.info = {'url': seq_url, 'type': _type}
+                new_source.url = seq_url
+                new_source.addgene_sequence_type = _type
                 sources.append(new_source)
                 # There should be only one sequence
                 products.append(get_sequences_from_gb_file_url(seq_url)[0])

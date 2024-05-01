@@ -35,7 +35,7 @@ input_source = RepositoryIdSource(
     repository_id='NM_001018957.2',
 )
 
-payload = client.post('/repository_id', json=input_source.model_dump()).json()
+payload = client.post('/repository_id/genbank', json=input_source.model_dump()).json()
 
 # There should only be one in the list, so we can simply sum them
 source = payload['sources'][0]
