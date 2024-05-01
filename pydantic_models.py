@@ -11,6 +11,7 @@ from shareyourcloning_linkml.datamodel import (
     PolymeraseExtensionSource as _PolymeraseExtensionSource,
     GenomeCoordinatesSource as _GenomeCoordinatesSource,
     RepositoryIdSource as _RepositoryIdSource,
+    ManuallyTypedSource as _ManuallyTypedSource,
 )
 
 
@@ -118,15 +119,10 @@ class Source(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
 
-class ManuallyTypedSource(Source):
+class ManuallyTypedSource(_ManuallyTypedSource):
     """Describes a sequence that is typed manually by the user"""
 
-    type: SourceType = SourceType('manually_typed')
-    user_input: Annotated[str, Field(pattern=r'^[acgtACGT]+$')] = Field(
-        ..., description='The sequence typed by the user'
-    )
-    circular: Optional[bool] = Field(False, description='Whether the sequence is circular or not')
-
+    # TODO: add this to LinkML
     overhang_crick_3prime: Optional[int] = 0
     overhang_watson_3prime: Optional[int] = 0
 

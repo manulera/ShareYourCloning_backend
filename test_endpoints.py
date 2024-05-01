@@ -1189,6 +1189,7 @@ class ManuallyTypedTest(unittest.TestCase):
 
         # Test linear (default)
         source = ManuallyTypedSource(
+            id=0,
             user_input='ATGC',
         )
 
@@ -1219,6 +1220,7 @@ class ManuallyTypedTest(unittest.TestCase):
 
         # Test overhangs
         source = ManuallyTypedSource(
+            id=0,
             user_input='ATGC',
             overhang_crick_3prime=1,
             overhang_watson_3prime=2,
