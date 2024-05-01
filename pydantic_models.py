@@ -9,6 +9,7 @@ from typing import Annotated
 from shareyourcloning_linkml.datamodel import (
     OligoHybridizationSource as _OligoHybridizationSource,
     PolymeraseExtensionSource as _PolymeraseExtensionSource,
+    GenomeCoordinatesSource as _GenomeCoordinatesSource,
 )
 
 
@@ -154,19 +155,18 @@ class RepositoryIdSource(Source):
     type: SourceType = SourceType('repository_id')
 
 
-class GenomeCoordinatesSource(Source):
-    """Documents a request to NCBI for genome sequence"""
-
-    assembly_accession: Optional[str] = None
-    sequence_accession: str = Field(..., min_length=1)
-    # The unique identifier of a gene can come from either the gene_id or the locus_tag
-    # For instance, genes in the human reference genome have a gene_id, but no locus_tag
-    locus_tag: Optional[str] = None
-    gene_id: Optional[int] = None
-    start: int
-    stop: int
-    strand: int
-    type: SourceType = SourceType('genome_coordinates')
+class GenomeCoordinatesSource(_GenomeCoordinatesSource):
+    pass
+    # assembly_accession: Optional[str] = None
+    # sequence_accession: str = Field(..., min_length=1)
+    # # The unique identifier of a gene can come from either the gene_id or the locus_tag
+    # # For instance, genes in the human reference genome have a gene_id, but no locus_tag
+    # locus_tag: Optional[str] = None
+    # gene_id: Optional[int] = None
+    # start: int
+    # end: int
+    # strand: int
+    # type: SourceType = SourceType('genome_coordinates')
 
 
 class SequenceCut(Source):

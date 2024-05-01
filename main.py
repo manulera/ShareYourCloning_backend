@@ -277,7 +277,7 @@ async def genome_coordinates(
 ):
 
     # Validate that coordinates make sense
-    ncbi_requests.validate_coordinates_pre_request(source.start, source.stop, source.strand)
+    ncbi_requests.validate_coordinates_pre_request(source.start, source.end, source.strand)
 
     # Source includes a locus tag in annotated assembly
     if source.locus_tag is not None:
@@ -301,12 +301,12 @@ async def genome_coordinates(
         # The gene should fall within the range (range might be bigger if bases were requested upstream or downstream)
         if (
             int(gene_range['begin']) < source.start
-            or int(gene_range['end']) > source.stop
+            or int(gene_range['end']) > source.end
             or gene_strand != source.strand
         ):
             raise HTTPException(
                 400,
-                f'wrong coordinates, expected to fall within {source.start}, {source.stop} on strand: {source.strand}',
+                f'wrong coordinates, expected to fall within {source.start}, {source.end} on strand: {source.strand}',
             )
 
     elif source.gene_id is not None:
@@ -323,12 +323,10 @@ async def genome_coordinates(
     if len(assembly_accessions):
         source.assembly_accession = assembly_accessions[0]
 
-    seq = ncbi_requests.get_genbank_sequence_subset(
-        source.sequence_accession, source.start, source.stop, source.strand
-    )
+    seq = ncbi_requests.get_genbank_sequence_subset(source.sequence_accession, source.start, source.end, source.strand)
 
     # NCBI does not complain for coordinates that fall out of the sequence, so we have to check here
-    if len(seq) != source.stop - source.start + 1:
+    if len(seq) != source.end - source.start + 1:
         raise HTTPException(400, 'coordinates fall outside the sequence')
 
     return {'sequences': [format_sequence_genbank(seq)], 'sources': [source.model_copy()]}

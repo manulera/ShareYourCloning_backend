@@ -1311,7 +1311,7 @@ class GenomeRegionTest(unittest.TestCase):
         # Wrong coordinates
         s = correct_source.model_copy()
         s.start = 1
-        s.stop = 10
+        s.end = 10
         response = client.post('/genome_coordinates', json=s.model_dump())
         self.assertStatusCode(response.status_code, 400)
 
@@ -1337,17 +1337,17 @@ class GenomeRegionTest(unittest.TestCase):
             request_examples.genome_region_examples['viral_sequence']['value']
         )
         viral_source.start = 10
-        viral_source.stop = 1
+        viral_source.end = 1
         response = client.post('/genome_coordinates', json=viral_source.model_dump())
         self.assertStatusCode(response.status_code, 422)
 
         viral_source.start = 0
-        viral_source.stop = 20
+        viral_source.end = 20
         response = client.post('/genome_coordinates', json=viral_source.model_dump())
         self.assertStatusCode(response.status_code, 422)
 
         viral_source.start = 1
-        viral_source.stop = 20
+        viral_source.end = 20
         viral_source.strand = 0
         response = client.post('/genome_coordinates', json=viral_source.model_dump())
         self.assertStatusCode(response.status_code, 422)
@@ -1355,7 +1355,7 @@ class GenomeRegionTest(unittest.TestCase):
         # Coordinates outside of the sequence
         viral_source.start = 1
         # the length is 2151
-        viral_source.stop = 2152
+        viral_source.end = 2152
         viral_source.strand = 1
         response = client.post('/genome_coordinates', json=viral_source.model_dump())
         self.assertStatusCode(response.status_code, 400)
