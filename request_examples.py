@@ -49,10 +49,8 @@ oligonucleotide_hybridization_examples = {
         'value': {
             'source': {
                 'id': 1,
-                'kind': 'source',
                 'input': [],
                 'output': 0,
-                'type': 'oligonucleotide_hybridization',
                 'forward_oligo': 2,
                 'reverse_oligo': 3,
             },

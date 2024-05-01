@@ -994,6 +994,7 @@ class OligoHybridizationTest(unittest.TestCase):
         response = client.post(
             '/oligonucleotide_hybridization', json=default_example, params={'minimal_annealing': 60}
         )
+        print(response.json())
         self.assertEqual(response.status_code, 400)
 
     def test_invalid_oligo_id(self):
