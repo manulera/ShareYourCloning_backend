@@ -12,11 +12,14 @@ from shareyourcloning_linkml.datamodel import (
     GenomeCoordinatesSource as _GenomeCoordinatesSource,
     RepositoryIdSource as _RepositoryIdSource,
     ManuallyTypedSource as _ManuallyTypedSource,
+    UploadedFileSource as _UploadedFileSource,
+    SequenceFileFormat as _SequenceFileFormat,
 )
+
+SequenceFileFormat = _SequenceFileFormat
 
 
 class SourceType(str, Enum):
-    repository_id = 'repository_id'
     file = 'file'
     restriction = 'restriction'
     ligation = 'ligation'
@@ -25,16 +28,6 @@ class SourceType(str, Enum):
     crispr = 'crispr'
     gibson_assembly = 'gibson_assembly'
     restriction_and_ligation = 'restriction_and_ligation'
-    genome_coordinates = 'genome_coordinates'
-    manually_typed = 'manually_typed'
-    oligonucleotide_hybridization = 'oligonucleotide_hybridization'
-    polymerase_extension = 'polymerase_extension'
-
-
-class SequenceFileFormat(str, Enum):
-    fasta = 'fasta'
-    genbank = 'genbank'
-    snapgene = 'snapgene'
 
 
 class RepositoryName(str, Enum):
@@ -135,13 +128,8 @@ class ManuallyTypedSource(_ManuallyTypedSource):
         return self
 
 
-class UploadedFileSource(Source):
+class UploadedFileSource(_UploadedFileSource):
     """Describes a sequence from a file uploaded by the user"""
-
-    file_name: str = Field(..., min_length=1)
-    file_format: SequenceFileFormat
-    type: SourceType = SourceType('file')
-    index_in_file: Optional[int] = None
 
 
 class RepositoryIdSource(_RepositoryIdSource):

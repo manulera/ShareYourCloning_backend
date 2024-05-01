@@ -77,7 +77,7 @@
                 }
             ],
             "file_name": "pFA6a-hphMX6.gb",
-            "file_format": "genbank",
+            "sequence_file_format": "genbank",
             "kind": "source"
         },
         {

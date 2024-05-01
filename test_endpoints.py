@@ -25,7 +25,6 @@ from pydna.dseqrecord import Dseqrecord
 import unittest
 from pydna.dseq import Dseq
 import request_examples
-import json
 import copy
 
 client = TestClient(app)
@@ -65,7 +64,7 @@ class ReadFileTest(unittest.TestCase):
             for seq in resulting_sequences:
                 self.assertGreater(len(seq), 3)
             for source in sources:
-                self.assertEqual(source.file_format, example['format'])
+                self.assertEqual(source.sequence_file_format, example['format'])
 
     def test_errors_read_files(self):
 
@@ -89,7 +88,9 @@ class ReadFileTest(unittest.TestCase):
         for example in examples:
             with open(example['file'], 'rb') as f:
                 if example['format'] is not None:
-                    response = client.post(f'/read_from_file?file_format={example["format"]}', files={'file': f})
+                    response = client.post(
+                        f'/read_from_file?sequence_file_format={example["format"]}', files={'file': f}
+                    )
                 else:
                     response = client.post('/read_from_file', files={'file': f})
 
@@ -110,22 +111,6 @@ class ReadFileTest(unittest.TestCase):
 
         self.assertEqual(len(sources), 1)
         self.assertEqual(len(resulting_sequences), 1)
-
-    def test_info_dict(self):
-        """Test that the info dict can be submitted in the form"""
-
-        info_dict = {'a': 'b'}
-        info_str = json.dumps(info_dict)
-
-        with open('./examples/sequences/dummy_multi_fasta.fasta', 'rb') as f:
-            response = client.post('/read_from_file?index_in_file=1', files={'file': f}, data={'info_str': info_str})
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-
-        source = next(UploadedFileSource.model_validate(s) for s in payload['sources'])
-
-        self.assertEqual(source.info, info_dict)
 
 
 class GenBankTest(unittest.TestCase):

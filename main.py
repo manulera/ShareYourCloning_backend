@@ -1,5 +1,4 @@
-import json
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter, Form
+from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter
 from typing import Annotated
 from fastapi.responses import JSONResponse
 from pydna.dseqrecord import Dseqrecord
@@ -158,11 +157,10 @@ async def greeting(request: Request):
 )
 async def read_from_file(
     file: UploadFile = File(...),
-    file_format: SequenceFileFormat = Query(
+    sequence_file_format: SequenceFileFormat = Query(
         None,
         description='Format of the sequence file. Unless specified, it will be guessed from the extension',
     ),
-    info_str: str = Form(''),
     index_in_file: int = Query(
         None,
         description='The index of the sequence in the file for multi-sequence files',
@@ -170,7 +168,7 @@ async def read_from_file(
 ):
     """Return a json sequence from a sequence file"""
 
-    if file_format is None:
+    if sequence_file_format is None:
         extension_dict = {'gbk': 'genbank', 'gb': 'genbank', 'dna': 'snapgene', 'fasta': 'fasta'}
         extension = file.filename.split('.')[-1]
         if extension not in extension_dict:
@@ -180,18 +178,18 @@ async def read_from_file(
             )
 
         # We guess the file type from the extension
-        file_format = SequenceFileFormat(extension_dict[extension])
+        sequence_file_format = SequenceFileFormat(extension_dict[extension])
 
-    if file_format in ['fasta', 'genbank']:
+    if sequence_file_format in ['fasta', 'genbank']:
         # Read the whole file to a string
         file_content = (await file.read()).decode()
         dseqs = pydna_parse(file_content)
         if len(dseqs) == 0:
             raise HTTPException(422, 'Pydna parser reader cannot process this file.')
 
-    elif file_format == 'snapgene':
+    elif sequence_file_format == 'snapgene':
         try:
-            seq = seqio_read(file.file, file_format)
+            seq = seqio_read(file.file, sequence_file_format)
         except ValueError:
             raise HTTPException(422, 'Biopython snapgene reader cannot process this file.')
 
@@ -199,13 +197,12 @@ async def read_from_file(
         dseqs = [Dseqrecord(seq, circular=iscircular)]
 
     # The common part
-    parent_source = UploadedFileSource(file_format=file_format, file_name=file.filename)
+    # TODO: using id=0 is not great
+    parent_source = UploadedFileSource(id=0, sequence_file_format=sequence_file_format, file_name=file.filename)
     out_sources = list()
-    info = json.loads(info_str) if info_str else dict()
     for i in range(len(dseqs)):
         new_source = parent_source.model_copy()
         new_source.index_in_file = i
-        new_source.info = info
         out_sources.append(new_source)
 
     out_sequences = [format_sequence_genbank(s) for s in dseqs]
@@ -214,8 +211,8 @@ async def read_from_file(
         if index_in_file >= len(out_sources):
             raise HTTPException(404, 'The index_in_file is out of range.')
         return {'sequences': [out_sequences[index_in_file]], 'sources': [out_sources[index_in_file]]}
-
-    return {'sequences': out_sequences, 'sources': out_sources}
+    else:
+        return {'sequences': out_sequences, 'sources': out_sources}
 
 
 # TODO: a bit inconsistent that here you don't put {source: {...}} in the request, but
