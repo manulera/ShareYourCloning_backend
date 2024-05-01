@@ -6,7 +6,10 @@ from Bio.SeqFeature import SeqFeature, Location
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
 from Bio.Restriction.Restriction import RestrictionType
 from typing import Annotated
-from shareyourcloning_linkml.datamodel import OligoHybridizationSource as _OligoHybridizationSource
+from shareyourcloning_linkml.datamodel import (
+    OligoHybridizationSource as _OligoHybridizationSource,
+    PolymeraseExtensionSource as _PolymeraseExtensionSource,
+)
 
 
 class SourceType(str, Enum):
@@ -375,6 +378,5 @@ class OligoHybridizationSource(_OligoHybridizationSource):
     pass
 
 
-class PolymeraseExtensionSource(Source):
-    type: SourceType = SourceType('polymerase_extension')
-    input: conlist(int, min_length=1, max_length=1)
+class PolymeraseExtensionSource(_PolymeraseExtensionSource):
+    pass
