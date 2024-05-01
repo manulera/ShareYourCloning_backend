@@ -28,6 +28,7 @@ class StubRouteTest(unittest.TestCase):
 
     def test_stub_route(self):
         source = ManuallyTypedSource(
+            id=0,
             user_input='ATGC',
         )
 
@@ -38,8 +39,9 @@ class StubRouteTest(unittest.TestCase):
         self.assertTrue(len(os.listdir('stubs/manually_typed/')), 1)
 
         # Also works for 422 response
-        source.user_input = 'io'
-        response = self.client.post('/manually_typed', json=source.model_dump())
+        source_dict = source.model_dump()
+        source_dict['user_input'] = 'io'
+        response = self.client.post('/manually_typed', json=source_dict)
         self.assertEqual(response.status_code, 422)
         self.assertEqual(len(os.listdir('stubs/manually_typed/')), 2)
 
