@@ -230,13 +230,13 @@ async def read_from_file(
 async def get_from_repository_id(source: RepositoryIdSource):
 
     try:
-        if source.repository == 'genbank':
+        if source.repository_name == 'genbank':
             # This only returns one
             gb = Genbank('example@gmail.com')
             seq = Dseqrecord(gb.nucleotide(source.repository_id))
             dseqs = [seq]
             sources = [source.model_copy()]
-        elif source.repository == 'addgene':
+        elif source.repository_name == 'addgene':
             # This may return more than one? Not clear
             dseqs, sources = request_from_addgene(source)
             # Special addgene exception, they may have only partial sequences
@@ -255,15 +255,15 @@ async def get_from_repository_id(source: RepositoryIdSource):
     except HTTPError as exception:
         if exception.code == 500:  # pragma: no cover
             raise HTTPException(
-                503, f'{source.repository.value} returned: {exception} - {source.repository} might be down'
+                503, f'{source.repository_name} returned: {exception} - {source.repository_name} might be down'
             )
         elif exception.code == 400 or exception.code == 404:
             raise HTTPException(
                 404,
-                f'{source.repository.value} returned: {exception} - Likely you inserted a wrong {source.repository} id',
+                f'{source.repository_name} returned: {exception} - Likely you inserted a wrong {source.repository_name} id',
             )
     except URLError as exception:
-        raise HTTPException(504, f'Unable to connect to {source.repository}: {exception}')
+        raise HTTPException(504, f'Unable to connect to {source.repository_name}: {exception}')
 
 
 @router.post(

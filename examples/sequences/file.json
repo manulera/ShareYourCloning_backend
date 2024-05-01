@@ -84,7 +84,7 @@
             "id": 3,
             "input": [],
             "output": 4,
-            "type": "repository_id",
+            "type": "RepositoryIdSource",
             "output_index": null,
             "output_list": [
                 {
@@ -99,7 +99,7 @@
                     }
                 }
             ],
-            "repository": "genbank",
+            "repository_name": "genbank",
             "repository_id": "NM_001018957.2",
             "kind": "source"
         },

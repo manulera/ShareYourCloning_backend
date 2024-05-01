@@ -10,6 +10,7 @@ from shareyourcloning_linkml.datamodel import (
     OligoHybridizationSource as _OligoHybridizationSource,
     PolymeraseExtensionSource as _PolymeraseExtensionSource,
     GenomeCoordinatesSource as _GenomeCoordinatesSource,
+    RepositoryIdSource as _RepositoryIdSource,
 )
 
 
@@ -147,26 +148,12 @@ class UploadedFileSource(Source):
     index_in_file: Optional[int] = None
 
 
-class RepositoryIdSource(Source):
+class RepositoryIdSource(_RepositoryIdSource):
     """Documents a request to a repository"""
-
-    repository: RepositoryName
-    repository_id: str = Field(..., min_length=1)
-    type: SourceType = SourceType('repository_id')
 
 
 class GenomeCoordinatesSource(_GenomeCoordinatesSource):
     pass
-    # assembly_accession: Optional[str] = None
-    # sequence_accession: str = Field(..., min_length=1)
-    # # The unique identifier of a gene can come from either the gene_id or the locus_tag
-    # # For instance, genes in the human reference genome have a gene_id, but no locus_tag
-    # locus_tag: Optional[str] = None
-    # gene_id: Optional[int] = None
-    # start: int
-    # end: int
-    # strand: int
-    # type: SourceType = SourceType('genome_coordinates')
 
 
 class SequenceCut(Source):

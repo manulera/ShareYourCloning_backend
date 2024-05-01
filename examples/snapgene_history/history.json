@@ -62,8 +62,8 @@
             "kind": "source",
             "input": [],
             "output": 2,
-            "type": "repository_id",
-            "repository": "genbank",
+            "type": "RepositoryIdSource",
+            "repository_name": "genbank",
             "repository_id": "NM_001018957.2"
         },
         {

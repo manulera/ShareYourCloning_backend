@@ -133,7 +133,8 @@ class GenBankTest(unittest.TestCase):
     def test_request_gene(self):
         """Test whether the gene is requested from GenBank"""
         source = RepositoryIdSource(
-            repository='genbank',
+            id=1,
+            repository_name='genbank',
             repository_id='NM_001018957.2',
         )
         response = client.post('/repository_id', json=source.model_dump())
@@ -142,7 +143,8 @@ class GenBankTest(unittest.TestCase):
     def test_request_wrong_id(self):
         """Test a wrong Genbank id"""
         source = RepositoryIdSource(
-            repository='genbank',
+            id=1,
+            repository_name='genbank',
             repository_id='wrong_id',
         )
         response = client.post('/repository_id', json=source.model_dump())
@@ -166,7 +168,8 @@ class AddGeneTest(unittest.TestCase):
         ]
         for example in examples:
             source = RepositoryIdSource(
-                repository='addgene',
+                id=1,
+                repository_name='addgene',
                 repository_id=example['id'],
             )
 
@@ -190,7 +193,8 @@ class AddGeneTest(unittest.TestCase):
     def test_missing_sequences(self):
         # Non-existing id
         source = RepositoryIdSource(
-            repository='addgene',
+            id=1,
+            repository_name='addgene',
             repository_id='DUMMYTEST',
         )
 
@@ -200,7 +204,8 @@ class AddGeneTest(unittest.TestCase):
 
         # Id that has no full-sequences
         source = RepositoryIdSource(
-            repository='addgene',
+            id=1,
+            repository_name='addgene',
             repository_id='39291',
         )
         response = client.post('/repository_id', json=source.model_dump())
@@ -209,7 +214,8 @@ class AddGeneTest(unittest.TestCase):
 
         # url does not exist
         source = RepositoryIdSource(
-            repository='addgene',
+            id=1,
+            repository_name='addgene',
             repository_id='39282',
             info={'url': 'https://media.addgene.org/snapgene-media/wrongggggggg.gbk'},
         )
