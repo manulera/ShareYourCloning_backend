@@ -16,6 +16,8 @@ from shareyourcloning_linkml.datamodel import (
     SequenceFileFormat as _SequenceFileFormat,
     RestrictionEnzymeDigestionSource as _RestrictionEnzymeDigestionSource,
     RestrictionSequenceCut as _RestrictionSequenceCut,
+    TextFileSequence as _TextFileSequence,
+    RepositoryName,
 )
 
 
@@ -23,8 +25,6 @@ SequenceFileFormat = _SequenceFileFormat
 
 
 class SourceType(str, Enum):
-    file = 'file'
-    restriction = 'restriction'
     ligation = 'ligation'
     PCR = 'PCR'
     homologous_recombination = 'homologous_recombination'
@@ -33,39 +33,8 @@ class SourceType(str, Enum):
     restriction_and_ligation = 'restriction_and_ligation'
 
 
-class RepositoryName(str, Enum):
-    genbank = 'genbank'
-    addgene = 'addgene'
-
-
-# Sequence: =========================================
-
-
-class GenbankSequence(BaseModel):
-    """A class to store sequences and features in genbank model"""
-
-    type: str = 'file'
-    file_extension: str = 'gb'
-    file_content: str = ''
-    overhang_crick_3prime: int = Field(
-        0,
-        description='Taken from pydna\'s `dseq::ovhg`\
-        An integer describing the length of the\
-        crick strand overhang in the 5\' of the molecule, or 3\' of the crick strand',
-    )
-    overhang_watson_3prime: int = Field(
-        0,
-        description='The equivalent of `overhang_crick_3prime`\
-        but for the watson strand',
-    )
-
-
-class SequenceEntity(BaseModel):
-    id: Optional[int] = Field(None, description='Unique identifier of the sequence')
-    kind: str = Field('entity', description='The kind entity (always equal to "entity"). Should probably be removed.')
-    sequence: Optional[GenbankSequence] = Field(
-        ..., description='The sequence in genbank format + some extra info that is not captured by the genbank format'
-    )
+class TextFileSequence(_TextFileSequence):
+    pass
 
 
 class PrimerModel(BaseModel):

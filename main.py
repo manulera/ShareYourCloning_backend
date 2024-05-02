@@ -18,7 +18,7 @@ from dna_functions import (
 from pydantic_models import (
     PCRSource,
     PrimerModel,
-    SequenceEntity,
+    TextFileSequence,
     SequenceFileFormat,
     RepositoryIdSource,
     AddgeneIDSource,
@@ -152,7 +152,7 @@ async def greeting(request: Request):
 @router.post(
     '/read_from_file',
     response_model=create_model(
-        'UploadedFileResponse', sources=(list[UploadedFileSource], ...), sequences=(list[SequenceEntity], ...)
+        'UploadedFileResponse', sources=(list[UploadedFileSource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
 async def read_from_file(
@@ -239,7 +239,7 @@ def repository_id_url_error_handler(exception: URLError, source: RepositoryIdSou
 @router.post(
     '/repository_id/genbank',
     response_model=create_model(
-        'RepositoryIdResponse', sources=(list[RepositoryIdSource], ...), sequences=(list[SequenceEntity], ...)
+        'RepositoryIdResponse', sources=(list[RepositoryIdSource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
 def get_from_repository_id_genbank(source: RepositoryIdSource):
@@ -257,7 +257,7 @@ def get_from_repository_id_genbank(source: RepositoryIdSource):
 @router.post(
     '/repository_id/addgene',
     response_model=create_model(
-        'AddgeneIdResponse', sources=(list[AddgeneIDSource], ...), sequences=(list[SequenceEntity], ...)
+        'AddgeneIdResponse', sources=(list[AddgeneIDSource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
 def get_from_repository_id_addgene(source: AddgeneIDSource):
@@ -280,7 +280,7 @@ def get_from_repository_id_addgene(source: AddgeneIDSource):
 @router.post(
     '/genome_coordinates',
     response_model=create_model(
-        'GenomeRegionResponse', sources=(list[GenomeCoordinatesSource], ...), sequences=(list[SequenceEntity], ...)
+        'GenomeRegionResponse', sources=(list[GenomeCoordinatesSource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
 async def genome_coordinates(
@@ -348,13 +348,13 @@ async def genome_coordinates(
     response_model=create_model(
         'CrisprResponse',
         sources=(list[CrisprSource], ...),
-        sequences=(list[SequenceEntity], ...),
+        sequences=(list[TextFileSequence], ...),
     ),
 )
 async def crispr(
     source: CrisprSource,
     guides: list[PrimerModel],
-    sequences: conlist(SequenceEntity, min_length=2, max_length=2),
+    sequences: conlist(TextFileSequence, min_length=2, max_length=2),
     minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.'),
 ):
     """Return the sequence after performing CRISPR editing by Homology directed repair
@@ -428,7 +428,7 @@ async def crispr(
 @router.post(
     '/manually_typed',
     response_model=create_model(
-        'ManuallyTypedResponse', sources=(list[ManuallyTypedSource], ...), sequences=(list[SequenceEntity], ...)
+        'ManuallyTypedResponse', sources=(list[ManuallyTypedSource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
 async def manually_typed(source: ManuallyTypedSource):
@@ -455,12 +455,12 @@ async def get_restriction_enzyme_list():
     response_model=create_model(
         'RestrictionEnzymeDigestionResponse',
         sources=(list[RestrictionEnzymeDigestionSource], ...),
-        sequences=(list[SequenceEntity], ...),
+        sequences=(list[TextFileSequence], ...),
     ),
 )
 async def restriction(
     source: RestrictionEnzymeDigestionSource,
-    sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+    sequences: conlist(TextFileSequence, min_length=1, max_length=1),
     restriction_enzymes: Annotated[list[str], Query(default_factory=list)],
 ):
     # There should be 1 or 2 enzymes in the request if the source does not have cuts
@@ -507,12 +507,12 @@ async def restriction(
 @router.post(
     '/ligation',
     response_model=create_model(
-        'LigationResponse', sources=(list[LigationSource], ...), sequences=(list[SequenceEntity], ...)
+        'LigationResponse', sources=(list[LigationSource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
 async def ligation(
     source: LigationSource,
-    sequences: conlist(SequenceEntity, min_length=1),
+    sequences: conlist(TextFileSequence, min_length=1),
     blunt: bool = Query(False, description='Use blunt ligation instead of sticky ends.'),
     allow_partial_overlap: bool = Query(True, description='Allow for partially overlapping sticky ends.'),
     circular_only: bool = Query(False, description='Only return circular assemblies.'),
@@ -567,11 +567,13 @@ async def ligation(
 
 @router.post(
     '/pcr',
-    response_model=create_model('PCRResponse', sources=(list[PCRSource], ...), sequences=(list[SequenceEntity], ...)),
+    response_model=create_model(
+        'PCRResponse', sources=(list[PCRSource], ...), sequences=(list[TextFileSequence], ...)
+    ),
 )
 async def pcr(
     source: PCRSource,
-    sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+    sequences: conlist(TextFileSequence, min_length=1, max_length=1),
     primers: conlist(PrimerModel, min_length=1, max_length=2),
     minimal_annealing: int = Query(20, description='The minimal annealing length for each primer.'),
     allowed_mismatches: int = Query(0, description='The number of mismatches allowed'),
@@ -639,7 +641,7 @@ async def pcr(
     response_model=create_model(
         'OligoHybridizationResponse',
         sources=(list[OligoHybridizationSource], ...),
-        sequences=(list[SequenceEntity], ...),
+        sequences=(list[TextFileSequence], ...),
     ),
     openapi_extra={
         'requestBody': {
@@ -701,12 +703,12 @@ async def oligonucleotide_hybridization(
     response_model=create_model(
         'PolymeraseExtensionResponse',
         sources=(list[PolymeraseExtensionSource], ...),
-        sequences=(list[SequenceEntity], ...),
+        sequences=(list[TextFileSequence], ...),
     ),
 )
 async def polymerase_extension(
     source: PolymeraseExtensionSource,
-    sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+    sequences: conlist(TextFileSequence, min_length=1, max_length=1),
 ):
     """Return the sequence from a polymerase extension reaction"""
 
@@ -731,12 +733,12 @@ async def polymerase_extension(
     response_model=create_model(
         'HomologousRecombinationResponse',
         sources=(list[HomologousRecombinationSource], ...),
-        sequences=(list[SequenceEntity], ...),
+        sequences=(list[TextFileSequence], ...),
     ),
 )
 async def homologous_recombination(
     source: HomologousRecombinationSource,
-    sequences: conlist(SequenceEntity, min_length=2, max_length=2),
+    sequences: conlist(TextFileSequence, min_length=2, max_length=2),
     minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.'),
 ):
     # source.input contains the ids of the sequences in the order template, insert
@@ -776,12 +778,12 @@ async def homologous_recombination(
 @router.post(
     '/gibson_assembly',
     response_model=create_model(
-        'GibsonAssemblyResponse', sources=(list[GibsonAssemblySource], ...), sequences=(list[SequenceEntity], ...)
+        'GibsonAssemblyResponse', sources=(list[GibsonAssemblySource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
 async def gibson_assembly(
     source: GibsonAssemblySource,
-    sequences: conlist(SequenceEntity, min_length=1),
+    sequences: conlist(TextFileSequence, min_length=1),
     minimal_homology: int = Query(
         40, description='The minimum homology between consecutive fragments in the assembly.'
     ),
@@ -837,13 +839,13 @@ async def gibson_assembly(
     response_model=create_model(
         'RestrictionAndLigationResponse',
         sources=(list[RestrictionAndLigationSource], ...),
-        sequences=(list[SequenceEntity], ...),
+        sequences=(list[TextFileSequence], ...),
     ),
     summary='Restriction and ligation in a single step. Can also be used for Golden Gate assembly.',
 )
 async def restriction_and_ligation(
     source: RestrictionAndLigationSource,
-    sequences: conlist(SequenceEntity, min_length=1),
+    sequences: conlist(TextFileSequence, min_length=1),
     allow_partial_overlap: bool = Query(False, description='Allow for partially overlapping sticky ends.'),
     circular_only: bool = Query(False, description='Only return circular assemblies.'),
 ):

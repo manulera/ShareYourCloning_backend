@@ -4,7 +4,7 @@ from Bio.Restriction.Restriction import RestrictionBatch
 from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from pydantic_models import GenbankSequence, SequenceEntity, AddgeneIDSource
+from pydantic_models import TextFileSequence, AddgeneIDSource, SequenceFileFormat
 from pydna.parsers import parse as pydna_parse
 import requests
 from bs4 import BeautifulSoup
@@ -41,27 +41,28 @@ def sum_is_sticky(three_prime_end: tuple[str, str], five_prime_end: tuple[str, s
         return 0
 
 
-def format_sequence_genbank(seq: Dseqrecord) -> SequenceEntity:
+def format_sequence_genbank(seq: Dseqrecord) -> TextFileSequence:
 
     if seq.name.lower() == 'exported':
         correct_name(seq)
-    # In principle here we do not set the id from the id of the Dseqrecord
-    gb_seq = GenbankSequence(
+
+    return TextFileSequence(
+        id=0,
         file_content=seq.format('genbank'),
+        sequence_file_format=SequenceFileFormat('genbank'),
         overhang_crick_3prime=seq.seq.ovhg,
         overhang_watson_3prime=seq.seq.watson_ovhg(),
     )
-    return SequenceEntity(sequence=gb_seq)
 
 
-def read_dsrecord_from_json(seq: SequenceEntity) -> Dseqrecord:
-    initial_dseqrecord: Dseqrecord = pydna_parse(seq.sequence.file_content)[0]
-    if seq.sequence.overhang_watson_3prime == 0 and seq.sequence.overhang_crick_3prime == 0:
+def read_dsrecord_from_json(seq: TextFileSequence) -> Dseqrecord:
+    initial_dseqrecord: Dseqrecord = pydna_parse(seq.file_content)[0]
+    if seq.overhang_watson_3prime == 0 and seq.overhang_crick_3prime == 0:
         out_dseq_record = initial_dseqrecord
     else:
         out_dseq_record = Dseqrecord(
             Dseq.from_full_sequence_and_overhangs(
-                str(initial_dseqrecord.seq), seq.sequence.overhang_crick_3prime, seq.sequence.overhang_watson_3prime
+                str(initial_dseqrecord.seq), seq.overhang_crick_3prime, seq.overhang_watson_3prime
             ),
             features=initial_dseqrecord.features,
         )
