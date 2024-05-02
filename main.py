@@ -461,11 +461,16 @@ async def get_restriction_enzyme_list():
 async def restriction(
     source: RestrictionEnzymeDigestionSource,
     sequences: conlist(SequenceEntity, min_length=1, max_length=1),
-    restriction_enzymes: Annotated[list[str] | None, Query()] = None,
+    restriction_enzymes: Annotated[list[str], Query(default_factory=list)],
 ):
-    # There should be 1 or 2 enzymes in the request
-    if len(restriction_enzymes) < 1 or len(restriction_enzymes) > 2:
-        raise HTTPException(422, 'There should be 1 or 2 restriction enzymes in the request.')
+    # There should be 1 or 2 enzymes in the request if the source does not have cuts
+    if source.left_edge is None and source.right_edge is None:
+        if len(restriction_enzymes) < 1 or len(restriction_enzymes) > 2:
+            raise HTTPException(422, 'There should be 1 or 2 restriction enzymes in the request.')
+    else:
+        if len(restriction_enzymes) != 0:
+            raise HTTPException(422, 'There should be no restriction enzymes in the request if source is populated.')
+        restriction_enzymes = source.get_enzymes()
 
     # TODO: this could be moved to the class
     invalid_enzymes = get_invalid_enzyme_names(restriction_enzymes)

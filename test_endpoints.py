@@ -20,6 +20,7 @@ from pydantic_models import (
     PolymeraseExtensionSource,
     CrisprSource,
     AddgeneIDSource,
+    RestrictionSequenceCut,
 )
 from pydna.dseqrecord import Dseqrecord
 import unittest
@@ -478,12 +479,12 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual(sources[1].right_edge, None)
 
         # The enzyme names are correctly returned:
-        self.assertEqual(sources[0].get_enzymes(), [None, 'EcoRI'])
-        self.assertEqual(sources[1].get_enzymes(), ['EcoRI', None])
+        self.assertEqual(sources[0].get_enzymes(), ['EcoRI'])
+        self.assertEqual(sources[1].get_enzymes(), ['EcoRI'])
 
         # Now we specify the output
         source = RestrictionEnzymeDigestionSource(
-            input=[1], restriction_enzymes=[None, 'EcoRI'], left_edge=None, right_edge=(7, -4)
+            id=0, input=[1], left_edge=None, right_edge=RestrictionSequenceCut.from_cutsite_tuple(((7, -4), 'EcoRI'))
         )
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data)
@@ -495,8 +496,9 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(len(sources), 1)
         self.assertEqual(sources[0].left_edge, None)
-        self.assertEqual(sources[0].right_edge, (7, -4))
-        self.assertEqual(sources[0].restriction_enzymes, [None, 'EcoRI'])
+        self.assertEqual(sources[0].right_edge.to_cutsite_tuple()[0], (7, -4))
+        self.assertEqual(str(sources[0].right_edge.to_cutsite_tuple()[1]), 'EcoRI')
+        self.assertEqual(sources[0].get_enzymes(), ['EcoRI'])
 
     def test_circular_single_restriction(self):
 
@@ -506,11 +508,11 @@ class RestrictionTest(unittest.TestCase):
 
         # See if we get the right responses
         source = RestrictionEnzymeDigestionSource(
+            id=0,
             input=[1],
-            restriction_enzymes=['EcoRI'],
         )
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
-        response = client.post('/restriction', json=data)
+        response = client.post('/restriction', json=data, params={'restriction_enzymes': ['EcoRI']})
         payload = response.json()
 
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
@@ -523,11 +525,11 @@ class RestrictionTest(unittest.TestCase):
         self.assertEqual(resulting_sequences[0].seq.watson.upper(), 'AATTCTTTTTTAAAAAAG')
 
         # The edges of the fragments are correct:
-        self.assertEqual(sources[0].left_edge, (7, -4))
-        self.assertEqual(sources[0].right_edge, (7, -4))
+        self.assertEqual(sources[0].left_edge.to_cutsite_tuple()[0], (7, -4))
+        self.assertEqual(sources[0].right_edge.to_cutsite_tuple()[0], (7, -4))
 
         # The enzyme names are correctly returned:
-        self.assertEqual(sources[0].restriction_enzymes, ['EcoRI', 'EcoRI'])
+        self.assertEqual(sources[0].get_enzymes(), ['EcoRI'])
 
         # When the cutting site spans the origin
         sequences = ['AATTCTTTTTTG', 'ATTCTTTTTTGA']
@@ -540,11 +542,11 @@ class RestrictionTest(unittest.TestCase):
 
             # See if we get the right responses
             source = RestrictionEnzymeDigestionSource(
+                id=0,
                 input=[1],
-                restriction_enzymes=['EcoRI'],
             )
             data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
-            response = client.post('/restriction', json=data)
+            response = client.post('/restriction', json=data, params={'restriction_enzymes': ['EcoRI']})
             payload = response.json()
 
             resulting_sequences = [
@@ -559,11 +561,11 @@ class RestrictionTest(unittest.TestCase):
             self.assertEqual(resulting_sequences[0].seq.watson.upper(), 'AATTCTTTTTTG')
 
             # The edges of the fragments are correct:
-            self.assertEqual(sources[0].left_edge, pos)
-            self.assertEqual(sources[0].right_edge, pos)
+            self.assertEqual(sources[0].left_edge.to_cutsite_tuple()[0], pos)
+            self.assertEqual(sources[0].right_edge.to_cutsite_tuple()[0], pos)
 
             # The enzyme names are correctly returned:
-            self.assertEqual(sources[0].restriction_enzymes, ['EcoRI', 'EcoRI'])
+            self.assertEqual(sources[0].get_enzymes(), ['EcoRI'])
 
     def test_linear_multiple_restriction(self):
 
@@ -573,11 +575,11 @@ class RestrictionTest(unittest.TestCase):
 
         # We try EcoRV, which gives blunt ends
         source = RestrictionEnzymeDigestionSource(
+            id=0,
             input=[1],
-            restriction_enzymes=['BamHI', 'EcoRV'],
         )
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
-        response = client.post('/restriction', json=data)
+        response = client.post('/restriction', json=data, params={'restriction_enzymes': ['BamHI', 'EcoRV']})
         payload = response.json()
 
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
@@ -593,22 +595,27 @@ class RestrictionTest(unittest.TestCase):
 
         # The edges of the fragments are correct:
         # AAAG^GATC_CAAAAGAT^ATCAAAAA
-        edges = [(None, (4, -4)), ((4, -4), (16, 0)), ((16, 0), None)]
+        edges = [
+            (None, RestrictionSequenceCut(cut_watson=4, overhang=-4, restriction_enzyme='BamHI')),
+            (
+                RestrictionSequenceCut(cut_watson=4, overhang=-4, restriction_enzyme='BamHI'),
+                RestrictionSequenceCut(cut_watson=16, overhang=0, restriction_enzyme='EcoRV'),
+            ),
+            (RestrictionSequenceCut(cut_watson=16, overhang=0, restriction_enzyme='EcoRV'), None),
+        ]
         for i, e in enumerate(edges):
             self.assertEqual(sources[i].left_edge, e[0])
             self.assertEqual(sources[i].right_edge, e[1])
 
         # The enzyme names are correct
-        restriction_enzymes = [[None, 'BamHI'], ['BamHI', 'EcoRV'], ['EcoRV', None]]
+        restriction_enzymes = [['BamHI'], ['BamHI', 'EcoRV'], ['EcoRV']]
         for i, e in enumerate(restriction_enzymes):
-            self.assertEqual(sources[i].restriction_enzymes, e)
+            self.assertEqual(sources[i].get_enzymes(), e)
 
         # Submitting the known fragments
 
         for i in range(len(edges)):
-            source = RestrictionEnzymeDigestionSource(
-                input=[1], restriction_enzymes=restriction_enzymes[i], left_edge=edges[i][0], right_edge=edges[i][1]
-            )
+            source = RestrictionEnzymeDigestionSource(id=0, input=[1], left_edge=edges[i][0], right_edge=edges[i][1])
             data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
             response = client.post('/restriction', json=data)
             payload = response.json()
@@ -630,11 +637,11 @@ class RestrictionTest(unittest.TestCase):
 
         # We try EcoRV, which gives blunt ends
         source = RestrictionEnzymeDigestionSource(
+            id=0,
             input=[1],
-            restriction_enzymes=['BamHI', 'EcoRV'],
         )
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
-        response = client.post('/restriction', json=data)
+        response = client.post('/restriction', json=data, params={'restriction_enzymes': ['BamHI', 'EcoRV']})
         payload = response.json()
 
         resulting_sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
@@ -651,7 +658,17 @@ class RestrictionTest(unittest.TestCase):
         # The edges of the fragments are correct:
         # AAAG^GATC_CAAAAGAT^ATCAAAAA
         # We use 8 + len because it's an origin-spanning sequence
-        edges = [((4, -4), (16, 0)), ((16, 0), (4, -4))]
+        edges = [
+            (
+                RestrictionSequenceCut(cut_watson=4, overhang=-4, restriction_enzyme='BamHI'),
+                RestrictionSequenceCut(cut_watson=16, overhang=0, restriction_enzyme='EcoRV'),
+            ),
+            (
+                RestrictionSequenceCut(cut_watson=16, overhang=0, restriction_enzyme='EcoRV'),
+                RestrictionSequenceCut(cut_watson=4, overhang=-4, restriction_enzyme='BamHI'),
+            ),
+        ]
+
         for i, e in enumerate(edges):
             self.assertEqual(sources[i].left_edge, e[0])
             self.assertEqual(sources[i].right_edge, e[1])
@@ -659,12 +676,15 @@ class RestrictionTest(unittest.TestCase):
         # The enzyme names are correct
         restriction_enzymes = [['BamHI', 'EcoRV'], ['EcoRV', 'BamHI']]
         for i, e in enumerate(restriction_enzymes):
-            self.assertEqual(sources[i].restriction_enzymes, e)
+            self.assertEqual(sources[i].get_enzymes(), e)
 
         # Submitting the known fragments
         for i in range(len(edges)):
             source = RestrictionEnzymeDigestionSource(
-                input=[1], restriction_enzymes=restriction_enzymes[i], left_edge=edges[i][0], right_edge=edges[i][1]
+                id=0,
+                input=[1],
+                left_edge=edges[i][0],
+                right_edge=edges[i][1],
             )
             data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
             response = client.post('/restriction', json=data)

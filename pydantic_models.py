@@ -171,6 +171,8 @@ class RestrictionSequenceCut(_RestrictionSequenceCut):
         restriction_enzyme = RestrictionBatch(first=[self.restriction_enzyme]).pop()
         return ((self.cut_watson, self.overhang), restriction_enzyme)
 
+    # TODO: make cut_watson and ovherhang not optional
+
 
 class RestrictionEnzymeDigestionSource(_RestrictionEnzymeDigestionSource):
     """Documents a restriction enzyme digestion, and the selection of one of the fragments."""
@@ -204,7 +206,8 @@ class RestrictionEnzymeDigestionSource(_RestrictionEnzymeDigestionSource):
             out.append(self.left_edge.restriction_enzyme)
         if self.right_edge is not None:
             out.append(self.right_edge.restriction_enzyme)
-        return out
+        # Unique values, sorted the same way
+        return sorted(list(set(out)), key=out.index)
 
 
 class AssemblySource(Source):
