@@ -3,6 +3,7 @@ from main import app
 from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
+from Bio.SeqFeature import SimpleLocation
 from pydantic_models import (
     RepositoryIdSource,
     PCRSource,
@@ -18,8 +19,8 @@ from pydantic_models import (
     GenomeCoordinatesSource,
     OligoHybridizationSource,
     PolymeraseExtensionSource,
-    CrisprSource,
-    AddgeneIDSource,
+    CRISPRSource,
+    AddGeneIdSource,
     RestrictionSequenceCut,
 )
 from pydna.dseqrecord import Dseqrecord
@@ -156,7 +157,7 @@ class AddGeneTest(unittest.TestCase):
             },
         ]
         for example in examples:
-            source = AddgeneIDSource(
+            source = AddGeneIdSource(
                 id=1,
                 repository_name='addgene',
                 repository_id=example['id'],
@@ -168,12 +169,12 @@ class AddGeneTest(unittest.TestCase):
             resulting_sequences = [
                 read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']
             ]
-            sources = [AddgeneIDSource.model_validate(s) for s in payload['sources']]
+            sources = [AddGeneIdSource.model_validate(s) for s in payload['sources']]
 
             self.assertEqual(len(resulting_sequences), 1)
             self.assertEqual(len(sources), 1)
             self.assertEqual(sources[0].addgene_sequence_type, example['type'])
-            self.assertEqual(sources[0].url, example['url'])
+            self.assertEqual(sources[0].sequence_file_url, example['url'])
 
             # We get the same response when making the response with the url
             response2 = client.post('/repository_id/addgene', json=payload['sources'][0])
@@ -181,7 +182,7 @@ class AddGeneTest(unittest.TestCase):
 
     def test_missing_sequences(self):
         # Non-existing id
-        source = AddgeneIDSource(
+        source = AddGeneIdSource(
             id=1,
             repository_name='addgene',
             repository_id='DUMMYTEST',
@@ -192,7 +193,7 @@ class AddGeneTest(unittest.TestCase):
         self.assertIn('wrong addgene id', response.json()['detail'])
 
         # Id that has no full-sequences
-        source = AddgeneIDSource(
+        source = AddGeneIdSource(
             id=1,
             repository_name='addgene',
             repository_id='39291',
@@ -202,11 +203,11 @@ class AddGeneTest(unittest.TestCase):
         self.assertIn('The requested plasmid does not have full sequences', response.json()['detail'])
 
         # url does not exist
-        source = AddgeneIDSource(
+        source = AddGeneIdSource(
             id=1,
             repository_name='addgene',
             repository_id='39282',
-            url='https://media.addgene.org/snapgene-media/wrongggggggg.gbk',
+            sequence_file_url='https://media.addgene.org/snapgene-media/wrongggggggg.gbk',
         )
         response = client.post('/repository_id/addgene', json=source.model_dump())
         self.assertEqual(response.status_code, 404)
@@ -232,7 +233,9 @@ class StickyLigationTest(unittest.TestCase):
         json_seqs = [seq.model_dump() for seq in json_seqs]
 
         # Assign ids to define deterministic assembly
-        source = LigationSource(input=[1, 2], assembly=[(1, 2, '8..11', '1..4')], circular=False)
+        source = LigationSource.from_assembly(
+            id=0, input=[1, 2], assembly=[(1, 2, SimpleLocation(7, 11), SimpleLocation(0, 4))], circular=False
+        )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post('/ligation', json=data)
         payload = response.json()
@@ -250,7 +253,9 @@ class StickyLigationTest(unittest.TestCase):
         self.assertEqual(sources[0], source)
 
         # Check that the inverse assembly will not pass
-        source = LigationSource(input=[2, 1], assembly=[(1, 2, '8..11', '1..4')], circular=False)
+        source = LigationSource.from_assembly(
+            id=0, input=[2, 1], assembly=[(1, 2, SimpleLocation(8, 11), SimpleLocation(1, 4))], circular=False
+        )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post('/ligation', json=data)
         self.assertEqual(response.status_code, 400)
@@ -258,7 +263,9 @@ class StickyLigationTest(unittest.TestCase):
         self.assertEqual(data['detail'], 'The provided assembly is not valid.')
 
         # Check that the circular assembly does not pass either
-        source = LigationSource(input=[1, 2], assembly=[(1, 2, '8..11', '1..4')], circular=True)
+        source = LigationSource.from_assembly(
+            id=0, input=[1, 2], assembly=[(1, 2, SimpleLocation(7, 11), SimpleLocation(0, 4))], circular=True
+        )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post('/ligation', json=data)
         self.assertEqual(response.status_code, 400)
@@ -283,6 +290,7 @@ class StickyLigationTest(unittest.TestCase):
 
         # We don't set the fragments_inverted, so we will get all possibilities (in this case only one)
         source = LigationSource(
+            id=0,
             input=[1, 2],
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
@@ -313,6 +321,7 @@ class StickyLigationTest(unittest.TestCase):
         json_seqs = [seq.model_dump() for seq in json_seqs]
 
         source = LigationSource(
+            id=0,
             input=[1, 2],
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
@@ -338,6 +347,7 @@ class StickyLigationTest(unittest.TestCase):
         json_seqs[0].id = 1
         json_seqs = [seq.model_dump() for seq in json_seqs]
         source = LigationSource(
+            id=0,
             input=[1],
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
@@ -358,6 +368,7 @@ class BluntLigationTest(unittest.TestCase):
         json_seqs[1].id = 2
         json_seqs = [seq.model_dump() for seq in json_seqs]
         source = LigationSource(
+            id=0,
             input=[1, 2],
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
@@ -387,6 +398,7 @@ class BluntLigationTest(unittest.TestCase):
         json_seqs[0].id = 1
         json_seqs = [seq.model_dump() for seq in json_seqs]
         source = LigationSource(
+            id=0,
             input=[1],
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
@@ -733,6 +745,7 @@ class PCRTest(unittest.TestCase):
         json_seq.id = 1
 
         submitted_source = PCRSource(
+            id=0,
             input=[1],
             forward_primer=2,
             reverse_primer=3,
@@ -796,6 +809,7 @@ class PCRTest(unittest.TestCase):
         json_seq.id = 1
 
         submitted_source = PCRSource(
+            id=0,
             input=[1],
             forward_primer=2,
             reverse_primer=2,
@@ -824,7 +838,7 @@ class PCRTest(unittest.TestCase):
         json_seq = format_sequence_genbank(template)
         json_seq.id = 1
 
-        submitted_source = PCRSource(input=[1], forward_primer=2, reverse_primer=3)
+        submitted_source = PCRSource(id=0, input=[1], forward_primer=2, reverse_primer=3)
 
         primer_fwd = PrimerModel(sequence='CCCCCCCC', id=2, name='forward')
 
@@ -847,10 +861,16 @@ class PCRTest(unittest.TestCase):
 
         primer_fwd = PrimerModel(sequence='ACGTACGT', id=2, name='forward')
 
-        # This would be the correct annealing info
-        submitted_source.forward_primer = 2
-        submitted_source.reverse_primer = 3
-        submitted_source.assembly = [(1, 2, '1..8', '5..12'), (2, -3, '19..26', '1..8')]
+        submitted_source = PCRSource.from_assembly(
+            id=0,
+            input=[1],
+            forward_primer=2,
+            reverse_primer=3,
+            assembly=[
+                (1, 2, SimpleLocation(0, 8), SimpleLocation(4, 12)),
+                (2, -3, SimpleLocation(18, 26), SimpleLocation(0, 8)),
+            ],
+        )
 
         data = {
             'source': submitted_source.model_dump(),
@@ -862,9 +882,16 @@ class PCRTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
         # This is the wrong annealing info
-        submitted_source.forward_primer = 2
-        submitted_source.reverse_primer = 3
-        submitted_source.assembly = [(2, -3, '19..26', '1..8'), (1, 2, '1..8', '5..12')]
+        submitted_source = PCRSource.from_assembly(
+            id=0,
+            input=[1],
+            forward_primer=2,
+            reverse_primer=3,
+            assembly=[
+                (2, -3, SimpleLocation(18, 26), SimpleLocation(0, 8)),
+                (1, 2, SimpleLocation(0, 8), SimpleLocation(4, 12)),
+            ],
+        )
 
         data = {
             'source': submitted_source.model_dump(),
@@ -883,6 +910,7 @@ class PCRTest(unittest.TestCase):
         json_seq.id = 1
 
         submitted_source = PCRSource(
+            id=0,
             input=[1],
             forward_primer=2,
             reverse_primer=3,
@@ -905,7 +933,7 @@ class PCRTest(unittest.TestCase):
 
 # class TemplatelessPCRTest(unittest.TestCase):
 #     def test_templateless(self):
-#         submitted_source = TemplatelessPCRSource(
+#         submitted_source = TemplatelessPCRSource(id=0,
 #             input=[],
 #             forward_primer=1,
 #             reverse_primer=2,
@@ -1030,7 +1058,6 @@ class OligoHybridizationTest(unittest.TestCase):
         response = client.post(
             '/oligonucleotide_hybridization', json=default_example, params={'minimal_annealing': 60}
         )
-        print(response.json())
         self.assertEqual(response.status_code, 400)
 
     def test_invalid_oligo_id(self):
@@ -1053,6 +1080,7 @@ class HomologousRecombinationTest(unittest.TestCase):
         json_insert.id = 2
         # One enzyme
         source = HomologousRecombinationSource(
+            id=0,
             input=[1, 2],
         )
         data = {'source': source.model_dump(), 'sequences': [json_template.model_dump(), json_insert.model_dump()]}
@@ -1092,6 +1120,7 @@ class GibsonAssemblyTest(unittest.TestCase):
             f.id = i + 1
 
         source = GibsonAssemblySource(
+            id=0,
             input=[1, 2, 3],
         )
 
@@ -1112,6 +1141,7 @@ class GibsonAssemblyTest(unittest.TestCase):
             f.id = i + 1
 
         source = GibsonAssemblySource(
+            id=0,
             input=[1],
         )
         data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
@@ -1132,6 +1162,7 @@ class GibsonAssemblyTest(unittest.TestCase):
             f.id = i + 1
 
         source = GibsonAssemblySource(
+            id=0,
             input=[1, 2],
         )
 
@@ -1150,6 +1181,7 @@ class RestrictionAndLigationTest(unittest.TestCase):
             f.id = i + 1
 
         source = RestrictionAndLigationSource(
+            id=0,
             input=[1, 2, 3],
             restriction_enzymes=['EcoRI'],
         )
@@ -1175,6 +1207,7 @@ class RestrictionAndLigationTest(unittest.TestCase):
             f.id = i + 1
 
         source = RestrictionAndLigationSource(
+            id=0,
             input=[1, 2, 3, 4],
             restriction_enzymes=['BsaI'],
         )
@@ -1194,6 +1227,7 @@ class RestrictionAndLigationTest(unittest.TestCase):
             f.id = i + 1
 
         source = RestrictionAndLigationSource(
+            id=0,
             input=[1],
             restriction_enzymes=['EcoRI'],
         )
@@ -1465,7 +1499,8 @@ class CrisprTest(unittest.TestCase):
         json_insert.id = 2
 
         guide = PrimerModel(sequence='ttcaatgcaaacagtaatga', id=3, name='guide_1')
-        source = CrisprSource(
+        source = CRISPRSource(
+            id=0,
             input=[1, 2],
             guides=[3],
         )
@@ -1483,7 +1518,7 @@ class CrisprTest(unittest.TestCase):
         resulting_sequences = [
             read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']
         ]
-        sources = [CrisprSource.model_validate(s) for s in payload['sources']]
+        sources = [CRISPRSource.model_validate(s) for s in payload['sources']]
 
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(len(sources), 1)
@@ -1503,7 +1538,8 @@ class CrisprTest(unittest.TestCase):
 
         guide = PrimerModel(sequence='AAAAAAAA', id=3, name='guide_1')
 
-        source = CrisprSource(
+        source = CRISPRSource(
+            id=0,
             input=[1, 2],
             guides=[3],
         )

@@ -21,12 +21,12 @@ from pydantic_models import (
     TextFileSequence,
     SequenceFileFormat,
     RepositoryIdSource,
-    AddgeneIDSource,
+    AddGeneIdSource,
     RestrictionEnzymeDigestionSource,
     LigationSource,
     UploadedFileSource,
     HomologousRecombinationSource,
-    CrisprSource,
+    CRISPRSource,
     GibsonAssemblySource,
     RestrictionAndLigationSource,
     AssemblySource,
@@ -257,10 +257,10 @@ def get_from_repository_id_genbank(source: RepositoryIdSource):
 @router.post(
     '/repository_id/addgene',
     response_model=create_model(
-        'AddgeneIdResponse', sources=(list[AddgeneIDSource], ...), sequences=(list[TextFileSequence], ...)
+        'AddgeneIdResponse', sources=(list[AddGeneIdSource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
-def get_from_repository_id_addgene(source: AddgeneIDSource):
+def get_from_repository_id_addgene(source: AddGeneIdSource):
     try:
         dseqs, sources = request_from_addgene(source)
     except HTTPError as exception:
@@ -347,12 +347,12 @@ async def genome_coordinates(
     '/crispr',
     response_model=create_model(
         'CrisprResponse',
-        sources=(list[CrisprSource], ...),
+        sources=(list[CRISPRSource], ...),
         sequences=(list[TextFileSequence], ...),
     ),
 )
 async def crispr(
-    source: CrisprSource,
+    source: CRISPRSource,
     guides: list[PrimerModel],
     sequences: conlist(TextFileSequence, min_length=2, max_length=2),
     minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.'),
@@ -413,12 +413,12 @@ async def crispr(
     # meant for linear DNA
 
     out_sources = [
-        CrisprSource.from_assembly(id=source.id, input=source.input, assembly=a, guides=source.guides)
+        CRISPRSource.from_assembly(id=source.id, input=source.input, assembly=a, guides=source.guides)
         for a in valid_assemblies
     ]
 
     # If a specific assembly is requested
-    if source.assembly is not None:
+    if len(source.assembly):
         return format_known_assembly_response(source, out_sources, [template, insert])
 
     out_sequences = [format_sequence_genbank(assemble([template, insert], a, False)) for a in valid_assemblies]
@@ -529,7 +529,7 @@ async def ligation(
 
     # If the assembly is known, the blunt parameter is ignored, and we set the algorithm type from the assembly
     # (blunt ligations have features without length)
-    if source.assembly is not None:
+    if len(source.assembly):
         asm = source.get_assembly_plan()
         blunt = len(asm[0][2]) == 0
 
@@ -552,7 +552,7 @@ async def ligation(
         # Not possible to have insertion assemblies in this case
 
     # If a specific assembly is requested
-    if source.assembly is not None:
+    if len(source.assembly):
         return format_known_assembly_response(source, out_sources, fragments)
 
     if len(out_sources) == 0:
@@ -590,7 +590,7 @@ async def pcr(
     # What happens if annealing is zero? That would mean
     # mismatch in the 3' of the primer, which maybe should
     # not be allowed.
-    if source.assembly is not None:
+    if len(source.assembly):
         minimal_annealing = source.minimal_overlap()
         # Only the ones that match are included in the output assembly
         # location, so the submitted assembly should be returned without
@@ -623,7 +623,7 @@ async def pcr(
     ]
 
     # If a specific assembly is requested
-    if source.assembly is not None:
+    if len(source.assembly):
         return format_known_assembly_response(source, out_sources, fragments)
 
     if len(possible_assemblies) == 0:
@@ -750,7 +750,7 @@ async def homologous_recombination(
         raise HTTPException(400, 'The template and the insert must be linear.')
 
     # If an assembly is provided, we ignore minimal_homology
-    if source.assembly is not None:
+    if len(source.assembly):
         minimal_homology = source.minimal_overlap()
 
     asm = Assembly((template, insert), limit=minimal_homology, use_all_fragments=True)
@@ -767,7 +767,7 @@ async def homologous_recombination(
     ]
 
     # If a specific assembly is requested
-    if source.assembly is not None:
+    if len(source.assembly):
         return format_known_assembly_response(source, out_sources, [template, insert])
 
     out_sequences = [format_sequence_genbank(assemble([template, insert], a, False)) for a in possible_assemblies]
@@ -818,7 +818,7 @@ async def gibson_assembly(
         # Not possible to have insertion assemblies with gibson
 
     # If a specific assembly is requested
-    if source.assembly is not None:
+    if len(source.assembly):
         return format_known_assembly_response(source, out_sources, fragments)
 
     if len(out_sources) == 0:
@@ -885,7 +885,7 @@ async def restriction_and_ligation(
             out_sources += [create_source(a, False) for a in asm.get_insertion_assemblies()]
 
     # If a specific assembly is requested
-    if source.assembly is not None:
+    if len(source.assembly):
         return format_known_assembly_response(source, out_sources, fragments)
 
     if len(out_sources) == 0:
