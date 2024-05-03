@@ -413,7 +413,7 @@ async def crispr(
     # meant for linear DNA
 
     out_sources = [
-        CrisprSource.from_assembly(id=source.id, input=source.input, assembly=a, guides=source.guides, circular=False)
+        CrisprSource.from_assembly(id=source.id, input=source.input, assembly=a, guides=source.guides)
         for a in valid_assemblies
     ]
 

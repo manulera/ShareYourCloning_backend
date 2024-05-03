@@ -202,6 +202,21 @@ class AssemblySource(Source):
             out.append((p[0], p[1], Location.fromstring(p[2]), Location.fromstring(p[3])))
         return tuple(out)
 
+    @classmethod
+    def from_assembly(
+        cls, assembly: list[tuple[int, int, Location, Location]], input: list[int], id: int, circular: bool, **kwargs
+    ):
+        return cls(
+            id=id,
+            assembly=[
+                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
+                for part in assembly
+            ],
+            input=input,
+            circular=circular,
+            **kwargs
+        )
+
 
 class PCRSource(AssemblySource):
     """Documents a PCR, and the selection of one of the products."""
@@ -214,43 +229,24 @@ class PCRSource(AssemblySource):
     # This can only take one input
     input: conlist(int, min_length=1, max_length=1)
 
+    @classmethod
     def from_assembly(
+        cls,
         assembly: list[tuple[int, int, Location, Location]],
         input: list[int],
         id: int,
         forward_primer: int,
         reverse_primer: int,
-    ) -> 'PCRSource':
+    ):
         """Creates a PCRSource from an assembly, input and id"""
-        return PCRSource(
-            id=id,
-            assembly=[
-                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
-                for part in assembly
-            ],
-            input=input,
-            forward_primer=forward_primer,
-            reverse_primer=reverse_primer,
+        return super().from_assembly(
+            assembly, input, id, False, forward_primer=forward_primer, reverse_primer=reverse_primer
         )
 
 
 class LigationSource(AssemblySource):
 
     type: SourceType = SourceType('ligation')
-
-    def from_assembly(
-        assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int
-    ) -> 'LigationSource':
-        """Creates a StickyLigationSource from an assembly, input and circularity"""
-        return LigationSource(
-            id=id,
-            assembly=[
-                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
-                for part in assembly
-            ],
-            input=input,
-            circular=circular,
-        )
 
 
 class HomologousRecombinationSource(AssemblySource):
@@ -259,37 +255,11 @@ class HomologousRecombinationSource(AssemblySource):
     type: SourceType = SourceType('homologous_recombination')
     input: conlist(int, min_length=2, max_length=2)
 
-    def from_assembly(
-        assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int
-    ) -> 'HomologousRecombinationSource':
-        return HomologousRecombinationSource(
-            id=id,
-            assembly=[
-                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
-                for part in assembly
-            ],
-            input=input,
-            circular=circular,
-        )
-
 
 class GibsonAssemblySource(AssemblySource):
 
     type: SourceType = SourceType('gibson_assembly')
     input: conlist(int, min_length=1)
-
-    def from_assembly(
-        assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int
-    ) -> 'GibsonAssemblySource':
-        return GibsonAssemblySource(
-            id=id,
-            assembly=[
-                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
-                for part in assembly
-            ],
-            input=input,
-            circular=circular,
-        )
 
 
 class CrisprSource(AssemblySource):
@@ -300,24 +270,15 @@ class CrisprSource(AssemblySource):
     guides: list[int] = Field(..., description='The CRISPR guides')
     circular: bool = False
 
+    @classmethod
     def from_assembly(
+        cls,
         assembly: list[tuple[int, int, Location, Location]],
         input: list[int],
         id: int,
         guides: list[int],
-        circular: bool,
-    ) -> 'CrisprSource':
-        'Creates a CrisprSource from an assembly, input, guide and id'
-        return CrisprSource(
-            id=id,
-            assembly=[
-                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
-                for part in assembly
-            ],
-            input=input,
-            guides=guides,
-            circular=circular,
-        )
+    ):
+        return super().from_assembly(assembly, input, id, False, guides=guides)
 
 
 class RestrictionAndLigationSource(AssemblySource):
@@ -327,23 +288,16 @@ class RestrictionAndLigationSource(AssemblySource):
         ..., description='The list of restriction enzymes used in the digestion'
     )
 
+    @classmethod
     def from_assembly(
+        cls,
         assembly: list[tuple[int, int, Location, Location]],
         input: list[int],
         circular: bool,
         id: int,
         restriction_enzymes=list['str'],
-    ) -> 'RestrictionAndLigationSource':
-        return RestrictionAndLigationSource(
-            id=id,
-            assembly=[
-                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
-                for part in assembly
-            ],
-            input=input,
-            circular=circular,
-            restriction_enzymes=restriction_enzymes,
-        )
+    ):
+        return super().from_assembly(assembly, input, id, circular, restriction_enzymes=restriction_enzymes)
 
 
 class OligoHybridizationSource(_OligoHybridizationSource):
