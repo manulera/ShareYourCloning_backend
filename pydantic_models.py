@@ -24,6 +24,7 @@ from shareyourcloning_linkml.datamodel import (
     CRISPRSource as _CRISPRSource,
     Primer as _Primer,
     AssemblyJoin as _AssemblyJoin,
+    AssemblyJoinComponent as _AssemblyJoinComponent,
     SimpleSequenceLocation as _SimpleSequenceLocation,
     AddGeneIdSource as _AddGeneIdSource,
 )
@@ -182,31 +183,40 @@ class SimpleSequenceLocation(_SimpleSequenceLocation):
         return BioSimpleLocation(self.start, self.end, self.strand)
 
 
+class AssemblyJoinComponent(_AssemblyJoinComponent):
+    location: SimpleSequenceLocation = Field(
+        ...,
+        description="""Location of the overlap in the fragment. Might be an empty location (start == end) to indicate blunt join.""",
+    )
+    pass
+
+
 class AssemblyJoin(_AssemblyJoin):
-    left_location: SimpleSequenceLocation = Field(
-        ...,
-        description="""Location of the overlap in the left fragment. Might be an empty location (start == end) to indicate blunt join.""",
-    )
-    right_location: SimpleSequenceLocation = Field(
-        ...,
-        description="""Location of the overlap in the right fragment. Might be an empty location (start == end) to indicate blunt join.""",
-    )
+
+    left: AssemblyJoinComponent = Field(...)
+    right: AssemblyJoinComponent = Field(...)
 
     @classmethod
     def from_join_tuple(cls, join_tuple: tuple[int, int, BioSimpleLocation, BioSimpleLocation]):
         return cls(
-            left_fragment=join_tuple[0],
-            right_fragment=join_tuple[1],
-            left_location=SimpleSequenceLocation.from_simple_location(join_tuple[2]),
-            right_location=SimpleSequenceLocation.from_simple_location(join_tuple[3]),
+            left=AssemblyJoinComponent(
+                sequence=abs(join_tuple[0]),
+                reverse_complemented=join_tuple[0] < 0,
+                location=SimpleSequenceLocation.from_simple_location(join_tuple[2]),
+            ),
+            right=AssemblyJoinComponent(
+                sequence=abs(join_tuple[1]),
+                reverse_complemented=join_tuple[1] < 0,
+                location=SimpleSequenceLocation.from_simple_location(join_tuple[3]),
+            ),
         )
 
     def to_join_tuple(self) -> tuple[int, int, BioSimpleLocation, BioSimpleLocation]:
         return (
-            self.left_fragment,
-            self.right_fragment,
-            self.left_location.to_simple_location(),
-            self.right_location.to_simple_location(),
+            self.left.sequence * (-1 if self.left.reverse_complemented else 1),
+            self.right.sequence * (-1 if self.right.reverse_complemented else 1),
+            self.left.location.to_simple_location(),
+            self.right.location.to_simple_location(),
         )
 
     def __str__(self) -> str:
@@ -227,10 +237,10 @@ class AssemblySourceCommonClass:
         all_overlaps = list()
         for f in self.assembly:
             # TODO: these conditions are probably not needed
-            # if f.left_location is not None:
-            all_overlaps.append(f.left_location.end - f.left_location.start)
-            # if f.right_location is not None:
-            all_overlaps.append(f.right_location.end - f.right_location.start)
+            # if f.left.location is not None:
+            all_overlaps.append(f.left.location.end - f.left.location.start)
+            # if f.right.location is not None:
+            all_overlaps.append(f.right.location.end - f.right.location.start)
         return min(all_overlaps)
 
     def get_assembly_plan(self):
