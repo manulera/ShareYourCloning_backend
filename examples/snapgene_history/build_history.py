@@ -2,14 +2,22 @@
 A script to clone a gene into a plasmid. The same operation will be done in Snapgene,
 and we will try to extract the snapgene history to match the documentation by ShareYourCloning.
 """
+
 # %%
 import sys
+
 sys.path.append('../../')
 
-from pydantic_models import RepositoryIdSource, PrimerAnnealingSettings, PrimerModel, PCRSource, RestrictionEnzymeDigestionSource  # noqa
+from pydantic_models import (  # noqa: E402
+    RepositoryIdSource,
+    PrimerModel,
+    PCRSource,
+    RestrictionEnzymeDigestionSource,
+)  # noqa
 from fastapi.testclient import TestClient  # noqa
 from main import app  # noqa
 import json  # noqa
+
 # %%
 
 # lists to collect sources and sequences
@@ -23,11 +31,11 @@ client = TestClient(app)
 # 1. Request Ase1 to genbank (a pombe gene) ==========================
 
 input_source = RepositoryIdSource(
-    repository='genbank',
+    repository_name='genbank',
     repository_id='NM_001018957.2',
 )
 
-payload = client.post('/repository_id', json=input_source.model_dump()).json()
+payload = client.post('/repository_id/genbank', json=input_source.model_dump()).json()
 
 # There should only be one in the list, so we can simply sum them
 source = payload['sources'][0]
@@ -40,17 +48,9 @@ sequences.append(sequence)
 
 # 2. Amplify Ase1 by PCR ==========================
 
-primer_fwd = PrimerModel(
-    sequence='TAAGCAGTCGACatgcaaacagtaatgatggatg',
-    id=3,
-    name='ase1_forward'
-)
+primer_fwd = PrimerModel(sequence='TAAGCAGTCGACatgcaaacagtaatgatggatg', id=3, name='ase1_forward')
 
-primer_rvs = PrimerModel(
-    sequence='TAAGCAGGCGCGCCaaagccttcttctccccatt',
-    id=4,
-    name='ase1_rvs'
-)
+primer_rvs = PrimerModel(sequence='TAAGCAGGCGCGCCaaagccttcttctccccatt', id=4, name='ase1_rvs')
 
 input_source = PCRSource(
     input=[2],
@@ -59,7 +59,7 @@ input_source = PCRSource(
 primers = [primer_fwd.model_dump(), primer_rvs.model_dump()]
 
 data = {'source': input_source.model_dump(), 'sequences': sequences, 'primers': primers}
-payload = client.post("/pcr", json=data, params={'minimal_annealing': 13}).json()
+payload = client.post('/pcr', json=data, params={'minimal_annealing': 13}).json()
 
 source = payload['sources'][0]
 source['id'] = 5
@@ -77,7 +77,7 @@ input_source = RestrictionEnzymeDigestionSource(
 )
 
 data = {'source': input_source.model_dump(), 'sequences': [sequences[-1]]}
-payload = client.post("/restriction", json=data).json()
+payload = client.post('/restriction', json=data).json()
 
 source = payload['sources'][1]
 source['id'] = 7
@@ -90,7 +90,7 @@ sequences.append(sequence)
 # 4. Load plasmid from file ==========================
 
 with open('addgene-plasmid-39296-sequence-49545.dna', 'rb') as f:
-    payload = client.post("/read_from_file", files={"file": f}).json()
+    payload = client.post('/read_from_file', files={'file': f}).json()
 
 source = payload['sources'][0]
 source['id'] = 9
@@ -109,7 +109,7 @@ input_source = RestrictionEnzymeDigestionSource(
 )
 
 data = {'source': input_source.model_dump(), 'sequences': [sequences[-1]]}
-payload = client.post("/restriction", json=data).json()
+payload = client.post('/restriction', json=data).json()
 
 source = payload['sources'][1]
 source['id'] = 11
@@ -119,11 +119,7 @@ sequence['id'] = 12
 sources.append(source)
 sequences.append(sequence)
 
-output_dict = {
-    'sequences': sequences,
-    'sources': sources,
-    'primers': primers
-}
+output_dict = {'sequences': sequences, 'sources': sources, 'primers': primers}
 
 
 with open('history.json', 'w') as fp:

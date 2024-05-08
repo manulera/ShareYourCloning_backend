@@ -27,9 +27,14 @@ class RecordStubRoute(APIRoute):
             try:
                 response: JSONResponse = await original_route_handler(request)
             except RequestValidationError as exc:
-                detail = {'detail': exc.errors()}
-                response = JSONResponse(content=detail, status_code=422)
+                errors = exc.errors()
+                for e in errors:
+                    if 'ctx' in e:
+                        # This is a ValueError Object that cannot be serialized
+                        del e['ctx']
+                response = JSONResponse(content=errors, status_code=422)
             except HTTPException as exc:
+                print('>>exception', exc)
                 detail = {'detail': exc.detail}
                 response = JSONResponse(content=detail, status_code=exc.status_code)
 

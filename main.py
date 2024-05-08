@@ -1,5 +1,4 @@
-import json
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter, Form
+from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter
 from typing import Annotated
 from fastapi.responses import JSONResponse
 from pydna.dseqrecord import Dseqrecord
@@ -19,14 +18,15 @@ from dna_functions import (
 from pydantic_models import (
     PCRSource,
     PrimerModel,
-    SequenceEntity,
+    TextFileSequence,
     SequenceFileFormat,
     RepositoryIdSource,
+    AddGeneIdSource,
     RestrictionEnzymeDigestionSource,
     LigationSource,
     UploadedFileSource,
     HomologousRecombinationSource,
-    CrisprSource,
+    CRISPRSource,
     GibsonAssemblySource,
     RestrictionAndLigationSource,
     AssemblySource,
@@ -152,16 +152,15 @@ async def greeting(request: Request):
 @router.post(
     '/read_from_file',
     response_model=create_model(
-        'UploadedFileResponse', sources=(list[UploadedFileSource], ...), sequences=(list[SequenceEntity], ...)
+        'UploadedFileResponse', sources=(list[UploadedFileSource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
 async def read_from_file(
     file: UploadFile = File(...),
-    file_format: SequenceFileFormat = Query(
+    sequence_file_format: SequenceFileFormat = Query(
         None,
         description='Format of the sequence file. Unless specified, it will be guessed from the extension',
     ),
-    info_str: str = Form(''),
     index_in_file: int = Query(
         None,
         description='The index of the sequence in the file for multi-sequence files',
@@ -169,7 +168,7 @@ async def read_from_file(
 ):
     """Return a json sequence from a sequence file"""
 
-    if file_format is None:
+    if sequence_file_format is None:
         extension_dict = {'gbk': 'genbank', 'gb': 'genbank', 'dna': 'snapgene', 'fasta': 'fasta'}
         extension = file.filename.split('.')[-1]
         if extension not in extension_dict:
@@ -179,18 +178,18 @@ async def read_from_file(
             )
 
         # We guess the file type from the extension
-        file_format = SequenceFileFormat(extension_dict[extension])
+        sequence_file_format = SequenceFileFormat(extension_dict[extension])
 
-    if file_format in ['fasta', 'genbank']:
+    if sequence_file_format in ['fasta', 'genbank']:
         # Read the whole file to a string
         file_content = (await file.read()).decode()
         dseqs = pydna_parse(file_content)
         if len(dseqs) == 0:
             raise HTTPException(422, 'Pydna parser reader cannot process this file.')
 
-    elif file_format == 'snapgene':
+    elif sequence_file_format == 'snapgene':
         try:
-            seq = seqio_read(file.file, file_format)
+            seq = seqio_read(file.file, sequence_file_format)
         except ValueError:
             raise HTTPException(422, 'Biopython snapgene reader cannot process this file.')
 
@@ -198,13 +197,12 @@ async def read_from_file(
         dseqs = [Dseqrecord(seq, circular=iscircular)]
 
     # The common part
-    parent_source = UploadedFileSource(file_format=file_format, file_name=file.filename)
+    # TODO: using id=0 is not great
+    parent_source = UploadedFileSource(id=0, sequence_file_format=sequence_file_format, file_name=file.filename)
     out_sources = list()
-    info = json.loads(info_str) if info_str else dict()
     for i in range(len(dseqs)):
         new_source = parent_source.model_copy()
         new_source.index_in_file = i
-        new_source.info = info
         out_sources.append(new_source)
 
     out_sequences = [format_sequence_genbank(s) for s in dseqs]
@@ -213,63 +211,76 @@ async def read_from_file(
         if index_in_file >= len(out_sources):
             raise HTTPException(404, 'The index_in_file is out of range.')
         return {'sequences': [out_sequences[index_in_file]], 'sources': [out_sources[index_in_file]]}
-
-    return {'sequences': out_sequences, 'sources': out_sources}
+    else:
+        return {'sequences': out_sequences, 'sources': out_sources}
 
 
 # TODO: a bit inconsistent that here you don't put {source: {...}} in the request, but
 # directly the object.
 
 
+def repository_id_http_error_handler(exception: HTTPError, source: RepositoryIdSource):
+
+    if exception.code == 500:  # pragma: no cover
+        raise HTTPException(
+            503, f'{source.repository_name} returned: {exception} - {source.repository_name} might be down'
+        )
+    elif exception.code == 400 or exception.code == 404:
+        raise HTTPException(
+            404,
+            f'{source.repository_name} returned: {exception} - Likely you inserted a wrong {source.repository_name} id',
+        )
+
+
+def repository_id_url_error_handler(exception: URLError, source: RepositoryIdSource):
+    raise HTTPException(504, f'Unable to connect to {source.repository_name}: {exception}')
+
+
 @router.post(
-    '/repository_id',
+    '/repository_id/genbank',
     response_model=create_model(
-        'RepositoryIdResponse', sources=(list[RepositoryIdSource], ...), sequences=(list[SequenceEntity], ...)
+        'RepositoryIdResponse', sources=(list[RepositoryIdSource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
-async def get_from_repository_id(source: RepositoryIdSource):
-
+def get_from_repository_id_genbank(source: RepositoryIdSource):
     try:
-        if source.repository == 'genbank':
-            # This only returns one
-            gb = Genbank('example@gmail.com')
-            seq = Dseqrecord(gb.nucleotide(source.repository_id))
-            dseqs = [seq]
-            sources = [source.model_copy()]
-        elif source.repository == 'addgene':
-            # This may return more than one? Not clear
-            dseqs, sources = request_from_addgene(source)
-            # Special addgene exception, they may have only partial sequences
-            if len(dseqs) == 0:
-                raise HTTPException(
-                    404,
-                    f'The requested plasmid does not exist, or does not have full sequences, see https://www.addgene.org/{source.repository_id}/sequences/',
-                )
-        else:
-            raise HTTPException(404, 'wrong ID')
-
-        output_sequences = [format_sequence_genbank(s) for s in dseqs]
-
-        return {'sequences': output_sequences, 'sources': sources}
-
+        gb = Genbank('example@gmail.com')
+        seq = Dseqrecord(gb.nucleotide(source.repository_id))
     except HTTPError as exception:
-        if exception.code == 500:  # pragma: no cover
-            raise HTTPException(
-                503, f'{source.repository.value} returned: {exception} - {source.repository} might be down'
-            )
-        elif exception.code == 400 or exception.code == 404:
-            raise HTTPException(
-                404,
-                f'{source.repository.value} returned: {exception} - Likely you inserted a wrong {source.repository} id',
-            )
+        repository_id_http_error_handler(exception, source)
     except URLError as exception:
-        raise HTTPException(504, f'Unable to connect to {source.repository}: {exception}')
+        repository_id_url_error_handler(exception, source)
+
+    return {'sequences': [format_sequence_genbank(seq)], 'sources': [source.model_copy()]}
+
+
+@router.post(
+    '/repository_id/addgene',
+    response_model=create_model(
+        'AddgeneIdResponse', sources=(list[AddGeneIdSource], ...), sequences=(list[TextFileSequence], ...)
+    ),
+)
+def get_from_repository_id_addgene(source: AddGeneIdSource):
+    try:
+        dseqs, sources = request_from_addgene(source)
+    except HTTPError as exception:
+        repository_id_http_error_handler(exception, source)
+    except URLError as exception:
+        repository_id_url_error_handler(exception, source)
+
+    # Special addgene exception, they may have only partial sequences
+    if len(dseqs) == 0:
+        raise HTTPException(
+            404,
+            f'The requested plasmid does not have full sequences, see https://www.addgene.org/{source.repository_id}/sequences/',
+        )
+    return {'sequences': [format_sequence_genbank(s) for s in dseqs], 'sources': sources}
 
 
 @router.post(
     '/genome_coordinates',
     response_model=create_model(
-        'GenomeRegionResponse', sources=(list[GenomeCoordinatesSource], ...), sequences=(list[SequenceEntity], ...)
+        'GenomeRegionResponse', sources=(list[GenomeCoordinatesSource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
 async def genome_coordinates(
@@ -277,7 +288,7 @@ async def genome_coordinates(
 ):
 
     # Validate that coordinates make sense
-    ncbi_requests.validate_coordinates_pre_request(source.start, source.stop, source.strand)
+    ncbi_requests.validate_coordinates_pre_request(source.start, source.end, source.strand)
 
     # Source includes a locus tag in annotated assembly
     if source.locus_tag is not None:
@@ -301,12 +312,12 @@ async def genome_coordinates(
         # The gene should fall within the range (range might be bigger if bases were requested upstream or downstream)
         if (
             int(gene_range['begin']) < source.start
-            or int(gene_range['end']) > source.stop
+            or int(gene_range['end']) > source.end
             or gene_strand != source.strand
         ):
             raise HTTPException(
                 400,
-                f'wrong coordinates, expected to fall within {source.start}, {source.stop} on strand: {source.strand}',
+                f'wrong coordinates, expected to fall within {source.start}, {source.end} on strand: {source.strand}',
             )
 
     elif source.gene_id is not None:
@@ -323,12 +334,10 @@ async def genome_coordinates(
     if len(assembly_accessions):
         source.assembly_accession = assembly_accessions[0]
 
-    seq = ncbi_requests.get_genbank_sequence_subset(
-        source.sequence_accession, source.start, source.stop, source.strand
-    )
+    seq = ncbi_requests.get_genbank_sequence_subset(source.sequence_accession, source.start, source.end, source.strand)
 
     # NCBI does not complain for coordinates that fall out of the sequence, so we have to check here
-    if len(seq) != source.stop - source.start + 1:
+    if len(seq) != source.end - source.start + 1:
         raise HTTPException(400, 'coordinates fall outside the sequence')
 
     return {'sequences': [format_sequence_genbank(seq)], 'sources': [source.model_copy()]}
@@ -338,14 +347,14 @@ async def genome_coordinates(
     '/crispr',
     response_model=create_model(
         'CrisprResponse',
-        sources=(list[CrisprSource], ...),
-        sequences=(list[SequenceEntity], ...),
+        sources=(list[CRISPRSource], ...),
+        sequences=(list[TextFileSequence], ...),
     ),
 )
 async def crispr(
-    source: CrisprSource,
+    source: CRISPRSource,
     guides: list[PrimerModel],
-    sequences: conlist(SequenceEntity, min_length=2, max_length=2),
+    sequences: conlist(TextFileSequence, min_length=2, max_length=2),
     minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.'),
 ):
     """Return the sequence after performing CRISPR editing by Homology directed repair
@@ -404,12 +413,12 @@ async def crispr(
     # meant for linear DNA
 
     out_sources = [
-        CrisprSource.from_assembly(id=source.id, input=source.input, assembly=a, guides=source.guides, circular=False)
+        CRISPRSource.from_assembly(id=source.id, input=source.input, assembly=a, guides=source.guides)
         for a in valid_assemblies
     ]
 
     # If a specific assembly is requested
-    if source.assembly is not None:
+    if len(source.assembly):
         return format_known_assembly_response(source, out_sources, [template, insert])
 
     out_sequences = [format_sequence_genbank(assemble([template, insert], a, False)) for a in valid_assemblies]
@@ -419,7 +428,7 @@ async def crispr(
 @router.post(
     '/manually_typed',
     response_model=create_model(
-        'ManuallyTypedResponse', sources=(list[ManuallyTypedSource], ...), sequences=(list[SequenceEntity], ...)
+        'ManuallyTypedResponse', sources=(list[ManuallyTypedSource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
 async def manually_typed(source: ManuallyTypedSource):
@@ -446,18 +455,28 @@ async def get_restriction_enzyme_list():
     response_model=create_model(
         'RestrictionEnzymeDigestionResponse',
         sources=(list[RestrictionEnzymeDigestionSource], ...),
-        sequences=(list[SequenceEntity], ...),
+        sequences=(list[TextFileSequence], ...),
     ),
 )
 async def restriction(
-    source: RestrictionEnzymeDigestionSource, sequences: conlist(SequenceEntity, min_length=1, max_length=1)
+    source: RestrictionEnzymeDigestionSource,
+    sequences: conlist(TextFileSequence, min_length=1, max_length=1),
+    restriction_enzymes: Annotated[list[str], Query(default_factory=list)],
 ):
+    # There should be 1 or 2 enzymes in the request if the source does not have cuts
+    if source.left_edge is None and source.right_edge is None:
+        if len(restriction_enzymes) < 1 or len(restriction_enzymes) > 2:
+            raise HTTPException(422, 'There should be 1 or 2 restriction enzymes in the request.')
+    else:
+        if len(restriction_enzymes) != 0:
+            raise HTTPException(422, 'There should be no restriction enzymes in the request if source is populated.')
+        restriction_enzymes = source.get_enzymes()
 
     # TODO: this could be moved to the class
-    invalid_enzymes = get_invalid_enzyme_names(source.restriction_enzymes)
+    invalid_enzymes = get_invalid_enzyme_names(restriction_enzymes)
     if len(invalid_enzymes):
         raise HTTPException(404, 'These enzymes do not exist: ' + ', '.join(invalid_enzymes))
-    enzymes = RestrictionBatch(first=[e for e in source.restriction_enzymes if e is not None])
+    enzymes = RestrictionBatch(first=[e for e in restriction_enzymes if e is not None])
 
     seqr = read_dsrecord_from_json(sequences[0])
     # TODO: return error if the id of the sequence does not correspond
@@ -466,19 +485,13 @@ async def restriction(
     cutsite_pairs = seqr.seq.get_cutsite_pairs(cutsites)
     sources = [RestrictionEnzymeDigestionSource.from_cutsites(*p, source.input, source.id) for p in cutsite_pairs]
 
-    all_enzymes = set(enzyme for s in sources for enzyme in s.restriction_enzymes)
-    enzymes_not_cutting = set(source.restriction_enzymes) - set(all_enzymes)
+    all_enzymes = set(enzyme for s in sources for enzyme in s.get_enzymes())
+    enzymes_not_cutting = set(restriction_enzymes) - set(all_enzymes)
     if len(enzymes_not_cutting):
         raise HTTPException(400, 'These enzymes do not cut: ' + ', '.join(enzymes_not_cutting))
 
     # If the output is known
     if source.left_edge is not None or source.right_edge is not None:
-        # TODO: this could be moved to the class
-        if len(source.restriction_enzymes) != 2:
-            raise HTTPException(
-                400,
-                'If either `left_edge` or `right_edge` is provided, the length of `restriction_enzymes` must be 2.',
-            )
 
         for i, s in enumerate(sources):
             if s == source:
@@ -494,12 +507,12 @@ async def restriction(
 @router.post(
     '/ligation',
     response_model=create_model(
-        'LigationResponse', sources=(list[LigationSource], ...), sequences=(list[SequenceEntity], ...)
+        'LigationResponse', sources=(list[LigationSource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
 async def ligation(
     source: LigationSource,
-    sequences: conlist(SequenceEntity, min_length=1),
+    sequences: conlist(TextFileSequence, min_length=1),
     blunt: bool = Query(False, description='Use blunt ligation instead of sticky ends.'),
     allow_partial_overlap: bool = Query(True, description='Allow for partially overlapping sticky ends.'),
     circular_only: bool = Query(False, description='Only return circular assemblies.'),
@@ -516,7 +529,7 @@ async def ligation(
 
     # If the assembly is known, the blunt parameter is ignored, and we set the algorithm type from the assembly
     # (blunt ligations have features without length)
-    if source.assembly is not None:
+    if len(source.assembly):
         asm = source.get_assembly_plan()
         blunt = len(asm[0][2]) == 0
 
@@ -539,7 +552,7 @@ async def ligation(
         # Not possible to have insertion assemblies in this case
 
     # If a specific assembly is requested
-    if source.assembly is not None:
+    if len(source.assembly):
         return format_known_assembly_response(source, out_sources, fragments)
 
     if len(out_sources) == 0:
@@ -554,11 +567,13 @@ async def ligation(
 
 @router.post(
     '/pcr',
-    response_model=create_model('PCRResponse', sources=(list[PCRSource], ...), sequences=(list[SequenceEntity], ...)),
+    response_model=create_model(
+        'PCRResponse', sources=(list[PCRSource], ...), sequences=(list[TextFileSequence], ...)
+    ),
 )
 async def pcr(
     source: PCRSource,
-    sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+    sequences: conlist(TextFileSequence, min_length=1, max_length=1),
     primers: conlist(PrimerModel, min_length=1, max_length=2),
     minimal_annealing: int = Query(20, description='The minimal annealing length for each primer.'),
     allowed_mismatches: int = Query(0, description='The number of mismatches allowed'),
@@ -575,7 +590,7 @@ async def pcr(
     # What happens if annealing is zero? That would mean
     # mismatch in the 3' of the primer, which maybe should
     # not be allowed.
-    if source.assembly is not None:
+    if len(source.assembly):
         minimal_annealing = source.minimal_overlap()
         # Only the ones that match are included in the output assembly
         # location, so the submitted assembly should be returned without
@@ -608,7 +623,7 @@ async def pcr(
     ]
 
     # If a specific assembly is requested
-    if source.assembly is not None:
+    if len(source.assembly):
         return format_known_assembly_response(source, out_sources, fragments)
 
     if len(possible_assemblies) == 0:
@@ -626,7 +641,7 @@ async def pcr(
     response_model=create_model(
         'OligoHybridizationResponse',
         sources=(list[OligoHybridizationSource], ...),
-        sequences=(list[SequenceEntity], ...),
+        sequences=(list[TextFileSequence], ...),
     ),
     openapi_extra={
         'requestBody': {
@@ -688,12 +703,12 @@ async def oligonucleotide_hybridization(
     response_model=create_model(
         'PolymeraseExtensionResponse',
         sources=(list[PolymeraseExtensionSource], ...),
-        sequences=(list[SequenceEntity], ...),
+        sequences=(list[TextFileSequence], ...),
     ),
 )
 async def polymerase_extension(
     source: PolymeraseExtensionSource,
-    sequences: conlist(SequenceEntity, min_length=1, max_length=1),
+    sequences: conlist(TextFileSequence, min_length=1, max_length=1),
 ):
     """Return the sequence from a polymerase extension reaction"""
 
@@ -718,12 +733,12 @@ async def polymerase_extension(
     response_model=create_model(
         'HomologousRecombinationResponse',
         sources=(list[HomologousRecombinationSource], ...),
-        sequences=(list[SequenceEntity], ...),
+        sequences=(list[TextFileSequence], ...),
     ),
 )
 async def homologous_recombination(
     source: HomologousRecombinationSource,
-    sequences: conlist(SequenceEntity, min_length=2, max_length=2),
+    sequences: conlist(TextFileSequence, min_length=2, max_length=2),
     minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.'),
 ):
     # source.input contains the ids of the sequences in the order template, insert
@@ -735,7 +750,7 @@ async def homologous_recombination(
         raise HTTPException(400, 'The template and the insert must be linear.')
 
     # If an assembly is provided, we ignore minimal_homology
-    if source.assembly is not None:
+    if len(source.assembly):
         minimal_homology = source.minimal_overlap()
 
     asm = Assembly((template, insert), limit=minimal_homology, use_all_fragments=True)
@@ -752,7 +767,7 @@ async def homologous_recombination(
     ]
 
     # If a specific assembly is requested
-    if source.assembly is not None:
+    if len(source.assembly):
         return format_known_assembly_response(source, out_sources, [template, insert])
 
     out_sequences = [format_sequence_genbank(assemble([template, insert], a, False)) for a in possible_assemblies]
@@ -763,12 +778,12 @@ async def homologous_recombination(
 @router.post(
     '/gibson_assembly',
     response_model=create_model(
-        'GibsonAssemblyResponse', sources=(list[GibsonAssemblySource], ...), sequences=(list[SequenceEntity], ...)
+        'GibsonAssemblyResponse', sources=(list[GibsonAssemblySource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
 async def gibson_assembly(
     source: GibsonAssemblySource,
-    sequences: conlist(SequenceEntity, min_length=1),
+    sequences: conlist(TextFileSequence, min_length=1),
     minimal_homology: int = Query(
         40, description='The minimum homology between consecutive fragments in the assembly.'
     ),
@@ -803,7 +818,7 @@ async def gibson_assembly(
         # Not possible to have insertion assemblies with gibson
 
     # If a specific assembly is requested
-    if source.assembly is not None:
+    if len(source.assembly):
         return format_known_assembly_response(source, out_sources, fragments)
 
     if len(out_sources) == 0:
@@ -824,13 +839,13 @@ async def gibson_assembly(
     response_model=create_model(
         'RestrictionAndLigationResponse',
         sources=(list[RestrictionAndLigationSource], ...),
-        sequences=(list[SequenceEntity], ...),
+        sequences=(list[TextFileSequence], ...),
     ),
     summary='Restriction and ligation in a single step. Can also be used for Golden Gate assembly.',
 )
 async def restriction_and_ligation(
     source: RestrictionAndLigationSource,
-    sequences: conlist(SequenceEntity, min_length=1),
+    sequences: conlist(TextFileSequence, min_length=1),
     allow_partial_overlap: bool = Query(False, description='Allow for partially overlapping sticky ends.'),
     circular_only: bool = Query(False, description='Only return circular assemblies.'),
 ):
@@ -870,7 +885,7 @@ async def restriction_and_ligation(
             out_sources += [create_source(a, False) for a in asm.get_insertion_assemblies()]
 
     # If a specific assembly is requested
-    if source.assembly is not None:
+    if len(source.assembly):
         return format_known_assembly_response(source, out_sources, fragments)
 
     if len(out_sources) == 0:

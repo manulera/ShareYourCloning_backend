@@ -1,79 +1,52 @@
 from pydantic import BaseModel, Field, ConfigDict, model_validator
-from pydantic.types import conlist
 from enum import Enum
-from typing import Optional
-from Bio.SeqFeature import SeqFeature, Location
+from typing import Optional, List
+from Bio.SeqFeature import SeqFeature, Location, SimpleLocation as BioSimpleLocation
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
-from Bio.Restriction.Restriction import RestrictionType
-from typing import Annotated
+from Bio.Restriction.Restriction import RestrictionType, RestrictionBatch
+from shareyourcloning_linkml.datamodel import (
+    OligoHybridizationSource as _OligoHybridizationSource,
+    PolymeraseExtensionSource as _PolymeraseExtensionSource,
+    GenomeCoordinatesSource as _GenomeCoordinatesSource,
+    RepositoryIdSource as _RepositoryIdSource,
+    ManuallyTypedSource as _ManuallyTypedSource,
+    UploadedFileSource as _UploadedFileSource,
+    SequenceFileFormat as _SequenceFileFormat,
+    RestrictionEnzymeDigestionSource as _RestrictionEnzymeDigestionSource,
+    RestrictionSequenceCut as _RestrictionSequenceCut,
+    TextFileSequence as _TextFileSequence,
+    AssemblySource as _AssemblySource,
+    PCRSource as _PCRSource,
+    HomologousRecombinationSource as _HomologousRecombinationSource,
+    GibsonAssemblySource as _GibsonAssemblySource,
+    RestrictionAndLigationSource as _RestrictionAndLigationSource,
+    LigationSource as _LigationSource,
+    CRISPRSource as _CRISPRSource,
+    Primer as _Primer,
+    AssemblyJoin as _AssemblyJoin,
+    SimpleSequenceLocation as _SimpleSequenceLocation,
+    AddGeneIdSource as _AddGeneIdSource,
+)
+
+
+SequenceFileFormat = _SequenceFileFormat
 
 
 class SourceType(str, Enum):
-    repository_id = 'repository_id'
-    file = 'file'
-    restriction = 'restriction'
     ligation = 'ligation'
     PCR = 'PCR'
     homologous_recombination = 'homologous_recombination'
     crispr = 'crispr'
     gibson_assembly = 'gibson_assembly'
     restriction_and_ligation = 'restriction_and_ligation'
-    genome_coordinates = 'genome_coordinates'
-    manually_typed = 'manually_typed'
-    oligonucleotide_hybridization = 'oligonucleotide_hybridization'
-    polymerase_extension = 'polymerase_extension'
 
 
-class SequenceFileFormat(str, Enum):
-    fasta = 'fasta'
-    genbank = 'genbank'
-    snapgene = 'snapgene'
+class TextFileSequence(_TextFileSequence):
+    pass
 
 
-class RepositoryName(str, Enum):
-    genbank = 'genbank'
-    addgene = 'addgene'
-
-
-# Sequence: =========================================
-
-
-class GenbankSequence(BaseModel):
-    """A class to store sequences and features in genbank model"""
-
-    type: str = 'file'
-    file_extension: str = 'gb'
-    file_content: str = ''
-    overhang_crick_3prime: int = Field(
-        0,
-        description='Taken from pydna\'s `dseq::ovhg`\
-        An integer describing the length of the\
-        crick strand overhang in the 5\' of the molecule, or 3\' of the crick strand',
-    )
-    overhang_watson_3prime: int = Field(
-        0,
-        description='The equivalent of `overhang_crick_3prime`\
-        but for the watson strand',
-    )
-
-
-class SequenceEntity(BaseModel):
-    id: Optional[int] = Field(None, description='Unique identifier of the sequence')
-    kind: str = Field('entity', description='The kind entity (always equal to "entity"). Should probably be removed.')
-    sequence: Optional[GenbankSequence] = Field(
-        ..., description='The sequence in genbank format + some extra info that is not captured by the genbank format'
-    )
-
-
-class PrimerModel(BaseModel):
+class PrimerModel(_Primer):
     """Called PrimerModel not to be confused with the class from pydna."""
-
-    id: int
-    name: str = Field(..., min_length=1)
-    # TODO: add this to the flake8 exceptions
-    # TODO: implement constrains when there is an answer for https://github.com/pydantic/pydantic/issues/7745
-    sequence: Annotated[str, Field(pattern=r'^[acgtACGT]+$')]
-    # sequence: str
 
 
 class SeqFeatureModel(BaseModel):
@@ -112,17 +85,8 @@ class Source(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
 
-class ManuallyTypedSource(Source):
+class ManuallyTypedSource(_ManuallyTypedSource):
     """Describes a sequence that is typed manually by the user"""
-
-    type: SourceType = SourceType('manually_typed')
-    user_input: Annotated[str, Field(pattern=r'^[acgtACGT]+$')] = Field(
-        ..., description='The sequence typed by the user'
-    )
-    circular: Optional[bool] = Field(False, description='Whether the sequence is circular or not')
-
-    overhang_crick_3prime: Optional[int] = 0
-    overhang_watson_3prime: Optional[int] = 0
 
     @model_validator(mode='after')
     def validate_circularity(self):
@@ -133,253 +97,240 @@ class ManuallyTypedSource(Source):
         return self
 
 
-class UploadedFileSource(Source):
-    """Describes a sequence from a file uploaded by the user"""
-
-    file_name: str = Field(..., min_length=1)
-    file_format: SequenceFileFormat
-    type: SourceType = SourceType('file')
-    index_in_file: Optional[int] = None
+class UploadedFileSource(_UploadedFileSource):
+    pass
 
 
-class RepositoryIdSource(Source):
-    """Documents a request to a repository"""
-
-    repository: RepositoryName
-    repository_id: str = Field(..., min_length=1)
-    type: SourceType = SourceType('repository_id')
+class RepositoryIdSource(_RepositoryIdSource):
+    pass
 
 
-class GenomeCoordinatesSource(Source):
-    """Documents a request to NCBI for genome sequence"""
-
-    assembly_accession: Optional[str] = None
-    sequence_accession: str = Field(..., min_length=1)
-    # The unique identifier of a gene can come from either the gene_id or the locus_tag
-    # For instance, genes in the human reference genome have a gene_id, but no locus_tag
-    locus_tag: Optional[str] = None
-    gene_id: Optional[int] = None
-    start: int
-    stop: int
-    strand: int
-    type: SourceType = SourceType('genome_coordinates')
+class AddGeneIdSource(_AddGeneIdSource):
+    # TODO: add this to LinkML
+    # repository_name: RepositoryName = RepositoryName('addgene')
+    pass
 
 
-class SequenceCut(Source):
-    """A class to represent a cut in a sequence"""
-
-    left_edge: Optional[tuple[int, int]] = Field(
-        None, description='The left edge of the cut, in the format (cut_watson, ovhg)'
-    )
-    right_edge: Optional[tuple[int, int]] = Field(
-        None, description='The right edge of the cut, in the format (cut_watson, ovhg)'
-    )
+class GenomeCoordinatesSource(_GenomeCoordinatesSource):
+    pass
 
 
-class RestrictionEnzymeDigestionSource(SequenceCut):
+class RestrictionSequenceCut(_RestrictionSequenceCut):
+
+    @classmethod
+    def from_cutsite_tuple(cls, cutsite_tuple: tuple[tuple[int, int], RestrictionType]):
+        cut_watson, ovhg = cutsite_tuple[0]
+        enzyme = str(cutsite_tuple[1])
+
+        return cls(
+            cut_watson=cut_watson,
+            overhang=ovhg,
+            restriction_enzyme=enzyme,
+        )
+
+    def to_cutsite_tuple(self) -> tuple[tuple[int, int], RestrictionType]:
+        restriction_enzyme = RestrictionBatch(first=[self.restriction_enzyme]).pop()
+        return ((self.cut_watson, self.overhang), restriction_enzyme)
+
+
+class RestrictionEnzymeDigestionSource(_RestrictionEnzymeDigestionSource):
     """Documents a restriction enzyme digestion, and the selection of one of the fragments."""
 
-    type: SourceType = SourceType('restriction')
+    # TODO: maybe a better way? They have to be redefined here because
+    # we have overriden the original class
 
-    # The order of the enzymes in the list corresponds to the fragment_boundaries.
-    # For instance, if a fragment 5' is cut with EcoRI and the 3' with BamHI,
-    # restriction_enzymes = ['EcoRI', 'BamHI']
-    restriction_enzymes: conlist(str | None, min_length=1) = Field(
-        ...,
-        description='Enzymes associated with the left and right sides of the cut. It can contain None to represent the edge the sequence in linear sequences.',
-    )
+    left_edge: Optional[RestrictionSequenceCut] = Field(None)
+    right_edge: Optional[RestrictionSequenceCut] = Field(None)
 
+    @classmethod
     def from_cutsites(
+        cls,
         left: tuple[tuple[int, int], RestrictionType],
         right: tuple[tuple[int, int], RestrictionType],
         input: list[int],
         id: int,
-    ) -> 'RestrictionEnzymeDigestionSource':
-        return RestrictionEnzymeDigestionSource(
-            restriction_enzymes=[None if left is None else str(left[1]), None if right is None else str(right[1])],
-            left_edge=None if left is None else left[0],
-            right_edge=None if right is None else right[0],
+    ):
+        return cls(
+            id=id,
+            left_edge=None if left is None else RestrictionSequenceCut.from_cutsite_tuple(left),
+            right_edge=None if right is None else RestrictionSequenceCut.from_cutsite_tuple(right),
             input=input,
         )
 
+    # TODO could be made into a computed field?
+    def get_enzymes(self) -> list[str]:
+        """Returns the enzymes used in the digestion"""
+        out = list()
+        if self.left_edge is not None:
+            out.append(self.left_edge.restriction_enzyme)
+        if self.right_edge is not None:
+            out.append(self.right_edge.restriction_enzyme)
+        # Unique values, sorted the same way
+        return sorted(list(set(out)), key=out.index)
 
-class AssemblySource(Source):
-    assembly: Optional[conlist(tuple[int, int, str, str], min_length=1)] = Field(
-        None, description='The assembly plan as a list of tuples (part_1_id, part_2_id, loc1, loc2)'
+
+class SimpleSequenceLocation(_SimpleSequenceLocation):
+    @classmethod
+    def from_simple_location(cls, location: BioSimpleLocation):
+        return cls(
+            start=location.start,
+            end=location.end,
+            strand=location.strand,
+        )
+
+    def to_simple_location(self) -> BioSimpleLocation:
+        return BioSimpleLocation(self.start, self.end, self.strand)
+
+
+class AssemblyJoin(_AssemblyJoin):
+    left_location: SimpleSequenceLocation = Field(
+        ...,
+        description="""Location of the overlap in the left fragment. Might be an empty location (start == end) to indicate blunt join.""",
     )
-    circular: Optional[bool] = Field(None, description='Whether the assembly is circular or not')
+    right_location: SimpleSequenceLocation = Field(
+        ...,
+        description="""Location of the overlap in the right fragment. Might be an empty location (start == end) to indicate blunt join.""",
+    )
+
+    @classmethod
+    def from_join_tuple(cls, join_tuple: tuple[int, int, BioSimpleLocation, BioSimpleLocation]):
+        return cls(
+            left_fragment=join_tuple[0],
+            right_fragment=join_tuple[1],
+            left_location=SimpleSequenceLocation.from_simple_location(join_tuple[2]),
+            right_location=SimpleSequenceLocation.from_simple_location(join_tuple[3]),
+        )
+
+    def to_join_tuple(self) -> tuple[int, int, BioSimpleLocation, BioSimpleLocation]:
+        return (
+            self.left_fragment,
+            self.right_fragment,
+            self.left_location.to_simple_location(),
+            self.right_location.to_simple_location(),
+        )
+
+    def __str__(self) -> str:
+        u, v, lu, lv = self.to_join_tuple()
+        return f'{u}{lu}:{v}{lv}'
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+
+class AssemblySourceCommonClass:
+    assembly: List[AssemblyJoin] = Field(
+        default_factory=list, description="""The joins between the fragments in the assembly"""
+    )
 
     def minimal_overlap(self):
         """Returns the minimal overlap between the fragments in the assembly"""
         all_overlaps = list()
         for f in self.assembly:
-            if f[2] is not None:
-                all_overlaps.append(len(Location.fromstring(f[2])))
-            if f[3] is not None:
-                all_overlaps.append(len(Location.fromstring(f[3])))
+            # TODO: these conditions are probably not needed
+            # if f.left_location is not None:
+            all_overlaps.append(f.left_location.end - f.left_location.start)
+            # if f.right_location is not None:
+            all_overlaps.append(f.right_location.end - f.right_location.start)
         return min(all_overlaps)
 
     def get_assembly_plan(self):
         """Returns the assembly plan"""
-        out = list()
-        for p in self.assembly:
-            out.append((p[0], p[1], Location.fromstring(p[2]), Location.fromstring(p[3])))
-        return tuple(out)
+        return tuple(j.to_join_tuple() for j in self.assembly)
+
+    @classmethod
+    def from_assembly(
+        cls, assembly: list[tuple[int, int, Location, Location]], input: list[int], id: int, circular: bool, **kwargs
+    ):
+        return cls(
+            id=id,
+            assembly=[AssemblyJoin.from_join_tuple(join) for join in assembly],
+            input=input,
+            circular=circular,
+            **kwargs,
+        )
 
 
-class PCRSource(AssemblySource):
+class AssemblySource(_AssemblySource, AssemblySourceCommonClass):
+    pass
+
+
+class PCRSource(_PCRSource, AssemblySourceCommonClass):
     """Documents a PCR, and the selection of one of the products."""
 
-    type: SourceType = SourceType('PCR')
-    circular: bool = False
-    forward_primer: int = Field(..., description='The forward primer')
-    reverse_primer: int = Field(..., description='The reverse primer')
+    # TODO: add this to LinkML
+    # input: conlist(int, min_length=1, max_length=1)
+    # circular has to be false
 
-    # This can only take one input
-    input: conlist(int, min_length=1, max_length=1)
-
+    @classmethod
     def from_assembly(
+        cls,
         assembly: list[tuple[int, int, Location, Location]],
         input: list[int],
         id: int,
         forward_primer: int,
         reverse_primer: int,
-    ) -> 'PCRSource':
+    ):
         """Creates a PCRSource from an assembly, input and id"""
-        return PCRSource(
-            id=id,
-            assembly=[
-                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
-                for part in assembly
-            ],
-            input=input,
-            forward_primer=forward_primer,
-            reverse_primer=reverse_primer,
+        return super().from_assembly(
+            assembly, input, id, False, forward_primer=forward_primer, reverse_primer=reverse_primer
         )
 
 
-class LigationSource(AssemblySource):
-
-    type: SourceType = SourceType('ligation')
-
-    def from_assembly(
-        assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int
-    ) -> 'LigationSource':
-        """Creates a StickyLigationSource from an assembly, input and circularity"""
-        return LigationSource(
-            id=id,
-            assembly=[
-                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
-                for part in assembly
-            ],
-            input=input,
-            circular=circular,
-        )
+class LigationSource(_LigationSource, AssemblySourceCommonClass):
+    pass
 
 
-class HomologousRecombinationSource(AssemblySource):
+class HomologousRecombinationSource(_HomologousRecombinationSource, AssemblySourceCommonClass):
 
+    # TODO: add this to LinkML
     # This can only take two inputs, the first one is the template, the second one is the insert
-    type: SourceType = SourceType('homologous_recombination')
-    input: conlist(int, min_length=2, max_length=2)
+    # input: conlist(int, min_length=2, max_length=2)
+    pass
 
+
+class GibsonAssemblySource(_GibsonAssemblySource, AssemblySourceCommonClass):
+
+    # TODO: add this to LinkML
+    # input: conlist(int, min_length=1)
+    pass
+
+
+class CRISPRSource(_CRISPRSource, AssemblySourceCommonClass):
+
+    # TODO
+    # input: conlist(int, min_length=2, max_length=2)
+    # circular: bool = False
+
+    @classmethod
     def from_assembly(
-        assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int
-    ) -> 'HomologousRecombinationSource':
-        return HomologousRecombinationSource(
-            id=id,
-            assembly=[
-                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
-                for part in assembly
-            ],
-            input=input,
-            circular=circular,
-        )
-
-
-class GibsonAssemblySource(AssemblySource):
-
-    type: SourceType = SourceType('gibson_assembly')
-    input: conlist(int, min_length=1)
-
-    def from_assembly(
-        assembly: list[tuple[int, int, Location, Location]], input: list[int], circular: bool, id: int
-    ) -> 'GibsonAssemblySource':
-        return GibsonAssemblySource(
-            id=id,
-            assembly=[
-                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
-                for part in assembly
-            ],
-            input=input,
-            circular=circular,
-        )
-
-
-class CrisprSource(AssemblySource):
-
-    # TODO: For now this is just a copy of HomologousRecombinationSource
-    type: SourceType = SourceType('crispr')
-    input: conlist(int, min_length=2, max_length=2)
-    guides: list[int] = Field(..., description='The CRISPR guides')
-    circular: bool = False
-
-    def from_assembly(
+        cls,
         assembly: list[tuple[int, int, Location, Location]],
         input: list[int],
         id: int,
         guides: list[int],
-        circular: bool,
-    ) -> 'CrisprSource':
-        'Creates a CrisprSource from an assembly, input, guide and id'
-        return CrisprSource(
-            id=id,
-            assembly=[
-                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
-                for part in assembly
-            ],
-            input=input,
-            guides=guides,
-            circular=circular,
-        )
+    ):
+        return super().from_assembly(assembly, input, id, False, guides=guides)
 
 
-class RestrictionAndLigationSource(AssemblySource):
-    type: SourceType = SourceType('restriction_and_ligation')
-    input: conlist(int, min_length=1)
-    restriction_enzymes: conlist(str, min_length=1) = Field(
-        ..., description='The list of restriction enzymes used in the digestion'
-    )
+class RestrictionAndLigationSource(_RestrictionAndLigationSource, AssemblySourceCommonClass):
+    # TODO: add this to LinkML
+    # input: conlist(int, min_length=1)
 
+    @classmethod
     def from_assembly(
+        cls,
         assembly: list[tuple[int, int, Location, Location]],
         input: list[int],
         circular: bool,
         id: int,
         restriction_enzymes=list['str'],
-    ) -> 'RestrictionAndLigationSource':
-        return RestrictionAndLigationSource(
-            id=id,
-            assembly=[
-                (part[0], part[1], format_feature_location(part[2], None), format_feature_location(part[3], None))
-                for part in assembly
-            ],
-            input=input,
-            circular=circular,
-            restriction_enzymes=restriction_enzymes,
-        )
+    ):
+        return super().from_assembly(assembly, input, id, circular, restriction_enzymes=restriction_enzymes)
 
 
-class OligoHybridizationSource(Source):
-    """Documents an oligonucleotide hybridization, optionally can fill in with PCR"""
-
-    type: SourceType = SourceType('oligonucleotide_hybridization')
-    input: conlist(int, max_length=0) = []
-    forward_oligo: int = None
-    reverse_oligo: int = None
-    overhang_crick_3prime: Optional[int] = None
+class OligoHybridizationSource(_OligoHybridizationSource):
+    pass
 
 
-class PolymeraseExtensionSource(Source):
-    type: SourceType = SourceType('polymerase_extension')
-    input: conlist(int, min_length=1, max_length=1)
+class PolymeraseExtensionSource(_PolymeraseExtensionSource):
+    pass

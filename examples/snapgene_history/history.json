@@ -62,8 +62,8 @@
             "kind": "source",
             "input": [],
             "output": 2,
-            "type": "repository_id",
-            "repository": "genbank",
+            "type": "RepositoryIdSource",
+            "repository_name": "genbank",
             "repository_id": "NM_001018957.2"
         },
         {
@@ -111,7 +111,7 @@
             "output": 10,
             "type": "file",
             "file_name": "addgene-plasmid-39296-sequence-49545.dna",
-            "file_format": "snapgene",
+            "sequence_file_format": "snapgene",
             "index_in_file": 0
         },
         {

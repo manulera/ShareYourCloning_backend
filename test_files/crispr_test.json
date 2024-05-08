@@ -58,20 +58,20 @@
             "locus_tag": "SPAPB1A10.09",
             "gene_id": 2543372,
             "start": 1877009,
-            "stop": 1881726,
+            "end": 1881726,
             "strand": 1
         },
         {
             "id": 2,
             "input": [],
             "output": 4,
-            "type": "repository_id",
+            "type": "RepositoryIdSource",
             "kind": "source",
             "info": {
                 "url": "https://media.addgene.org/snapgene-media/v1.7.9-0-g88a3305/sequences/49547/50886467-8250-49c3-8987-07dbd5627b8e/addgene-plasmid-39295-sequence-49547.gbk",
                 "type": "depositor-full"
             },
-            "repository": "addgene",
+            "repository_name": "addgene",
             "repository_id": "39295"
         },
         {

@@ -55,11 +55,11 @@ def get_annotation_from_locus_tag(locus_tag: str, assembly_accession: str) -> di
     return matching_annotations[0]
 
 
-def get_genbank_sequence_subset(sequence_accession, start, stop, strand):
+def get_genbank_sequence_subset(sequence_accession, start, end, strand):
     gb_strand = 1 if strand == 1 else 2
     gb = Genbank('example@gmail.com')
     try:
-        return gb.nucleotide(sequence_accession, start, stop, gb_strand)
+        return gb.nucleotide(sequence_accession, start, end, gb_strand)
     except HTTPError as e:
         if e.code == 400:
             raise HTTPException(404, 'wrong sequence accession')
@@ -67,11 +67,11 @@ def get_genbank_sequence_subset(sequence_accession, start, stop, strand):
             raise HTTPException(503, 'NCBI returned an error')
 
 
-def validate_coordinates_pre_request(start, stop, strand):
+def validate_coordinates_pre_request(start, end, strand):
     # TODO: move this to the class
     if strand not in [1, -1]:
         raise HTTPException(422, 'strand must be 1 or -1')
-    if start >= stop:
-        raise HTTPException(422, 'start must be less than stop')
+    if start >= end:
+        raise HTTPException(422, 'start must be less than end')
     if start < 1:
         raise HTTPException(422, 'start must be greater than 0')
