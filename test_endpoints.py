@@ -337,7 +337,7 @@ class StickyLigationTest(unittest.TestCase):
 
         # Check that the assembly is correct, the sequences cannot be compared with the equal operator since their origin is different
         # TODO there should be something in pydna to test circular molecules being equal but having different frames
-
+        print(sources[0])
         self.assertEqual(len(resulting_sequences[0]), len(initial_sequence))
 
     def test_circularization(self):
