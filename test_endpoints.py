@@ -22,12 +22,14 @@ from pydantic_models import (
     CRISPRSource,
     AddGeneIdSource,
     RestrictionSequenceCut,
+    BaseCloningStrategy,
 )
 from pydna.dseqrecord import Dseqrecord
 import unittest
 from pydna.dseq import Dseq
 import request_examples
 import copy
+import json
 
 client = TestClient(app)
 
@@ -931,98 +933,6 @@ class PCRTest(unittest.TestCase):
         self.assertIn('Clashing primers', payload['detail'])
 
 
-# class TemplatelessPCRTest(unittest.TestCase):
-#     def test_templateless(self):
-#         submitted_source = TemplatelessPCRSource(id=0,
-#             input=[],
-#             forward_primer=1,
-#             reverse_primer=2,
-#         )
-
-#         # Test case of initial example
-
-#         primer_fwd = PrimerModel(sequence='TTACGTAAAAAA', id=1, name='fwd')
-#         primer_rvs = PrimerModel(sequence='CGTACGTTTTTT', id=2, name='rvs')
-
-#         data = {
-#             'source': submitted_source.model_dump(),
-#             'sequences': [],
-#             'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
-#         }
-
-#         response = client.post('/templateless_pcr', json=data, params={'minimal_annealing': 6})
-#         payload = response.json()
-
-#         sources = [TemplatelessPCRSource.model_validate(s) for s in payload['sources']]
-#         sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
-
-#         assert len(sources) == 1
-#         assert len(sequences) == 1
-
-#         seq1 = sequences[0]
-#         assert str(seq1.seq) == 'TTACGTAAAAAACGTACG'
-
-#         # Test case of fully overlapping primers (it is not particularly special)
-
-#         primer_fwd = PrimerModel(sequence='ACGTACGT', id=1, name='fwd')
-#         primer_rvs = PrimerModel(sequence='ACGTACGT', id=2, name='rvs')
-
-#         data = {
-#             'source': submitted_source.model_dump(),
-#             'sequences': [],
-#             'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
-#         }
-
-#         response = client.post('/templateless_pcr', json=data, params={'minimal_annealing': 8})
-#         payload = response.json()
-
-#         sources = [TemplatelessPCRSource.model_validate(s) for s in payload['sources']]
-#         sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
-
-#         assert len(sources) == 1
-#         assert len(sequences) == 1
-
-#         seq1 = sequences[0]
-#         assert str(seq1.seq) == 'ACGTACGT'
-
-#         # Test several sources
-#         response = client.post('/templateless_pcr', json=data, params={'minimal_annealing': 4})
-#         payload = response.json()
-
-#         sources = [TemplatelessPCRSource.model_validate(s) for s in payload['sources']]
-#         sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
-
-#         assert len(sources) == 2
-#         assert len(sequences) == 2
-
-#         seq1 = sequences[0]
-#         seq2 = sequences[1]
-
-#         assert str(seq1.seq) == 'ACGTACGT'
-#         assert str(seq2.seq) == 'ACGTACGTACGT'
-
-#         # Test overhanging primers (should result in a fragment with overhang, as this would happen in a real PCR)
-#         primer_fwd = PrimerModel(sequence='ACGTACGT', id=1, name='fwd')
-#         primer_rvs = PrimerModel(sequence='ACGTACGTTTT', id=2, name='rvs')
-
-#         data = {
-#             'source': submitted_source.model_dump(),
-#             'sequences': [],
-#             'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
-#         }
-
-#         response = client.post('/templateless_pcr', json=data, params={'minimal_annealing': 8})
-#         payload = response.json()
-
-#         sources = [TemplatelessPCRSource.model_validate(s) for s in payload['sources']]
-#         sequences = [read_dsrecord_from_json(SequenceEntity.model_validate(s)) for s in payload['sequences']]
-
-#         assert len(sources) == 1
-#         assert len(sequences) == 1
-
-#         seq1 = sequences[0]
-
-
 class OligoHybridizationTest(unittest.TestCase):
 
     def test_hybridization(self):
@@ -1595,6 +1505,14 @@ class CrisprTest(unittest.TestCase):
             payload['detail'],
             'A Cas9 cutsite was found, and a homologous recombination region, but they do not overlap.',
         )
+
+
+class ValidatorTest(unittest.TestCase):
+    def test_validator(self):
+        with open('test_files/homologous_recombination.json') as ins:
+            # Read it to json
+            data = json.load(ins)
+        BaseCloningStrategy.model_validate(data)
 
 
 if __name__ == '__main__':

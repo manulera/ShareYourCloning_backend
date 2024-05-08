@@ -34,6 +34,7 @@ from pydantic_models import (
     ManuallyTypedSource,
     OligoHybridizationSource,
     PolymeraseExtensionSource,
+    BaseCloningStrategy,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
@@ -896,6 +897,17 @@ async def restriction_and_ligation(
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
+
+
+@router.post(
+    '/validate',
+    summary='Validate a cloning strategy',
+)
+async def cloning_strategy_is_valid(
+    cloning_strategy: BaseCloningStrategy,
+) -> bool:
+    """Validate a cloning strategy"""
+    return True
 
 
 app.include_router(router)
