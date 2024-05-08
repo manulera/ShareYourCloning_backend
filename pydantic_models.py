@@ -27,6 +27,7 @@ from shareyourcloning_linkml.datamodel import (
     AssemblyJoinComponent as _AssemblyJoinComponent,
     SimpleSequenceLocation as _SimpleSequenceLocation,
     AddGeneIdSource as _AddGeneIdSource,
+    CloningStrategy as _CloningStrategy,
 )
 
 
@@ -343,4 +344,10 @@ class OligoHybridizationSource(_OligoHybridizationSource):
 
 
 class PolymeraseExtensionSource(_PolymeraseExtensionSource):
+    pass
+
+
+class BaseCloningStrategy(_CloningStrategy):
+    # For now, we don't add anything, but the classes will not have the new methods if this is used
+    # It will be used for validation for now
     pass
