@@ -10,6 +10,6 @@
     },
     // Set flakes8 as the default linter
     "flake8.path": [".venv/bin/flake8"],
-    "pylint.path": [".venv/bin/pylint"],
+    "black-formatter.path": [".venv/bin/black"],
     "python.defaultInterpreterPath": ".venv/bin/python",
 }
