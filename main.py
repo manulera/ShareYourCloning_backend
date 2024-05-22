@@ -56,6 +56,8 @@ import request_examples
 import ncbi_requests
 import os
 from record_stub_route import RecordStubRoute
+from starlette.responses import RedirectResponse
+
 
 record_stubs = os.environ['RECORD_STUBS'] == '1' if 'RECORD_STUBS' in os.environ else False
 
@@ -235,6 +237,12 @@ def repository_id_http_error_handler(exception: HTTPError, source: RepositoryIdS
 
 def repository_id_url_error_handler(exception: URLError, source: RepositoryIdSource):
     raise HTTPException(504, f'Unable to connect to {source.repository_name}: {exception}')
+
+
+# Redirect to the right repository
+@router.post('/repository_id')
+async def get_from_repository_id(source: RepositoryIdSource | AddGeneIdSource):
+    return RedirectResponse(f'/repository_id/{source.repository_name}', status_code=307)
 
 
 @router.post(

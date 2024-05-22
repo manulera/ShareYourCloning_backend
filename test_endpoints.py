@@ -131,6 +131,9 @@ class GenBankTest(unittest.TestCase):
         )
         response = client.post('/repository_id/genbank', json=source.model_dump())
         self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        sequence = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertIn('Ase1', sequence.description)
 
     def test_request_wrong_id(self):
         """Test a wrong Genbank id"""
@@ -141,6 +144,19 @@ class GenBankTest(unittest.TestCase):
         )
         response = client.post('/repository_id/genbank', json=source.model_dump())
         self.assertEqual(response.status_code, 404)
+
+    def test_redirect(self):
+        """The repository_id endpoint should redirect based on repository_name value"""
+        source = RepositoryIdSource(
+            id=1,
+            repository_name='genbank',
+            repository_id='NM_001018957.2',
+        )
+        response = client.post('/repository_id', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        sequence: Dseqrecord = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertIn('Ase1', sequence.description)
 
 
 class AddGeneTest(unittest.TestCase):
@@ -215,6 +231,19 @@ class AddGeneTest(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
 
         # TODO url exists but does not match id, or does not match
+
+    def test_redirect(self):
+        """Test repository_id endpoint should redirect based on repository_name value"""
+        source = AddGeneIdSource(
+            id=1,
+            repository_name='addgene',
+            repository_id='39282',
+        )
+        response = client.post('/repository_id', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        sequence: Dseqrecord = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertIn('synthetic circular DNA', sequence.description)
 
 
 class StickyLigationTest(unittest.TestCase):
