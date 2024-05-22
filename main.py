@@ -240,7 +240,14 @@ def repository_id_url_error_handler(exception: URLError, source: RepositoryIdSou
 
 
 # Redirect to the right repository
-@router.post('/repository_id')
+@router.post(
+    '/repository_id',
+    response_model=create_model(
+        'RepositoryIdResponse',
+        sources=(list[RepositoryIdSource] | list[AddGeneIdSource], ...),
+        sequences=(list[TextFileSequence], ...),
+    ),
+)
 async def get_from_repository_id(source: RepositoryIdSource | AddGeneIdSource):
     return RedirectResponse(f'/repository_id/{source.repository_name}', status_code=307)
 
