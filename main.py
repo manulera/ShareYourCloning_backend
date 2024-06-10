@@ -74,7 +74,12 @@ else:
 # allow for the draft websites to also work in netlify.
 # TODO make this conditional to dev / prod using settings
 
-origins = ['http://localhost:3000', 'https://shareyourcloning.netlify.app', 'http://localhost:5173']
+origins = [
+    'http://localhost:3000',
+    'https://shareyourcloning.netlify.app',
+    'http://localhost:5173',
+    'https://shareyourcloning.org',
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
