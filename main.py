@@ -349,7 +349,10 @@ async def genome_coordinates(
 
     if source.assembly_accession is not None:
         if source.assembly_accession not in assembly_accessions:
-            raise HTTPException(422, 'assembly_accession does not match the one from the sequence_accession')
+            raise HTTPException(
+                422,
+                f'The assembly accessions associated with the sequence accession ({", ".join(assembly_accessions)}) do not include the provided sequence_accession ({source.assembly_accession})',
+            )
 
     # TODO: this could also be not set if there is more than one assembly linked to the sequence
     if len(assembly_accessions):
