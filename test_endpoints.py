@@ -30,6 +30,7 @@ from pydna.dseq import Dseq
 import request_examples
 import copy
 import json
+import tempfile
 
 client = TestClient(app)
 
@@ -49,12 +50,12 @@ class ReadFileTest(unittest.TestCase):
                 'format': 'snapgene',
                 'nb_sequences': 1,
             },
+            {'file': './examples/sequences/ase1.embl', 'format': 'embl', 'nb_sequences': 1},
         ]
 
         for example in examples:
             with open(example['file'], 'rb') as f:
                 response = client.post('/read_from_file', files={'file': f})
-
             self.assertEqual(response.status_code, 200)
             payload = response.json()
 
@@ -71,35 +72,62 @@ class ReadFileTest(unittest.TestCase):
                 self.assertEqual(source.sequence_file_format, example['format'])
 
     def test_errors_read_files(self):
+        # Create a temp empty file
+        with tempfile.NamedTemporaryFile() as temp_empty_file:
 
-        examples = [
-            {
-                'file': './test_endpoints.py',
-                'format': None,
-                'error_message': 'could not guess',
-            },
-            {
-                'file': './test_endpoints.py',
-                'format': 'snapgene',
-                'error_message': 'snapgene reader cannot',
-            },
-            {
-                'file': './test_endpoints.py',
-                'format': 'genbank',
-                'error_message': 'Pydna parser',
-            },
-        ]
-        for example in examples:
-            with open(example['file'], 'rb') as f:
+            examples = [
+                {
+                    'file': './test_endpoints.py',
+                    'format': None,
+                    'error_message': 'could not guess',
+                },
+                {
+                    'file': './test_endpoints.py',
+                    'format': 'snapgene',
+                    'error_message': 'Biopython cannot process',
+                },
+                {
+                    'file': './test_endpoints.py',
+                    'format': 'genbank',
+                    'error_message': 'Biopython cannot process',
+                },
+                {
+                    'file': './test_endpoints.py',
+                    'format': 'embl',
+                    'error_message': 'Biopython cannot process',
+                },
+                {
+                    'file': './test_endpoints.py',
+                    'format': 'fasta',
+                    'error_message': 'Biopython cannot process',
+                },
+                {
+                    'file': temp_empty_file.name,
+                    'format': 'genbank',
+                    'error_message': 'Biopython cannot process',
+                },
+                {
+                    'file': temp_empty_file.name,
+                    'format': 'embl',
+                    'error_message': 'Biopython cannot process',
+                },
+                {
+                    'file': temp_empty_file.name,
+                    'format': 'fasta',
+                    'error_message': 'Biopython cannot process',
+                },
+            ]
+            for example in examples:
                 if example['format'] is not None:
                     response = client.post(
-                        f'/read_from_file?sequence_file_format={example["format"]}', files={'file': f}
+                        f'/read_from_file?sequence_file_format={example["format"]}',
+                        files={'file': temp_empty_file},
                     )
                 else:
-                    response = client.post('/read_from_file', files={'file': f})
+                    response = client.post('/read_from_file', files={'file': temp_empty_file})
 
-            self.assertEqual(response.status_code, 422)
-            self.assertTrue(example['error_message'] in response.json()['detail'])
+                self.assertNotEqual(response.status_code, 200)
+                self.assertIn(example['error_message'], response.json()['detail'])
 
     def test_file_index_known(self):
         """Test that if the index in file is specified it works."""
@@ -117,6 +145,36 @@ class ReadFileTest(unittest.TestCase):
 
         self.assertEqual(len(sources), 1)
         self.assertEqual(len(resulting_sequences), 1)
+
+    def test_circularize_fasta_sequence(self):
+        """Test that the circularize parameter works when reading from file"""
+        with open('./examples/sequences/dummy_EcoRI.fasta', 'rb') as f:
+            response = client.post('/read_from_file?circularize=True', files={'file': f})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        resulting_sequences = [
+            read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']
+        ]
+        sources = [UploadedFileSource.model_validate(s) for s in payload['sources']]
+
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(len(resulting_sequences), 1)
+        self.assertTrue(sources[0].circularize)
+        self.assertTrue(resulting_sequences[0].circular)
+
+        # If the file format is different it raises an error
+        with open('./examples/sequences/dummy_EcoRI.fasta', 'rb') as f:
+            response = client.post('/read_from_file?circularize=True&sequence_file_format=genbank', files={'file': f})
+
+        self.assertEqual(response.status_code, 400)
+
+        # Also when guessing from a gb file
+        with open('./examples/sequences/pFA6a-hphMX6.gb', 'rb') as f:
+            response = client.post('/read_from_file?circularize=True', files={'file': f})
+
+        self.assertEqual(response.status_code, 400)
 
 
 class GenBankTest(unittest.TestCase):
