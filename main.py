@@ -5,8 +5,8 @@ from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
 from pydna.crispr import cas9
 from pydantic import conlist, create_model
-from pydna.parsers import parse as pydna_parse
-from Bio.SeqIO import read as seqio_read
+from Bio.SeqIO import parse as seqio_parse
+import io
 from pydna.genbank import Genbank
 from dna_functions import (
     get_invalid_enzyme_names,
@@ -173,12 +173,23 @@ async def read_from_file(
         None,
         description='The index of the sequence in the file for multi-sequence files',
     ),
+    circularize: bool = Query(
+        False,
+        description='circularize the sequence read (for FASTA files)',
+    ),
 ):
     """Return a json sequence from a sequence file"""
 
     if sequence_file_format is None:
-        extension_dict = {'gbk': 'genbank', 'gb': 'genbank', 'dna': 'snapgene', 'fasta': 'fasta'}
-        extension = file.filename.split('.')[-1]
+        extension_dict = {
+            'gbk': 'genbank',
+            'gb': 'genbank',
+            'dna': 'snapgene',
+            'fasta': 'fasta',
+            'embl': 'embl',
+            'fa': 'fasta',
+        }
+        extension = file.filename.split('.')[-1].lower()
         if extension not in extension_dict:
             raise HTTPException(
                 422,
@@ -188,25 +199,40 @@ async def read_from_file(
         # We guess the file type from the extension
         sequence_file_format = SequenceFileFormat(extension_dict[extension])
 
-    if sequence_file_format in ['fasta', 'genbank']:
-        # Read the whole file to a string
-        file_content = (await file.read()).decode()
-        dseqs = pydna_parse(file_content)
-        if len(dseqs) == 0:
-            raise HTTPException(422, 'Pydna parser reader cannot process this file.')
+    dseqs = list()
+    if sequence_file_format != 'fasta' and circularize is True:
+        raise HTTPException(400, 'circularize is only supported for fasta files.')
 
-    elif sequence_file_format == 'snapgene':
-        try:
-            seq = seqio_read(file.file, sequence_file_format)
-        except ValueError:
-            raise HTTPException(422, 'Biopython snapgene reader cannot process this file.')
+    try:
+        if sequence_file_format == 'snapgene':
 
-        iscircular = 'topology' in seq.annotations.keys() and seq.annotations['topology'] == 'circular'
-        dseqs = [Dseqrecord(seq, circular=iscircular)]
+            async def file_streamer():
+                return io.BytesIO((await file.read()))
+
+        else:
+
+            async def file_streamer():
+                return io.StringIO((await file.read()).decode())
+
+        with await file_streamer() as handle:
+            for parsed_seq in seqio_parse(handle, sequence_file_format):
+                circularize = circularize or (
+                    'topology' in parsed_seq.annotations.keys() and parsed_seq.annotations['topology'] == 'circular'
+                )
+                dseqs.append(Dseqrecord(parsed_seq, circular=circularize))
+    except ValueError:
+        raise HTTPException(422, 'Biopython cannot process this file.')
+
+    # This happens when textfiles are empty or contain something else, or when reading a text file as snapgene file,
+    # since StringIO does not raise an error when "Unexpected end of packet" is found
+    if len(dseqs) == 0:
+        raise HTTPException(422, 'Biopython cannot process this file.')
 
     # The common part
     # TODO: using id=0 is not great
-    parent_source = UploadedFileSource(id=0, sequence_file_format=sequence_file_format, file_name=file.filename)
+    parent_source = UploadedFileSource(
+        id=0, sequence_file_format=sequence_file_format, file_name=file.filename, circularize=circularize
+    )
     out_sources = list()
     for i in range(len(dseqs)):
         new_source = parent_source.model_copy()
