@@ -888,6 +888,8 @@ def test_pcr_assembly_invalid():
     else:
         AssertionError('Clashing primers should give ValueError')
 
+    # TODO: handle circular case where primers span the origin
+
 
 def test_fragments_only_once():
 

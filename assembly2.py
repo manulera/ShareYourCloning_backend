@@ -900,12 +900,13 @@ class PCRAssembly(Assembly):
         """Adds extra constrains to prevent clashing primers."""
         assemblies = super().get_linear_assemblies()
         # Error if clashing primers
-        for a in assemblies:
-            edge_pairs = zip(a, a[1:])
-            for (_u1, _v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
-                # Incompatible as described in figure above
-                if _location_boundaries(start_location)[1] > _location_boundaries(end_location)[0]:
-                    raise ValueError('Clashing primers in assembly ' + assembly2str(a))
+        # for a in assemblies:
+        #     edge_pairs = zip(a, a[1:])
+        #     for (_u1, _v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
+        #         # Incompatible as described in figure above
+        #         # TODO: fix this issue#140
+        #         if _location_boundaries(start_location)[1] > _location_boundaries(end_location)[0]:
+        #             raise ValueError('Clashing primers in assembly ' + assembly2str(a))
 
         return assemblies
 
