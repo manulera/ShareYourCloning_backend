@@ -29,7 +29,7 @@ from shareyourcloning_linkml.datamodel import (
     AddGeneIdSource as _AddGeneIdSource,
     CloningStrategy as _CloningStrategy,
 )
-
+from pydna.utils import shift_location as _shift_location
 
 SequenceFileFormat = _SequenceFileFormat
 
@@ -172,6 +172,7 @@ class RestrictionEnzymeDigestionSource(_RestrictionEnzymeDigestionSource):
 
 
 class SimpleSequenceLocation(_SimpleSequenceLocation):
+    # TODO: this should handle origin-spanning simple locations (splitted)
     @classmethod
     def from_simple_location(cls, location: BioSimpleLocation):
         return cls(
@@ -180,7 +181,10 @@ class SimpleSequenceLocation(_SimpleSequenceLocation):
             strand=location.strand,
         )
 
-    def to_simple_location(self) -> BioSimpleLocation:
+    def to_biopython_location(self, circular: bool = False, seq_len: int = None) -> Location:
+        if circular and self.start > self.end and seq_len is not None:
+            unwrapped_location = BioSimpleLocation(self.start, self.end + seq_len, self.strand)
+            return _shift_location(unwrapped_location, 0, seq_len)
         return BioSimpleLocation(self.start, self.end, self.strand)
 
 
@@ -216,8 +220,8 @@ class AssemblyJoin(_AssemblyJoin):
         return (
             self.left.sequence * (-1 if self.left.reverse_complemented else 1),
             self.right.sequence * (-1 if self.right.reverse_complemented else 1),
-            self.left.location.to_simple_location(),
-            self.right.location.to_simple_location(),
+            self.left.location.to_biopython_location(),
+            self.right.location.to_biopython_location(),
         )
 
     def __str__(self) -> str:
@@ -351,3 +355,8 @@ class BaseCloningStrategy(_CloningStrategy):
     # For now, we don't add anything, but the classes will not have the new methods if this is used
     # It will be used for validation for now
     pass
+
+
+class PrimerDesignQuery(BaseModel):
+    sequence: TextFileSequence
+    location: Optional[SimpleSequenceLocation] = None

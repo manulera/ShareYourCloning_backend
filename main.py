@@ -35,6 +35,7 @@ from pydantic_models import (
     OligoHybridizationSource,
     PolymeraseExtensionSource,
     BaseCloningStrategy,
+    PrimerDesignQuery,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
@@ -57,7 +58,7 @@ import ncbi_requests
 import os
 from record_stub_route import RecordStubRoute
 from starlette.responses import RedirectResponse
-
+from primer_design import homologous_recombination_primers
 
 record_stubs = os.environ['RECORD_STUBS'] == '1' if 'RECORD_STUBS' in os.environ else False
 
@@ -946,6 +947,45 @@ async def restriction_and_ligation(
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
+
+
+@router.post(
+    '/primer_design/homologous_recombination',
+    response_model=create_model(
+        'PrimerDesignResponse', forward_primer=(PrimerModel, ...), reverse_primer=(PrimerModel, ...)
+    ),
+)
+async def primer_design_homologous_recombination(
+    pcr_template: PrimerDesignQuery,
+    homologous_recombination_target: PrimerDesignQuery,
+    homology_length: int = Query(..., description='The length of the homology region in bps.'),
+    minimal_hybridization_length: int = Query(
+        ..., description='The minimal length of the hybridization region in bps.'
+    ),
+    insert_forward: bool = Query(..., description='Whether the insert is in the forward direction.'),
+    target_tm: float = Query(
+        ..., description='The desired melting temperature for the hybridization part of the primer.'
+    ),
+):
+    """Design primers for homologous recombination"""
+
+    pcr_seq = read_dsrecord_from_json(pcr_template.sequence)
+    pcr_loc = pcr_template.location.to_biopython_location(pcr_seq.circular, len(pcr_seq))
+
+    hr_seq = read_dsrecord_from_json(homologous_recombination_target.sequence)
+    hr_loc = homologous_recombination_target.location.to_biopython_location(hr_seq.circular, len(hr_seq))
+
+    try:
+        forward_primer, reverse_primer = homologous_recombination_primers(
+            pcr_seq, pcr_loc, hr_seq, hr_loc, homology_length, minimal_hybridization_length, insert_forward, target_tm
+        )
+    except ValueError as e:
+        raise HTTPException(400, *e.args)
+
+    forward_primer = PrimerModel(id=0, sequence=forward_primer, name='forward')
+    reverse_primer = PrimerModel(id=0, sequence=reverse_primer, name='reverse')
+
+    return {'forward_primer': forward_primer, 'reverse_primer': reverse_primer}
 
 
 @router.post(

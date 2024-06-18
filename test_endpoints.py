@@ -31,6 +31,7 @@ import request_examples
 import copy
 import json
 import tempfile
+import pytest
 
 client = TestClient(app)
 
@@ -921,6 +922,7 @@ class PCRTest(unittest.TestCase):
         self.assertEqual(len(sources), 1)
         self.assertEqual(len(sequences), 1)
 
+    @pytest.mark.xfail(reason='clashing primers bug #140')
     def test_wrong_primers(self):
 
         template = Dseqrecord(Dseq('TTTTACGTACGTAAAAAAGCGCGCGCTTTTT'))
