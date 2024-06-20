@@ -23,11 +23,6 @@ def homologous_recombination_primers(
     fragment2amplify = pcr_seq[start:end]
     amplicon = primer_design(fragment2amplify, limit=minimal_hybridization_length, target_tm=target_tm)
 
-    print(amplicon)
-
-    for f in amplicon.features:
-        print(f)
-
     if insert_forward:
         fwd_primer, rvs_primer = amplicon.primers()
     else:
