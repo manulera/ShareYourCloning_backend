@@ -23,6 +23,7 @@ from pydantic_models import (
     AddGeneIdSource,
     RestrictionSequenceCut,
     BaseCloningStrategy,
+    SimpleSequenceLocation as PydanticSimpleLocation,
 )
 from pydna.dseqrecord import Dseqrecord
 import unittest
@@ -1181,7 +1182,7 @@ class RestrictionAndLigationTest(unittest.TestCase):
 
         source = RestrictionAndLigationSource(
             id=0,
-            input=[1, 2, 3],
+            input=[1, 2],
             restriction_enzymes=['EcoRI'],
         )
 
@@ -1243,6 +1244,46 @@ class RestrictionAndLigationTest(unittest.TestCase):
 
         self.assertEqual(str(sequences[0].seq), 'AATTCAAAG')
         self.assertEqual(str(sequences[1].seq), 'AAAGAATTCAAAA')
+
+        sources = [RestrictionAndLigationSource.model_validate(s) for s in payload['sources']]
+        # Submitting the known fragments
+        data = {'source': sources[0].model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
+        response = client.post('/restriction_and_ligation', json=data)
+        payload = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(payload['sequences']), 1)
+        self.assertEqual(len(payload['sources']), 1)
+        self.assertEqual(payload['sources'][0], sources[0].model_dump())
+        self.assertEqual(
+            read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0])), sequences[0]
+        )
+
+    def test_errors(self):
+        fragments = [Dseqrecord('AAAGAATTCAAAGAATTCAAAA')]
+        json_fragments = [format_sequence_genbank(f) for f in fragments]
+        for i, f in enumerate(json_fragments):
+            f.id = i + 1
+
+        # Enzyme that does not exist
+        source = RestrictionAndLigationSource(
+            id=0,
+            input=[1],
+            restriction_enzymes=['dummy'],
+        )
+
+        data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
+        response = client.post('/restriction_and_ligation', json=data)
+        self.assertEqual(response.status_code, 404)
+
+        # enzyme that does not cut
+        source = RestrictionAndLigationSource(
+            id=0,
+            input=[1],
+            restriction_enzymes=['HindIII'],
+        )
+
+        data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
+        response = client.post('/restriction_and_ligation', json=data)
 
 
 class ManuallyTypedTest(unittest.TestCase):
@@ -1602,6 +1643,67 @@ class ValidatorTest(unittest.TestCase):
             # Read it to json
             data = json.load(ins)
         BaseCloningStrategy.model_validate(data)
+
+
+class PrimerDesignTest(unittest.TestCase):
+
+    def test_homologous_recombination(self):
+        pcr_seq = format_sequence_genbank(Dseqrecord('GAAATGGAACAGTGCCAGAAATTTTT'))
+        pcr_seq.id = 1
+        pcr_loc = PydanticSimpleLocation(start=1, end=23)
+        hr_seq = format_sequence_genbank(Dseqrecord('AAACGTTT'))
+        hr_seq.id = 2
+        hr_loc_replace = PydanticSimpleLocation(start=3, end=5)
+
+        homology_length = 3
+        minimal_hybridization_length = 10
+        insert_forward = True
+        target_tm = 30
+
+        # First we replace the CG
+        data = {
+            'pcr_template': {
+                'sequence': pcr_seq.model_dump(),
+                'location': pcr_loc.model_dump(),
+            },
+            'homologous_recombination_target': {
+                'sequence': hr_seq.model_dump(),
+                'location': hr_loc_replace.model_dump(),
+            },
+        }
+        params = {
+            'homology_length': homology_length,
+            'minimal_hybridization_length': minimal_hybridization_length,
+            'insert_forward': insert_forward,
+            'target_tm': target_tm,
+        }
+        response = client.post('/primer_design/homologous_recombination', json=data, params=params)
+        payload = response.json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload['forward_primer']['sequence'], 'aaaAAATGGAACAG')
+        self.assertEqual(payload['reverse_primer']['sequence'], 'aaaAATTTCTGGC')
+
+        # Raise valuerror
+        params['homology_length'] = 10
+        response = client.post('/primer_design/homologous_recombination', json=data, params=params)
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload['detail'], 'Forward homology region is out of bounds.')
+
+
+class ValidateEndPointTest(unittest.TestCase):
+
+    def test_validate(self):
+        with open('test_files/homologous_recombination.json') as ins:
+            # Read it to json
+            data = json.load(ins)
+        response = client.post('/validate', json=data)
+        self.assertEqual(response.status_code, 200)
+
+        data['dummy'] = 'dummy'
+        response = client.post('/validate', json=data)
+        self.assertEqual(response.status_code, 422)
 
 
 if __name__ == '__main__':
