@@ -807,7 +807,6 @@ def test_fill_dseq():
         assert assembly.fill_dseq(query) == solution
 
 
-@pytest.mark.xfail(reason='U in primers not handled')
 def test_pcr_assembly():
 
     primer1 = Dseqrecord(Dseq('ACGTACGT'))
@@ -846,6 +845,10 @@ def test_pcr_assembly():
     assert len(prods) == 1
     assert str(prods[0].seq) == 'TTTACGTACGTAAAAAAGCGCGCGCTTT'
 
+
+@pytest.mark.xfail(reason='U in primers not handled')
+def test_pcr_assembly_uracil():
+
     primer1 = Dseqrecord('AUUA')
     primer2 = Dseqrecord('UUAA')
 
@@ -883,12 +886,19 @@ def test_pcr_assembly_invalid():
 
     try:
         asm.assemble_linear()
+        AssertionError('Clashing primers should give ValueError')
     except ValueError:
         pass
-    else:
-        AssertionError('Clashing primers should give ValueError')
 
-    # TODO: handle circular case where primers span the origin
+    seq = seq.looped()
+    for shift in range(len(seq)):
+        seq_shifted = seq.shifted(shift)
+        asm = assembly.PCRAssembly([primer1, seq_shifted, primer2], limit=8)
+        try:
+            asm.assemble_linear()
+            AssertionError('Clashing primers should give ValueError')
+        except ValueError:
+            pass
 
 
 def test_fragments_only_once():
