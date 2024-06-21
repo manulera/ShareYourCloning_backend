@@ -75,17 +75,24 @@ class TestHomologousRecombinationPrimers(TestCase):
                     ('aaaAAATGGAACAG', 'acgAATTTCTGGC'),
                 )
                 for hr_loc, solution in zip([hr_loc_replace, hr_loc_insert], solutions):
-                    primers = homologous_recombination_primers(
-                        pcr_shifted,
-                        pcr_loc,
-                        hr_shifted,
-                        hr_loc,
-                        homology_length,
-                        minimal_hybridization_length,
-                        insert_forward,
-                        target_tm,
-                    )
-                    self.assertEqual(primers, solution)
+                    for insert_forward in (True, False):
+                        if not insert_forward:
+                            solution = (
+                                solution[0][:homology_length] + solution[1][homology_length:],
+                                solution[1][:homology_length] + solution[0][homology_length:],
+                            )
+
+                        primers = homologous_recombination_primers(
+                            pcr_shifted,
+                            pcr_loc,
+                            hr_shifted,
+                            hr_loc,
+                            homology_length,
+                            minimal_hybridization_length,
+                            insert_forward,
+                            target_tm,
+                        )
+                        self.assertEqual(primers, solution)
 
     def test_clashing_homology(self):
 
