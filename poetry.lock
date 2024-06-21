@@ -1373,9 +1373,9 @@ biopython = ">=1.80"
 networkx = ">=2.8.8"
 numpy = {version = ">1.26", markers = "python_version >= \"3.9\""}
 prettytable = ">=3.5.0"
-pydivsufsort = "^0.0.14"
+pydivsufsort = ">=0.0.14"
 pyfiglet = "0.8.post1"
-seguid = "^0.0.5"
+seguid = ">=0.0.5"
 
 [package.extras]
 clipboard = ["pyperclip (>=1.8.2)"]
@@ -1386,8 +1386,8 @@ gel = ["matplotlib (>=3.4.3)", "pillow (>=8.4.0)", "scipy (>=1.11.3)", "scipy (>
 [package.source]
 type = "git"
 url = "https://github.com/BjornFJohansson/pydna"
-reference = "25fc9f57622fe05527e5826eea956fc3aa3b8a20"
-resolved_reference = "25fc9f57622fe05527e5826eea956fc3aa3b8a20"
+reference = "afeb69dff3555c65b1f9d6add57b153ea78030ee"
+resolved_reference = "afeb69dff3555c65b1f9d6add57b153ea78030ee"
 
 [[package]]
 name = "pyfiglet"
@@ -2140,4 +2140,4 @@ test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "942cf04b24a90ce0fc19c943280ae645431baebcf9176998e692b60f2e0ae9eb"
+content-hash = "1ef351392b03220998d2cc1c939e6440dd99a700e3b716c41537e4c30b1d6020"
