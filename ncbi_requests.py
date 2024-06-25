@@ -27,11 +27,14 @@ def get_assembly_accession_from_sequence_accession(sequence_accession: str) -> l
             raise HTTPException(503, 'Error accessing assembly id')
         if 'error' in data:  # pragma: no cover
             raise HTTPException(503, f'failed to access NCBI: {data["error"]}')
-        assembly_accessions.extend(
-            data['result'][assembly_id]['assemblyaccession']
-            for assembly_id in links
-            if 'assemblyaccession' in data['result'][assembly_id]
-        )
+
+        for assembly_id in links:
+            # It seems now refseq is the default if present?
+            if 'assemblyaccession' in data['result'][assembly_id]:
+                assembly_accessions.append(data['result'][assembly_id]['assemblyaccession'])
+            if ('synonym' in data['result'][assembly_id]) and ('genbank' in data['result'][assembly_id]['synonym']):
+                assembly_accessions.append(data['result'][assembly_id]['synonym']['genbank'])
+
     return assembly_accessions
 
 
