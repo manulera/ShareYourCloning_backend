@@ -1132,6 +1132,7 @@ def test_gibson_assembly():
     # For the test we pass input fragments + expected output
     test_cases = [
         (['AGAGACCaaaAGAGACC'], ['AGAGACCaaa']),
+        (['GTCGACTaaaAGAGACC', 'AGAGACCcgcGTCGACT'], ['GTCGACTaaaAGAGACCcgc']),
     ]
 
     for fragments_str, expected_outputs in test_cases:
@@ -1147,7 +1148,13 @@ def test_gibson_assembly():
                 fragments = [
                     Dseqrecord(Dseq.from_full_sequence_and_overhangs('aaa' + f + 'aaa', -3, -3)) for f in fragments_str
                 ]
-            asm = assembly.SingleFragmentAssembly(fragments, limit=7, algorithm=assembly.gibson_overlap)
+            if len(fragments) == 1:
+                asm = assembly.SingleFragmentAssembly(fragments, limit=7, algorithm=assembly.gibson_overlap)
+            else:
+                asm = assembly.Assembly(
+                    fragments, limit=7, algorithm=assembly.gibson_overlap, use_fragment_order=False
+                )
+
             products = asm.assemble_circular()
             products_str = [str(p.seq) for p in products]
             assert products_str == expected_outputs
