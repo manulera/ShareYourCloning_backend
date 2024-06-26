@@ -91,9 +91,28 @@ def gibson_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
     xxxx------oooo
     Product (unwanted): oooo
     """
-    stringx = str(seqx.seq).upper()
-    stringy = str(seqy.seq).upper()
-    return [m for m in common_sub_strings_str(stringx, stringy, limit) if (m[1] == 0 and m[0] + m[2] == len(stringx))]
+
+    # Because Gibson enzymes remove 5' overhangs, we remove them from the sequence
+    # when looking for homology, then we shift the location of the second fragment accordingly.
+    # This is only relevant for linear fragments, so we don't need to worry about
+    # shifting locations for circular fragments.
+    trim_x_left = -seqx.seq.ovhg if seqx.seq.ovhg < 0 else 0
+    trim_x_right = seqx.seq.watson_ovhg() if seqx.seq.watson_ovhg() < 0 else None
+    trim_y_left = -seqy.seq.ovhg if seqy.seq.ovhg < 0 else 0
+    trim_y_right = seqy.seq.watson_ovhg() if seqy.seq.watson_ovhg() < 0 else None
+
+    stringx = str(seqx.seq[trim_x_left:trim_x_right]).upper()
+    stringy = str(seqy.seq[trim_y_left:trim_y_right]).upper()
+    # We have to convert to list because we need to modify the matches
+    matches = [
+        list(m) for m in common_sub_strings_str(stringx, stringy, limit) if (m[1] == 0 and m[0] + m[2] == len(stringx))
+    ]
+    for match in matches:
+        match[0] += trim_x_left
+        match[1] += trim_y_left
+
+    # convert to tuples again
+    return [tuple(m) for m in matches]
 
 
 def sticky_end_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=0):
