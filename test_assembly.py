@@ -1129,13 +1129,35 @@ def test_golden_gate():
 
 
 def test_gibson_assembly():
-    """There are many others that test this above, this is just the edge case"""
-    # Circularisation assemblies
-    f1 = Dseqrecord('AGAGACCaaaAGAGACC')
-    f = assembly.SingleFragmentAssembly([f1], limit=7)
-    products = f.assemble_circular()
-    assert len(products) == 1
-    assert str(products[0].seq) == 'AGAGACCaaa'
+    # For the test we pass input fragments + expected output
+    test_cases = [
+        (['AGAGACCaaaAGAGACC'], ['AGAGACCaaa']),
+        (['GTCGACTaaaAGAGACC', 'AGAGACCcgcGTCGACT'], ['GTCGACTaaaAGAGACCcgc']),
+    ]
+
+    for fragments_str, expected_outputs in test_cases:
+        for mode in range(3):
+            if mode == 0:
+                # No overhangs
+                fragments = [Dseqrecord(f) for f in fragments_str]
+            elif mode == 1:
+                # 3' overhangs (should give the same results as no overhangs)
+                fragments = [Dseqrecord(Dseq.from_full_sequence_and_overhangs(f, 3, 3)) for f in fragments_str]
+            else:
+                # Add 5' overhangs that will be removed in Gibson, so should give same results as no overhangs
+                fragments = [
+                    Dseqrecord(Dseq.from_full_sequence_and_overhangs('aaa' + f + 'aaa', -3, -3)) for f in fragments_str
+                ]
+            if len(fragments) == 1:
+                asm = assembly.SingleFragmentAssembly(fragments, limit=7, algorithm=assembly.gibson_overlap)
+            else:
+                asm = assembly.Assembly(
+                    fragments, limit=7, algorithm=assembly.gibson_overlap, use_fragment_order=False
+                )
+
+            products = asm.assemble_circular()
+            products_str = [str(p.seq) for p in products]
+            assert products_str == expected_outputs
 
 
 def test_insertion_assembly():
