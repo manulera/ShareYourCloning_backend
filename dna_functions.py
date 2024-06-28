@@ -131,7 +131,7 @@ def request_from_addgene(source: AddGeneIdSource) -> tuple[list[Dseqrecord], lis
 def correct_name(dseq: Dseqrecord):
     # Can set the name from keyword if locus is set to Exported
     if dseq.name.lower() == 'exported' and dseq.locus.lower() == 'exported' and 'keywords' in dseq.annotations:
-        dseq.name = dseq.annotations['keywords'][0]
+        dseq.name = dseq.annotations['keywords'][0].replace(' ', '_')
 
 
 def location_sorter(x, y) -> int:
