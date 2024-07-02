@@ -565,7 +565,7 @@ async def ligation(
     source: LigationSource,
     sequences: conlist(TextFileSequence, min_length=1),
     blunt: bool = Query(False, description='Use blunt ligation instead of sticky ends.'),
-    allow_partial_overlap: bool = Query(True, description='Allow for partially overlapping sticky ends.'),
+    allow_partial_overlap: bool = Query(False, description='Allow for partially overlapping sticky ends.'),
     circular_only: bool = Query(False, description='Only return circular assemblies.'),
 ):
 
