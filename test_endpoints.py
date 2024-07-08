@@ -1359,17 +1359,18 @@ class ManuallyTypedTest(unittest.TestCase):
 
 
 class GenomeRegionTest(unittest.TestCase):
-    def assertStatusCode(self, response_code: int, expected: int):
+    def assertStatusCode(self, response_code: int, expected: int, msg: str = ''):
         if response_code == 503:
             self.skipTest('NCBI not available')
         else:
-            self.assertEqual(response_code, expected)
+            self.assertEqual(response_code, expected, msg)
 
     def test_examples(self):
         for example_name in request_examples.genome_region_examples:
             example = request_examples.genome_region_examples[example_name]
             response = client.post('/genome_coordinates', json=example['value'])
-            self.assertStatusCode(response.status_code, 200)
+            msg = f'Error in example {example_name}'
+            self.assertStatusCode(response.status_code, 200, msg)
             payload = response.json()
             try:
                 sources = [GenomeCoordinatesSource.model_validate(s) for s in payload['sources']]
@@ -1378,15 +1379,14 @@ class GenomeRegionTest(unittest.TestCase):
             response_source = sources[0]
             request_source = GenomeCoordinatesSource.model_validate(example['value'])
             if example_name == 'full':
-                self.assertEqual(response_source, request_source)
+                self.assertEqual(response_source, request_source, msg)
             elif example_name == 'id_omitted':
                 request_source.gene_id = 2543372
-                self.assertEqual(response_source, request_source)
+                self.assertEqual(response_source, request_source, msg)
             elif example_name == 'assembly_accession_omitted':
-                request_source.assembly_accession = 'GCF_000002945.1'
-                self.assertEqual(response_source, request_source)
+                self.assertEqual(response_source, request_source, msg)
             elif example_name == 'viral_sequence':
-                self.assertEqual(response_source, request_source)
+                self.assertEqual(response_source, request_source, msg)
 
     def test_exceptions(self):
         # Load first example

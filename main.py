@@ -371,19 +371,14 @@ async def genome_coordinates(
     elif source.gene_id is not None:
         raise HTTPException(422, 'gene_id is set, but not locus_tag')
 
-    # We get the assembly accession (if it exists), and if the user provided one we validate it
-    assembly_accessions = ncbi_requests.get_assembly_accession_from_sequence_accession(source.sequence_accession)
-
     if source.assembly_accession is not None:
+        # We get the assembly accession (if it exists), and if the user provided one we validate it
+        assembly_accessions = ncbi_requests.get_assembly_accession_from_sequence_accession(source.sequence_accession)
         if source.assembly_accession not in assembly_accessions:
             raise HTTPException(
                 422,
-                f'The assembly accessions associated with the sequence accession ({", ".join(assembly_accessions)}) do not include the provided sequence_accession ({source.assembly_accession})',
+                f'The assembly accessions associated with the sequence accession ({", ".join(assembly_accessions)}) do not include the provided assembly_accession ({source.assembly_accession})',
             )
-
-    # TODO: this could also be not set if there is more than one assembly linked to the sequence
-    if len(assembly_accessions):
-        source.assembly_accession = assembly_accessions[0]
 
     seq = ncbi_requests.get_genbank_sequence_subset(source.sequence_accession, source.start, source.end, source.strand)
 
