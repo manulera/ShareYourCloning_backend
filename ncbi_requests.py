@@ -7,35 +7,17 @@ from pydna.genbank import Genbank
 
 def get_assembly_accession_from_sequence_accession(sequence_accession: str) -> list[str]:
     """Get the assembly accession from a sequence accession"""
-    url = f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi?dbfrom=nuccore&db=assembly&id={sequence_accession}&idtype=acc&retmode=json'
+
+    url = f'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/sequence_accession/{sequence_accession}/sequence_assemblies'
     resp = requests.get(url)
     try:
         data = resp.json()
     except JSONDecodeError:
         raise HTTPException(404, 'sequence accession not found')
-    assembly_accessions = []
-    # sequence_accessions is associated with any assembly
-    if 'error' in data:  # pragma: no cover
-        raise HTTPException(503, f'failed to access NCBI: {data["error"]}')
-    if 'linksetdbs' in data['linksets'][0]:
-        links = data['linksets'][0]['linksetdbs'][0]['links']
-        url = f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=assembly&retmode=json&id={",".join(links)}'
-        resp = requests.get(url)
-        try:
-            data = resp.json()
-        except JSONDecodeError:
-            raise HTTPException(503, 'Error accessing assembly id')
-        if 'error' in data:  # pragma: no cover
-            raise HTTPException(503, f'failed to access NCBI: {data["error"]}')
-
-        for assembly_id in links:
-            # It seems now refseq is the default if present?
-            if 'assemblyaccession' in data['result'][assembly_id]:
-                assembly_accessions.append(data['result'][assembly_id]['assemblyaccession'])
-            if ('synonym' in data['result'][assembly_id]) and ('genbank' in data['result'][assembly_id]['synonym']):
-                assembly_accessions.append(data['result'][assembly_id]['synonym']['genbank'])
-
-    return assembly_accessions
+    if 'accessions' in data:
+        return data['accessions']
+    else:
+        return []
 
 
 def get_annotation_from_locus_tag(locus_tag: str, assembly_accession: str) -> dict:
