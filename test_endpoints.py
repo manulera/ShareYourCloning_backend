@@ -72,6 +72,14 @@ class ReadFileTest(unittest.TestCase):
             for source in sources:
                 self.assertEqual(source.sequence_file_format, example['format'])
 
+        # Test naming
+        with open(example['file'], 'rb') as f:
+            response = client.post('/read_from_file?output_name=hello', files={'file': f})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        dseqr = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertEqual(dseqr.name, 'hello')
+
     def test_errors_read_files(self):
         # Create a temp empty file
         with tempfile.NamedTemporaryFile() as temp_empty_file:
@@ -216,6 +224,20 @@ class GenBankTest(unittest.TestCase):
         payload = response.json()
         sequence: Dseqrecord = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
         self.assertIn('Ase1', sequence.description)
+
+    def test_rename(self):
+        """If passing output_name, it renames the output"""
+        source = RepositoryIdSource(
+            id=1,
+            repository_name='genbank',
+            repository_id='NM_001018957.2',
+            output_name='hello',
+        )
+        response = client.post('/repository_id/genbank', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        sequence = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertEqual(sequence.name, 'hello')
 
 
 class AddGeneTest(unittest.TestCase):
@@ -1702,6 +1724,21 @@ class ValidateEndPointTest(unittest.TestCase):
         data['dummy'] = 'dummy'
         response = client.post('/validate', json=data)
         self.assertEqual(response.status_code, 422)
+
+
+class RenameSequenceTest(unittest.TestCase):
+
+    def test_rename(self):
+        dseqr = Dseqrecord('ACGT')
+        dseqr.name = 'original'
+        json_seq = format_sequence_genbank(dseqr)
+        json_seq.id = 0
+        response = client.post('/rename_sequence?name=hello', json=json_seq.model_dump())
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.json()
+        dseq_resp = read_dsrecord_from_json(payload)
+        self.assertEqual(dseq_resp.name, 'hello')
 
 
 if __name__ == '__main__':

@@ -41,9 +41,11 @@ def sum_is_sticky(three_prime_end: tuple[str, str], five_prime_end: tuple[str, s
         return 0
 
 
-def format_sequence_genbank(seq: Dseqrecord) -> TextFileSequence:
+def format_sequence_genbank(seq: Dseqrecord, seq_name: str = None) -> TextFileSequence:
 
-    if seq.name.lower() == 'exported':
+    if seq_name is not None:
+        seq.name = seq_name
+    elif seq.name.lower() == 'exported':
         correct_name(seq)
 
     return TextFileSequence(
