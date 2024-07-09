@@ -1737,7 +1737,7 @@ class RenameSequenceTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
         payload = response.json()
-        dseq_resp = read_dsrecord_from_json(payload)
+        dseq_resp = read_dsrecord_from_json(TextFileSequence.model_validate(payload))
         self.assertEqual(dseq_resp.name, 'hello')
 
 

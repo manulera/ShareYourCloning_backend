@@ -1020,7 +1020,6 @@ async def rename_sequence(
 ):
     """Rename a sequence"""
     dseqr = read_dsrecord_from_json(sequence)
-    print(dseqr.id)
     return format_sequence_genbank(dseqr, name)
 
 
