@@ -101,7 +101,7 @@ def format_known_assembly_response(
     for s in out_sources:
         if s == source:
             return {
-                'sequences': [format_sequence_genbank(assemble(fragments, assembly_plan, s.circular))],
+                'sequences': [format_sequence_genbank(assemble(fragments, assembly_plan, s.circular), s.output_name)],
                 'sources': [s],
             }
     raise HTTPException(400, 'The provided assembly is not valid.')
@@ -178,6 +178,10 @@ async def read_from_file(
         False,
         description='circularize the sequence read (for FASTA files)',
     ),
+    output_name: str = Query(
+        None,
+        description='Name of the output sequence',
+    ),
 ):
     """Return a json sequence from a sequence file"""
 
@@ -240,7 +244,7 @@ async def read_from_file(
         new_source.index_in_file = i
         out_sources.append(new_source)
 
-    out_sequences = [format_sequence_genbank(s) for s in dseqs]
+    out_sequences = [format_sequence_genbank(s, output_name) for s in dseqs]
 
     if index_in_file is not None:
         if index_in_file >= len(out_sources):
@@ -299,7 +303,7 @@ def get_from_repository_id_genbank(source: RepositoryIdSource):
     except URLError as exception:
         repository_id_url_error_handler(exception, source)
 
-    return {'sequences': [format_sequence_genbank(seq)], 'sources': [source.model_copy()]}
+    return {'sequences': [format_sequence_genbank(seq, source.output_name)], 'sources': [source.model_copy()]}
 
 
 @router.post(
@@ -322,7 +326,7 @@ def get_from_repository_id_addgene(source: AddGeneIdSource):
             404,
             f'The requested plasmid does not have full sequences, see https://www.addgene.org/{source.repository_id}/sequences/',
         )
-    return {'sequences': [format_sequence_genbank(s) for s in dseqs], 'sources': sources}
+    return {'sequences': [format_sequence_genbank(s, source.output_name) for s in dseqs], 'sources': sources}
 
 
 @router.post(
@@ -386,7 +390,7 @@ async def genome_coordinates(
     if len(seq) != source.end - source.start + 1:
         raise HTTPException(400, 'coordinates fall outside the sequence')
 
-    return {'sequences': [format_sequence_genbank(seq)], 'sources': [source.model_copy()]}
+    return {'sequences': [format_sequence_genbank(seq, source.output_name)], 'sources': [source.model_copy()]}
 
 
 @router.post(
@@ -467,7 +471,9 @@ async def crispr(
     if len(source.assembly):
         return format_known_assembly_response(source, out_sources, [template, insert])
 
-    out_sequences = [format_sequence_genbank(assemble([template, insert], a, False)) for a in valid_assemblies]
+    out_sequences = [
+        format_sequence_genbank(assemble([template, insert], a, False), source.output_name) for a in valid_assemblies
+    ]
     return {'sources': out_sources, 'sequences': out_sequences}
 
 
@@ -487,7 +493,7 @@ async def manually_typed(source: ManuallyTypedSource):
                 source.user_input, source.overhang_crick_3prime, source.overhang_watson_3prime
             )
         )
-    return {'sequences': [format_sequence_genbank(seq)], 'sources': [source]}
+    return {'sequences': [format_sequence_genbank(seq, source.output_name)], 'sources': [source]}
 
 
 @router.get('/restriction_enzyme_list', response_model=dict[str, list[str]])
@@ -541,11 +547,14 @@ async def restriction(
 
         for i, s in enumerate(sources):
             if s == source:
-                return {'sequences': [format_sequence_genbank(seqr.apply_cut(*cutsite_pairs[i]))], 'sources': [s]}
+                return {
+                    'sequences': [format_sequence_genbank(seqr.apply_cut(*cutsite_pairs[i]), source.output_name)],
+                    'sources': [s],
+                }
 
         raise HTTPException(400, 'Invalid restriction enzyme pair.')
 
-    products = [format_sequence_genbank(seqr.apply_cut(*p)) for p in cutsite_pairs]
+    products = [format_sequence_genbank(seqr.apply_cut(*p), source.output_name) for p in cutsite_pairs]
 
     return {'sequences': products, 'sources': sources}
 
@@ -605,7 +614,8 @@ async def ligation(
         raise HTTPException(400, 'No ligations were found.')
 
     out_sequences = [
-        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(), s.circular)) for s in out_sources
+        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(), s.circular), source.output_name)
+        for s in out_sources
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
@@ -676,7 +686,8 @@ async def pcr(
         raise HTTPException(400, 'No pair of annealing primers was found. Try changing the annealing settings.')
 
     out_sequences = [
-        format_sequence_genbank(assemble(fragments, a, s.circular)) for s, a in zip(out_sources, possible_assemblies)
+        format_sequence_genbank(assemble(fragments, a, s.circular), source.output_name)
+        for s, a in zip(out_sources, possible_assemblies)
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
@@ -727,7 +738,9 @@ async def oligonucleotide_hybridization(
         return {
             'sources': [source],
             'sequences': [
-                format_sequence_genbank(Dseqrecord(Dseq(watson_seq, crick_seq, source.overhang_crick_3prime)))
+                format_sequence_genbank(
+                    Dseqrecord(Dseq(watson_seq, crick_seq, source.overhang_crick_3prime)), source.output_name
+                )
             ],
         }
 
@@ -738,7 +751,9 @@ async def oligonucleotide_hybridization(
         new_source.overhang_crick_3prime = overhang
         out_sources.append(new_source)
         out_sequences.append(
-            format_sequence_genbank(Dseqrecord(Dseq(watson_seq, crick_seq, new_source.overhang_crick_3prime)))
+            format_sequence_genbank(
+                Dseqrecord(Dseq(watson_seq, crick_seq, new_source.overhang_crick_3prime)), source.output_name
+            )
         )
 
     return {'sources': out_sources, 'sequences': out_sequences}
@@ -771,7 +786,7 @@ async def polymerase_extension(
 
     out_sequence = Dseqrecord(dseq.seq.fill_in(), features=dseq.features)
 
-    return {'sequences': [format_sequence_genbank(out_sequence)], 'sources': [source]}
+    return {'sequences': [format_sequence_genbank(out_sequence, source.output_name)], 'sources': [source]}
 
 
 @router.post(
@@ -816,7 +831,10 @@ async def homologous_recombination(
     if len(source.assembly):
         return format_known_assembly_response(source, out_sources, [template, insert])
 
-    out_sequences = [format_sequence_genbank(assemble([template, insert], a, False)) for a in possible_assemblies]
+    out_sequences = [
+        format_sequence_genbank(assemble([template, insert], a, False), source.output_name)
+        for a in possible_assemblies
+    ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
 
@@ -874,7 +892,8 @@ async def gibson_assembly(
         )
 
     out_sequences = [
-        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(), s.circular)) for s in out_sources
+        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(), s.circular), source.output_name)
+        for s in out_sources
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
@@ -938,7 +957,8 @@ async def restriction_and_ligation(
         raise HTTPException(400, 'No compatible restriction-ligation was found.')
 
     out_sequences = [
-        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(), s.circular)) for s in out_sources
+        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(), s.circular), source.output_name)
+        for s in out_sources
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
@@ -992,6 +1012,15 @@ async def cloning_strategy_is_valid(
 ) -> bool:
     """Validate a cloning strategy"""
     return True
+
+
+@router.post('/rename_sequence', response_model=TextFileSequence)
+async def rename_sequence(
+    sequence: TextFileSequence, name: str = Query(..., description='The new name of the sequence.')
+):
+    """Rename a sequence"""
+    dseqr = read_dsrecord_from_json(sequence)
+    return format_sequence_genbank(dseqr, name)
 
 
 app.include_router(router)
