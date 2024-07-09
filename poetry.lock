@@ -1386,8 +1386,8 @@ gel = ["matplotlib (>=3.4.3)", "pillow (>=8.4.0)", "scipy (>=1.11.3)", "scipy (>
 [package.source]
 type = "git"
 url = "https://github.com/BjornFJohansson/pydna"
-reference = "afeb69dff3555c65b1f9d6add57b153ea78030ee"
-resolved_reference = "afeb69dff3555c65b1f9d6add57b153ea78030ee"
+reference = "bfddf0cb23dd5c326ad56b4907b52089fd6733d7"
+resolved_reference = "bfddf0cb23dd5c326ad56b4907b52089fd6733d7"
 
 [[package]]
 name = "pyfiglet"
@@ -2140,4 +2140,4 @@ test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "1ef351392b03220998d2cc1c939e6440dd99a700e3b716c41537e4c30b1d6020"
+content-hash = "e3ba4ab2739ad03d35499d5377906e035bc849801bc8542b1f9704d88c6546ea"
