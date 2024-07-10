@@ -15,7 +15,8 @@ from pydna.common_sub_strings import common_sub_strings
 
 
 def sum_is_sticky(three_prime_end: tuple[str, str], five_prime_end: tuple[str, str], partial: bool = False) -> int:
-    """Return true if the 3' end of seq1 and 5' end of seq2 ends are sticky and compatible for ligation."""
+    """Return the overlap length if the 3' end of seq1 and 5' end of seq2 ends are sticky and compatible for ligation.
+    Return 0 if they are not compatible."""
     type_seq1, sticky_seq1 = three_prime_end
     type_seq2, sticky_seq2 = five_prime_end
 

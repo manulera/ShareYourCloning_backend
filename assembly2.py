@@ -40,12 +40,28 @@ def ends_from_cutsite(cutsite: tuple[tuple[int, int], AbstractCut], seq: _Dseq):
     return ('blunt', ''), ('blunt', '')
 
 
-def restriction_ligation_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=RestrictionBatch, partial=False):
+def restriction_ligation_overlap(
+    seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=RestrictionBatch, partial=False, allow_blunt=True
+):
     """Find overlaps. Like in stiky and gibson, the order matters"""
     cuts_x = seqx.seq.get_cutsites(*enzymes)
     cuts_y = seqy.seq.get_cutsites(*enzymes)
+    # If blunt ends are allowed, we add the ends of linear sequences as possible cutsites
+    if allow_blunt:
+        if not seqx.circular:
+            cuts_x.append(((len(seqx), 0), None))
+        if not seqy.circular:
+            cuts_y.append(((0, 0), None))
     matches = list()
     for cut_x, cut_y in _itertools.product(cuts_x, cuts_y):
+        # A blunt end
+        if allow_blunt and cut_x[0][1] == cut_y[0][1] == 0:
+            print(seqx.id, seqy.id)
+            print(cut_x, cut_y)
+            matches.append((cut_x[0][0], cut_y[0][0], 0))
+            continue
+
+        # Otherwise, test overhangs
         overlap = sum_is_sticky(ends_from_cutsite(cut_x, seqx.seq)[0], ends_from_cutsite(cut_y, seqy.seq)[1], partial)
         if not overlap:
             continue
@@ -60,6 +76,18 @@ def restriction_ligation_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=R
 
         matches.append((left_x, left_y, overlap))
     return matches
+
+
+def combine_algorithms(*algorithms):
+    """Combine algorithms, if any of them returns a match, the match is returned."""
+
+    def combined(seqx, seqy, limit):
+        matches = list()
+        for algorithm in algorithms:
+            matches += algorithm(seqx, seqy, limit)
+        return matches
+
+    return combined
 
 
 def blunt_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=None):
