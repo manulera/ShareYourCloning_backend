@@ -1460,7 +1460,7 @@ class GenomeRegionTest(unittest.TestCase):
         s.assembly_accession = 'blah'
         response = client.post('/genome_coordinates', json=s.model_dump())
         self.assertStatusCode(response.status_code, 404)
-        self.assertIn('wrong sequence accession', response.json()['detail'])
+        self.assertIn('Wrong assembly accession', response.json()['detail'])
 
         # Assembly accession not linked to any sequence record
         s = correct_source.model_copy()
