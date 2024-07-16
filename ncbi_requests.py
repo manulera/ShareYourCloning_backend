@@ -1,24 +1,24 @@
 import requests
-from json import JSONDecodeError
 from fastapi import HTTPException
 from urllib.error import HTTPError
 from pydna.genbank import Genbank
 
 
 # TODO: this does not return old assembly accessions, see https://github.com/ncbi/datasets/issues/380#issuecomment-2231142816
-def get_assembly_accession_from_sequence_accession(sequence_accession: str) -> list[str]:
-    """Get the assembly accession from a sequence accession"""
+# from json import JSONDecodeError
+# def get_assembly_accession_from_sequence_accession(sequence_accession: str) -> list[str]:
+#     """Get the assembly accession from a sequence accession"""
 
-    url = f'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/sequence_accession/{sequence_accession}/sequence_assemblies'
-    resp = requests.get(url)
-    try:
-        data = resp.json()
-    except JSONDecodeError:
-        raise HTTPException(404, 'sequence accession not found')
-    if 'accessions' in data:
-        return data['accessions']
-    else:
-        return []
+#     url = f'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/sequence_accession/{sequence_accession}/sequence_assemblies'
+#     resp = requests.get(url)
+#     try:
+#         data = resp.json()
+#     except JSONDecodeError:
+#         raise HTTPException(404, 'sequence accession not found')
+#     if 'accessions' in data:
+#         return data['accessions']
+#     else:
+#         return []
 
 
 def get_sequence_accessions_from_assembly_accession(assembly_accession: str) -> list[str]:
