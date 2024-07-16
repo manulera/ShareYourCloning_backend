@@ -5,6 +5,7 @@ from urllib.error import HTTPError
 from pydna.genbank import Genbank
 
 
+# TODO: this does not return old assembly accessions, see https://github.com/ncbi/datasets/issues/380#issuecomment-2231142816
 def get_assembly_accession_from_sequence_accession(sequence_accession: str) -> list[str]:
     """Get the assembly accession from a sequence accession"""
 
@@ -18,6 +19,19 @@ def get_assembly_accession_from_sequence_accession(sequence_accession: str) -> l
         return data['accessions']
     else:
         return []
+
+
+def get_sequence_accessions_from_assembly_accession(assembly_accession: str) -> list[str]:
+    """Get the sequence accessions from an assembly accession"""
+    url = f'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/{assembly_accession}/sequence_reports'
+    resp = requests.get(url)
+    data = resp.json()
+    if 'reports' in data:
+        return [report['refseq_accession'] for report in data['reports']]
+    elif 'total_count' in data:
+        raise HTTPException(400, f'No sequence accessions linked, see {url}')
+    else:
+        raise HTTPException(404, 'Wrong assembly accession number')
 
 
 def get_annotation_from_locus_tag(locus_tag: str, assembly_accession: str) -> dict:

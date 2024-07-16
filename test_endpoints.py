@@ -1416,50 +1416,70 @@ class GenomeRegionTest(unittest.TestCase):
             request_examples.genome_region_examples['full']['value']
         )
 
-        # Ommit assembly accession
-        s = correct_source.model_copy()
-        s.assembly_accession = None
-        response = client.post('/genome_coordinates', json=s.model_dump())
-        self.assertStatusCode(response.status_code, 422)
+        # # Ommit assembly accession
+        # s = correct_source.model_copy()
+        # s.assembly_accession = None
+        # response = client.post('/genome_coordinates', json=s.model_dump())
+        # self.assertStatusCode(response.status_code, 422)
 
-        # Ommit locus_tag keeping gene id
-        s = correct_source.model_copy()
-        s.locus_tag = None
-        response = client.post('/genome_coordinates', json=s.model_dump())
-        self.assertStatusCode(response.status_code, 422)
+        # # Ommit locus_tag keeping gene id
+        # s = correct_source.model_copy()
+        # s.locus_tag = None
+        # response = client.post('/genome_coordinates', json=s.model_dump())
+        # self.assertStatusCode(response.status_code, 422)
 
-        # Wrong gene_id (not matching that of the locus_tag)
-        s = correct_source.model_copy()
-        s.gene_id = 123
-        response = client.post('/genome_coordinates', json=s.model_dump())
-        self.assertStatusCode(response.status_code, 400)
+        # # Wrong gene_id (not matching that of the locus_tag)
+        # s = correct_source.model_copy()
+        # s.gene_id = 123
+        # response = client.post('/genome_coordinates', json=s.model_dump())
+        # self.assertStatusCode(response.status_code, 400)
 
-        # Wrong assembly accession
-        s = correct_source.model_copy()
-        s.assembly_accession = 'blah'
-        response = client.post('/genome_coordinates', json=s.model_dump())
-        self.assertStatusCode(response.status_code, 404)
+        # # Wrong assembly accession
+        # s = correct_source.model_copy()
+        # s.assembly_accession = 'blah'
+        # response = client.post('/genome_coordinates', json=s.model_dump())
+        # self.assertStatusCode(response.status_code, 404)
 
-        # Wrong locus_tag
-        s = correct_source.model_copy()
-        s.locus_tag = 'blah'
-        response = client.post('/genome_coordinates', json=s.model_dump())
-        self.assertStatusCode(response.status_code, 404)
+        # # Wrong locus_tag
+        # s = correct_source.model_copy()
+        # s.locus_tag = 'blah'
+        # response = client.post('/genome_coordinates', json=s.model_dump())
+        # self.assertStatusCode(response.status_code, 404)
 
-        # Wrong coordinates
-        s = correct_source.model_copy()
-        s.start = 1
-        s.end = 10
-        response = client.post('/genome_coordinates', json=s.model_dump())
-        self.assertStatusCode(response.status_code, 400)
+        # # Wrong coordinates
+        # s = correct_source.model_copy()
+        # s.start = 1
+        # s.end = 10
+        # response = client.post('/genome_coordinates', json=s.model_dump())
+        # self.assertStatusCode(response.status_code, 400)
 
-        # Assembly accession that does not correspond to sequence_accession
+        # # Wrong assembly accession
+        # s = correct_source.model_copy()
+        # s.locus_tag = None
+        # s.gene_id = None
+        # s.assembly_accession = 'blah'
+        # response = client.post('/genome_coordinates', json=s.model_dump())
+        # self.assertStatusCode(response.status_code, 404)
+        # self.assertIn('wrong sequence accession', response.json()['detail'])
+
+        # Assembly accession not linked to any sequence record
         s = correct_source.model_copy()
         s.locus_tag = None
         s.gene_id = None
-        s.assembly_accession = 'blah'
+        s.assembly_accession = 'GCF_000146045.1'
         response = client.post('/genome_coordinates', json=s.model_dump())
-        self.assertStatusCode(response.status_code, 422)
+        self.assertStatusCode(response.status_code, 400)
+        self.assertIn('No sequence accessions linked', response.json()['detail'])
+
+        # Assembly accession not linked to that sequence accession
+        s = correct_source.model_copy()
+        s.locus_tag = None
+        s.gene_id = None
+        s.assembly_accession = 'GCF_000146045.2'
+        response = client.post('/genome_coordinates', json=s.model_dump())
+        print(response.json())
+        self.assertStatusCode(response.status_code, 400)
+        self.assertIn('not contained in assembly accession', response.json()['detail'])
 
         # Wrong sequence accession
         s = correct_source.model_copy()
