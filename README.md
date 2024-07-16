@@ -52,7 +52,7 @@ You can build the docker image and run it:
 
 ```bash
 docker build -t manulera/shareyourcloningbackend .
-docker run -d --name frontendcontainer -p 8000:8000 manulera/shareyourcloningbackend
+docker run -d --name backendcontainer -p 8000:8000 manulera/shareyourcloningbackend
 
 ```
 
@@ -60,7 +60,7 @@ If you don't want to download the repository and build the image, you can fetch 
 
 ```bash
 docker pull manulera/shareyourcloningbackend
-docker run -d --name frontendcontainer -p 8000:8000 manulera/shareyourcloningbackend
+docker run -d --name backendcontainer -p 8000:8000 manulera/shareyourcloningbackend
 ```
 
 The api will be running at `http://localhost:8000`, so you should be able to access the docs at [http://localhost:8000/docs](http://localhost:8000/docs0).
