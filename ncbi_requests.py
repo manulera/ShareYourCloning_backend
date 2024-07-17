@@ -23,7 +23,9 @@ def get_sequence_accessions_from_assembly_accession(assembly_accession: str) -> 
     resp = requests.get(url)
     data = resp.json()
     if 'reports' in data:
-        return [report['refseq_accession'] for report in data['reports']]
+        return [report['refseq_accession'] for report in data['reports']] + [
+            report['genbank_accession'] for report in data['reports']
+        ]
     elif 'total_count' in data:
         raise HTTPException(400, f'No sequence accessions linked, see {url}')
     else:
