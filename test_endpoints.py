@@ -1400,7 +1400,7 @@ class GenomeRegionTest(unittest.TestCase):
                 self.fail(f'Cannot parse the sources for example {example_name}')
             response_source = sources[0]
             request_source = GenomeCoordinatesSource.model_validate(example['value'])
-            if example_name == 'full':
+            if example_name == 'full' or example_name == 'full_with_genbank_accession':
                 self.assertEqual(response_source, request_source, msg)
             elif example_name == 'id_omitted':
                 request_source.gene_id = 2543372

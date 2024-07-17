@@ -12,6 +12,19 @@ genome_region_examples = {
             'strand': 1,
         },
     },
+    'full_with_genbank_accession': {
+        'summary': 'All parameters provided, but sequence accession is GenBank',
+        'value': {
+            'id': 1,
+            'sequence_accession': 'CU329670.1',
+            'assembly_accession': 'GCF_000002945.2',
+            'locus_tag': 'SPOM_SPAPB1A10.09',
+            'gene_id': 2543372,
+            'start': 1877009,
+            'end': 1881726,
+            'strand': 1,
+        },
+    },
     'id_omitted': {
         'summary': 'Gene ID omitted (filled in response)',
         'value': {
