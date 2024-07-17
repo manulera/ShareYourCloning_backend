@@ -719,14 +719,15 @@ class Assembly:
             ]
 
         rc_locs = [locs[0]._flip(len(first)), locs[1]._flip(len(secnd))]
-        # the parts list of rc_locs that span the origin get inverted when flipped.
-        # For instance, join{[4:6], [0:1]} in a sequence with length 6 will become
-        # join{[0:2], [5:6]} when flipped. This removes the meaning of origin-spanning.
-        # We fix this by flipping the parts list again.
-        # TODO: Pending on https://github.com/biopython/biopython/issues/4611
-        for rc_loc in rc_locs:
-            if len(rc_loc.parts) > 1:
-                rc_loc.parts = rc_loc.parts[::-1]
+
+        # Needed before https://github.com/biopython/biopython/issues/4611
+        # the parts list of rc_locs that span the origin used to get inverted when flipped.
+        # For instance, join{[4:6], [0:1]} in a sequence with length 6 would become
+        # join{[0:2], [5:6]} when flipped. This removed the meaning of origin-spanning.
+        # It used to be necessary to flip the parts list again.
+        # for rc_loc in rc_locs:
+        #     if len(rc_loc.parts) > 1:
+        #         rc_loc.parts = rc_loc.parts[::-1]
 
         combinations = (
             (u, v, locs),

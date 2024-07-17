@@ -377,11 +377,11 @@ async def genome_coordinates(
 
     if source.assembly_accession is not None:
         # We get the assembly accession (if it exists), and if the user provided one we validate it
-        assembly_accessions = ncbi_requests.get_assembly_accession_from_sequence_accession(source.sequence_accession)
-        if source.assembly_accession not in assembly_accessions:
+        sequence_accessions = ncbi_requests.get_sequence_accessions_from_assembly_accession(source.assembly_accession)
+        if source.sequence_accession not in sequence_accessions:
             raise HTTPException(
-                422,
-                f'The assembly accessions associated with the sequence accession ({", ".join(assembly_accessions)}) do not include the provided assembly_accession ({source.assembly_accession})',
+                400,
+                f'Sequence accession {source.sequence_accession} not contained in assembly accession {source.assembly_accession}, which contains accessions: {", ".join(sequence_accessions)}',
             )
 
     seq = ncbi_requests.get_genbank_sequence_subset(source.sequence_accession, source.start, source.end, source.strand)
