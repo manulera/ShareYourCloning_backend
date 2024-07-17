@@ -48,6 +48,9 @@ Then you should be able to open the API docs at [http://127.0.0.1:8000/docs](htt
 
 ### Running locally with docker :whale:
 
+
+> If you want to run the full application and not just the backend, see [this](https://github.com/manulera/ShareYourCloning?tab=readme-ov-file#timer_clock-getting-started-in-5-minutes).
+
 You can build the docker image and run it:
 
 ```bash
@@ -64,8 +67,6 @@ docker run -d --name backendcontainer -p 8000:8000 manulera/shareyourcloningback
 ```
 
 The api will be running at `http://localhost:8000`, so you should be able to access the docs at [http://localhost:8000/docs](http://localhost:8000/docs0).
-
-> Admin only:<br>to update the image in dockerhub<br> `docker image push manulera/shareyourcloningbackend`
 
 ### Connecting to the frontend
 
