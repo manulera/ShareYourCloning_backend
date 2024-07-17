@@ -3,3 +3,8 @@ examples/
 .github/
 .venv/
 .git/
+.pytest_cache/
+test_files/
+.DS_Store
+.flake8
+__pycache__/
