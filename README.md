@@ -66,7 +66,7 @@ docker pull manulera/shareyourcloningbackend
 docker run -d --name backendcontainer -p 8000:8000 manulera/shareyourcloningbackend
 ```
 
-The api will be running at `http://localhost:8000`, so you should be able to access the docs at [http://localhost:8000/docs](http://localhost:8000/docs0).
+The api will be running at `http://localhost:8000`, so you should be able to access the docs at [http://localhost:8000/docs](http://localhost:8000/docs).
 
 ### Connecting to the frontend
 
