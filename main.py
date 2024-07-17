@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter
 from typing import Annotated
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
 from pydna.crispr import cas9
@@ -140,22 +141,6 @@ async def custom_http_exception_handler(request: Request, exc: Exception):
             response.headers.add_vary_header('Origin')
 
     return response
-
-
-@router.get('/')
-async def greeting(request: Request):
-    html_content = """
-        <html>
-            <head>
-                <title>Welcome to ShareYourCloning API</title>
-            </head>
-            <body>
-                <h1>Welcome to ShareYourCloning API</h1>
-                <p>You can access the endpoints documentation <a href="/docs">here</a></p>
-            </body>
-        </html>
-        """
-    return HTMLResponse(content=html_content, status_code=200)
 
 
 @router.post(
@@ -1021,6 +1006,40 @@ async def rename_sequence(
     """Rename a sequence"""
     dseqr = read_dsrecord_from_json(sequence)
     return format_sequence_genbank(dseqr, name)
+
+
+serve_frontend = os.environ['SERVE_FRONTEND'] == '1' if 'SERVE_FRONTEND' in os.environ else False
+
+if not serve_frontend:
+
+    @router.get('/')
+    async def greeting(request: Request):
+        html_content = """
+            <html>
+                <head>
+                    <title>Welcome to ShareYourCloning API</title>
+                </head>
+                <body>
+                    <h1>Welcome to ShareYourCloning API</h1>
+                    <p>You can access the endpoints documentation <a href="/docs">here</a></p>
+                </body>
+            </html>
+            """
+        return HTMLResponse(content=html_content, status_code=200)
+
+else:
+    app.mount('/assets', StaticFiles(directory='frontend/assets'), name='assets')
+
+    @router.get('/')
+    async def get_frontend_index(request: Request):
+        return FileResponse('frontend/index.html')
+
+    @router.get('/{name:path}')
+    async def get_other_frontend_files(name: str):
+        """Catch-all for frontend files"""
+        if name in ['config.json', 'favicon.ico', 'robots.txt', 'logo192.png', 'logo512.png', 'manifest.json']:
+            return FileResponse(f"frontend/{name}")
+        raise HTTPException(404)
 
 
 app.include_router(router)
