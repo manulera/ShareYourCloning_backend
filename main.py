@@ -1029,6 +1029,7 @@ if not serve_frontend:
 
 else:
     app.mount('/assets', StaticFiles(directory='frontend/assets'), name='assets')
+    app.mount('/examples', StaticFiles(directory='frontend/examples'), name='examples')
 
     @router.get('/')
     async def get_frontend_index(request: Request):
