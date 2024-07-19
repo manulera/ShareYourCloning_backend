@@ -48,7 +48,6 @@ Then you should be able to open the API docs at [http://127.0.0.1:8000/docs](htt
 
 ### Running locally with docker :whale:
 
-
 > If you want to run the full application and not just the backend, see [this](https://github.com/manulera/ShareYourCloning?tab=readme-ov-file#timer_clock-getting-started-in-5-minutes).
 
 You can build the docker image and run it:
@@ -70,14 +69,26 @@ The api will be running at `http://localhost:8000`, so you should be able to acc
 
 ### Connecting to the frontend
 
-If you want to receive requests from the [frontend](https://github.com/manulera/ShareYourCloning_frontend), or from another web application that is not served at `http://localhost:3000`, you must include the url of the frontend application in the CORS exceptions, by adding it to the list `origins` in `main.py`:
+If you want to receive requests from the [frontend](https://github.com/manulera/ShareYourCloning_frontend), or from another web application you may have to include the url of the frontend application in the CORS exceptions. By default, if you run the dev server with `uvicorn main:app --reload --reload-exclude='.venv'`, the backend will accept requests coming from `http://localhost:3000`, which is the default address of the frontend dev server (ran with `yarn start`).
 
-```python
-# at the beginning of main.py file
-origins = ["http://localhost:3000", "https://shareyourcloning.netlify.app"]
+If you want to change the allowed origins, you can do so via env variables (comma-separated). e.g.:
+
+```
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001 uvicorn main:app --reload --reload-exclude='.venv'
 ```
 
-Finally, if you are running your api at an address other than `http://127.0.0.1:8000/`, you have to configure your frontend to send request to your api address ([see here](https://github.com/manulera/ShareYourCloning_backend#connecting-to-the-frontend)).
+Similarly, the frontend should be configured to send requests to the backend address, [see here](https://github.com/manulera/ShareYourCloning_frontend#connecting-to-the-backend).
+
+#### Serving the frontend from the backend
+
+You may prefer to handle everything from a single server. You can do so by:
+* Build the [frontend](https://github.com/manulera/ShareYourCloning_frontend) with `yarn build`.
+* Copy the folder `build` from the frontend to the root directory of the backend, and rename it to `frontend`.
+* Set the environment variable `SERVE_FRONTEND=1` when running the backend. By default this will remove all allowed origins, but you can still set them with `ALLOWED_ORIGINS`.
+* Set the value of `backendUrl` in `frontend/config.js` to `/`.
+* Now, when you go to the root of the backend (e.g. `http://localhost:8000`), you should receive the frontend instead of the greeting page of the API.
+
+You can see how this is done in this [docker image](https://github.com/manulera/ShareYourCloning/blob/master/Dockerfile) and [docker-compose file](https://github.com/manulera/ShareYourCloning/blob/master/docker-compose.yml).
 
 ## Contributing :hammer_and_wrench:
 
