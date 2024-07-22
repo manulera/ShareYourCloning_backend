@@ -8,3 +8,4 @@ test_files/
 .DS_Store
 .flake8
 __pycache__/
+frontend/

@@ -61,27 +61,26 @@ from record_stub_route import RecordStubRoute
 from starlette.responses import RedirectResponse
 from primer_design import homologous_recombination_primers
 
-record_stubs = os.environ['RECORD_STUBS'] == '1' if 'RECORD_STUBS' in os.environ else False
+# ENV variables ========================================
+RECORD_STUBS = os.environ['RECORD_STUBS'] == '1' if 'RECORD_STUBS' in os.environ else False
+SERVE_FRONTEND = os.environ['SERVE_FRONTEND'] == '1' if 'SERVE_FRONTEND' in os.environ else False
+
+origins = []
+if os.environ.get('ALLOWED_ORIGINS') is not None:
+    origins = os.environ['ALLOWED_ORIGINS'].split(',')
+elif not SERVE_FRONTEND:
+    # Default to the yarn start frontend url
+    origins = ['http://localhost:3000']
+
+# =====================================================
 
 # Instance of the API object
 app = FastAPI()
-if record_stubs:
+if RECORD_STUBS:
     router = APIRouter(route_class=RecordStubRoute)
 else:
     router = APIRouter()
 
-
-# Allow CORS
-# TODO put a wildcard on the shareyourcloning.netlify to
-# allow for the draft websites to also work in netlify.
-# TODO make this conditional to dev / prod using settings
-
-origins = [
-    'http://localhost:3000',
-    'https://shareyourcloning.netlify.app',
-    'http://localhost:5173',
-    'https://shareyourcloning.org',
-]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -1008,9 +1007,7 @@ async def rename_sequence(
     return format_sequence_genbank(dseqr, name)
 
 
-serve_frontend = os.environ['SERVE_FRONTEND'] == '1' if 'SERVE_FRONTEND' in os.environ else False
-
-if not serve_frontend:
+if not SERVE_FRONTEND:
 
     @router.get('/')
     async def greeting(request: Request):
@@ -1029,6 +1026,7 @@ if not serve_frontend:
 
 else:
     app.mount('/assets', StaticFiles(directory='frontend/assets'), name='assets')
+    app.mount('/examples', StaticFiles(directory='frontend/examples'), name='examples')
 
     @router.get('/')
     async def get_frontend_index(request: Request):
