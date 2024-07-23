@@ -20,6 +20,29 @@ from Bio.Restriction.Restriction import RestrictionBatch, AbstractCut
 import regex
 
 
+def assembly_checksum(G: _nx.MultiDiGraph, edge_list):
+    """Calculate a checksum for an assembly, from a list of edges in the form (u, v, key)."""
+    checksum_list = list()
+    for edge in edge_list:
+        u, v, key = edge
+        checksum_list.append(G.get_edge_data(u, v, key)['uid'])
+
+    return min('-'.join(checksum_list), '-'.join(checksum_list[::-1]))
+
+
+def unique_linear_paths(G: _nx.MultiDiGraph):
+    # We remove the begin and end nodes
+    edge_lists = [x[1:-1] for x in _nx.all_simple_edge_paths(G, 'begin', 'end')]
+    # For each path, we create a unique checksum
+    checksums = [assembly_checksum(G, edge_list) for edge_list in edge_lists]
+    # We remove duplicates
+    out = list()
+    for i in range(len(edge_lists)):
+        if checksums[i] not in checksums[:i]:
+            out.append(edge_lists[i])
+    return out
+
+
 def ends_from_cutsite(cutsite: tuple[tuple[int, int], AbstractCut], seq: _Dseq):
     if cutsite is None:
         raise ValueError('None is not supported')
@@ -648,9 +671,7 @@ class Assembly:
     - Circular assemblies: the first subfragment is not reversed, and has the smallest index in the input fragment list.
       use_fragment_order is ignored.
     - Linear assemblies:
-        - If use_fragment_order is False, the first fragment is always in the forward orientation.
-        - If use_fragment_order is True, the first fragment is always the first fragment in the input list,
-        in forward or reverse order, and the last one is the last fragment in the input list, in forward or reverse order.
+        - Using uid (see add_edges_from_match) to identify unique edges.
 
     Parameters
     ----------
@@ -748,14 +769,8 @@ class Assembly:
 
         rc_locs = [locs[0]._flip(len(first)), locs[1]._flip(len(secnd))]
 
-        # Needed before https://github.com/biopython/biopython/issues/4611
-        # the parts list of rc_locs that span the origin used to get inverted when flipped.
-        # For instance, join{[4:6], [0:1]} in a sequence with length 6 would become
-        # join{[0:2], [5:6]} when flipped. This removed the meaning of origin-spanning.
-        # It used to be necessary to flip the parts list again.
-        # for rc_loc in rc_locs:
-        #     if len(rc_loc.parts) > 1:
-        #         rc_loc.parts = rc_loc.parts[::-1]
+        # Unique id that identifies the edge in either orientation
+        uid = f'{u}{locs[0]}:{v}{locs[1]}'
 
         combinations = (
             (u, v, locs),
@@ -763,7 +778,7 @@ class Assembly:
         )
 
         for u, v, l in combinations:
-            self.G.add_edge(u, v, f'{u}{l[0]}:{v}{l[1]}', locations=l)
+            self.G.add_edge(u, v, f'{u}{l[0]}:{v}{l[1]}', locations=l, uid=uid)
 
     def format_assembly_edge(self, assembly_edge):
         """Go from the (u, v, key) to the (u, v, locu, locv) format."""
@@ -786,15 +801,11 @@ class Assembly:
             G.add_edge(len(self.fragments), 'end')
             G.add_edge(-len(self.fragments), 'end')
         else:
-            # Path must start with forward fragment
             for node in filter(lambda x: type(x) is int, G.nodes):
-                if not self.use_fragment_order and node > 0:
-                    G.add_edge('begin', node)
+                G.add_edge('begin', node)
                 G.add_edge(node, 'end')
 
-        assemblies = [
-            tuple(map(self.format_assembly_edge, x[1:-1])) for x in _nx.all_simple_edge_paths(G, 'begin', 'end')
-        ]
+        assemblies = [tuple(map(self.format_assembly_edge, x)) for x in unique_linear_paths(G)]
         return remove_subassemblies(
             [a for a in assemblies if assembly_is_valid(self.fragments, a, False, self.use_all_fragments)]
         )

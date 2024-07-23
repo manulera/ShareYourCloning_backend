@@ -1108,6 +1108,8 @@ def test_golden_gate():
     assert len(assembly_output) == 1
     assert assembly_output[0].seguid() == sum_output.seguid()
 
+    # TODO: related to https://github.com/manulera/ShareYourCloning_backend/issues/161
+    # These partial results should never have been returned
     # Linear assembly (all four possibilities)
     sum_output = i1 + i2 + i3
 
@@ -1123,6 +1125,14 @@ def test_golden_gate():
         i3_pre + i2.reverse_complement() + i1.reverse_complement() + i1_pre.reverse_complement(),
         i3_pre + i2.reverse_complement() + i1_post,
     ]
+
+    for a in results:
+        print(a.seq, a.seq.seguid())
+    print()
+    for a in asm.assemble_linear():
+        print(a.seq, a.seq.seguid())
+    for a in asm.get_linear_assemblies():
+        print(assembly.assembly2str(a))
 
     for result, product in zip(results, asm.assemble_linear()):
         assert result.seq == product.seq
@@ -1628,7 +1638,8 @@ def test_blunt_assembly():
     b = Dseqrecord('CCCC')
 
     asm = assembly.Assembly([a, b], algorithm=assembly.blunt_overlap, use_all_fragments=True, use_fragment_order=False)
-    assert asm.assemble_linear() == [a + b, a + b.reverse_complement(), b + a.reverse_complement(), b + a]
+
+    assert asm.assemble_linear() == [a + b, a + b.reverse_complement(), b + a, a.reverse_complement() + b]
     assert asm.assemble_circular() == [(a + b).looped(), (a + b.reverse_complement()).looped()]
 
     # Circularisation
