@@ -448,9 +448,7 @@ class LigationTest(unittest.TestCase):
         self.assertEqual(len(sources), 1)
 
         # Check that the assembly is correct, the sequences cannot be compared with the equal operator since their origin is different
-        # TODO there should be something in pydna to test circular molecules being equal but having different frames
-        print(sources[0])
-        self.assertEqual(len(resulting_sequences[0]), len(initial_sequence))
+        self.assertEqual(resulting_sequences[0].seq.seguid(), initial_sequence.seq.seguid())
 
     def test_circularization(self):
         enzyme = CommOnly.format('EcoRI')
@@ -542,8 +540,6 @@ class LigationTest(unittest.TestCase):
             read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']
         ]
         self.assertEqual(len(resulting_sequences), 1)
-        print(seqs[0].seq.__repr__())
-        print(seqs[1].seq.__repr__())
         self.assertEqual(resulting_sequences[0].seguid(), (seqs[1] + seqs[0]).looped().seguid())
 
 

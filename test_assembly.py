@@ -987,14 +987,8 @@ def test_restriction_ligation_assembly():
 
     # We shift
     for shift in range(len(f2)):
-        print(shift)
         f2_shifted = f2.shifted(shift)
         f = assembly.Assembly([f1, f2_shifted], algorithm=algo, use_fragment_order=False)
-        for ff in f.assemble_circular():
-            print(ff.seq)
-        print()
-        print((b1.seq + a2.seq).looped())
-        print((b1.seq + a2.seq.reverse_complement()).looped())
         observed_seguids = sorted(x.seguid() for x in f.assemble_circular())
         assert len(result_seguids) == len(observed_seguids)
         assert result_seguids == observed_seguids

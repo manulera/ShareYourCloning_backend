@@ -41,7 +41,7 @@ def ends_from_cutsite(cutsite: tuple[tuple[int, int], AbstractCut], seq: _Dseq):
 
 
 def restriction_ligation_overlap(
-    seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=RestrictionBatch, partial=False, allow_blunt=True
+    seqx: _Dseqrecord, seqy: _Dseqrecord, enzymes=RestrictionBatch, partial=False, allow_blunt=False
 ):
     """Find overlaps. Like in stiky and gibson, the order matters"""
     cuts_x = seqx.seq.get_cutsites(*enzymes)
