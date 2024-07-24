@@ -961,13 +961,14 @@ def test_restriction_ligation_assembly():
         a1, a2 = a.cut([enz])
         b1, b2 = b.cut([enz])
 
-        products = [a1 + b2, a1 + b1.reverse_complement(), b1 + a2, b1 + a1.reverse_complement()]
+        products = [a1 + b2, a1 + b1.reverse_complement(), b1 + a2, a2.reverse_complement() + b2]
 
         def algo(x, y, _l):
             return assembly.restriction_ligation_overlap(x, y, [enz])  # noqa: B023
 
         f = assembly.Assembly([a, b], algorithm=algo, use_fragment_order=False)
-        assert sorted(products) == sorted(f.assemble_linear())
+
+        assert sorted(products) == sorted(f.assemble_linear(only_adjacent_edges=True))
 
     # Insertion in a vector
     f1 = Dseqrecord('GAATTCaaaGAATTC')
@@ -989,7 +990,7 @@ def test_restriction_ligation_assembly():
     for shift in range(len(f2)):
         f2_shifted = f2.shifted(shift)
         f = assembly.Assembly([f1, f2_shifted], algorithm=algo, use_fragment_order=False)
-        observed_seguids = sorted(x.seguid() for x in f.assemble_circular())
+        observed_seguids = sorted(x.seguid() for x in f.assemble_circular(only_adjacent_edges=True))
         assert len(result_seguids) == len(observed_seguids)
         assert result_seguids == observed_seguids
 
@@ -1014,7 +1015,7 @@ def test_restriction_ligation_assembly():
     for shift in range(len(f1)):
         f1_shifted = f1.shifted(shift)
         f = assembly.Assembly([f1_shifted, f2], algorithm=algo, use_fragment_order=False, use_all_fragments=True)
-        observed_seguids = sorted(x.seguid() for x in f.assemble_circular())
+        observed_seguids = sorted(x.seguid() for x in f.assemble_circular(only_adjacent_edges=True))
         assert len(result_seguids) == len(observed_seguids)
         assert result_seguids == observed_seguids
 
@@ -1028,15 +1029,15 @@ def test_restriction_ligation_assembly():
         return assembly.restriction_ligation_overlap(x, y, [BsaI], False)
 
     f = assembly.Assembly(fragments, use_fragment_order=False, algorithm=algo)
-    assert len(f.get_linear_assemblies()) == 0
+    assert len(f.get_linear_assemblies(only_adjacent_edges=True)) == 0
 
     # Allowing partial overlaps
     def algo(x, y, _l):
-        return assembly.restriction_ligation_overlap(x, y, [BsaI], True)
+        return assembly.restriction_ligation_overlap(x, y, [BsaI], partial=True)
 
     f = assembly.Assembly(fragments, algorithm=algo, use_fragment_order=False)
-    assert len(f.get_linear_assemblies()) == 2
-    p1, p2 = f.assemble_linear()
+    assert len(f.get_linear_assemblies(only_adjacent_edges=True)) == 2
+    p1, p2 = f.assemble_linear(only_adjacent_edges=True)
     assert str(p1.seq) == 'GGTCTCCCCAACCAA'
     assert str(p2.seq) == 'GGTCTCCAACCAATT'
 
@@ -1097,45 +1098,14 @@ def test_golden_gate():
     i3_pre, i3, i3_post = insert3.cut(BsaI)
     _, v = vector.cut(BsaI)
 
-    sum_output = (i1 + i2 + i3 + v).looped()
-
     def algo(x, y, _l):
         return assembly.restriction_ligation_overlap(x, y, [BsaI])
 
     asm = assembly.Assembly([insert1, insert2, insert3, vector], use_fragment_order=False, algorithm=algo)
 
-    assembly_output = asm.assemble_circular()
+    assembly_output = asm.assemble_circular(only_adjacent_edges=True)
     assert len(assembly_output) == 1
-    assert assembly_output[0].seguid() == sum_output.seguid()
-
-    # TODO: related to https://github.com/manulera/ShareYourCloning_backend/issues/161
-    # These partial results should never have been returned
-    # Linear assembly (all four possibilities)
-    sum_output = i1 + i2 + i3
-
-    def algo(x, y, _l):
-        return assembly.restriction_ligation_overlap(x, y, [BsaI])
-
-    asm = assembly.Assembly(
-        [insert1, insert2, insert3], use_fragment_order=False, limit=10, algorithm=algo, use_all_fragments=True
-    )
-    results = [
-        i1_pre + i1 + i2 + i3 + i3_post,
-        i1_pre + i1 + i2 + i3_pre.reverse_complement(),
-        i3_pre + i2.reverse_complement() + i1.reverse_complement() + i1_pre.reverse_complement(),
-        i3_pre + i2.reverse_complement() + i1_post,
-    ]
-
-    for a in results:
-        print(a.seq, a.seq.seguid())
-    print()
-    for a in asm.assemble_linear():
-        print(a.seq, a.seq.seguid())
-    for a in asm.get_linear_assemblies():
-        print(assembly.assembly2str(a))
-
-    for result, product in zip(results, asm.assemble_linear()):
-        assert result.seq == product.seq
+    assert assembly_output[0].seguid() == (i1 + i2 + i3 + v).looped().seguid()
 
 
 def test_gibson_assembly():

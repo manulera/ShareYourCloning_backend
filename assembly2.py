@@ -786,7 +786,7 @@ class Assembly:
         locu, locv = self.G.get_edge_data(u, v, key)['locations']
         return u, v, locu, locv
 
-    def get_linear_assemblies(self):
+    def get_linear_assemblies(self, only_adjacent_edges: bool = False):
         """Get linear assemblies, applying the constrains described in __init__, ensuring that paths represent
         real assemblies (see assembly_is_valid). Subassemblies are removed (see remove_subassemblies)."""
 
@@ -806,9 +806,10 @@ class Assembly:
                 G.add_edge(node, 'end')
 
         assemblies = [tuple(map(self.format_assembly_edge, x)) for x in unique_linear_paths(G)]
-        return remove_subassemblies(
-            [a for a in assemblies if assembly_is_valid(self.fragments, a, False, self.use_all_fragments)]
-        )
+        out = [a for a in assemblies if assembly_is_valid(self.fragments, a, False, self.use_all_fragments)]
+        if only_adjacent_edges:
+            out = [a for a in out if self.assembly_uses_only_adjacent_edges(a, False)]
+        return remove_subassemblies(out)
 
     def cycle2circular_assemblies(self, cycle):
         """Convert a cycle in the format [1, 2, 3] (as returned by _nx.cycles.simple_cycles) to a list of all possible circular assemblies.
@@ -823,7 +824,7 @@ class Assembly:
             combine.append([(u, v, key) for key in self.G[u][v]])
         return [tuple(map(self.format_assembly_edge, x)) for x in _itertools.product(*combine)]
 
-    def get_circular_assemblies(self):
+    def get_circular_assemblies(self, only_adjacent_edges: bool = False):
         """Get circular assemblies, applying the constrains described in __init__, ensuring that paths represent
         real assemblies (see assembly_is_valid)."""
         # The constrain of circular sequence is that the first node is the fragment with the smallest index in its initial orientation,
@@ -832,7 +833,10 @@ class Assembly:
         sorted_cycles = filter(lambda x: x[0] > 0, sorted_cycles)
         # cycles.simple_cycles returns lists [1,2,3] not assemblies, see self.cycle2circular_assemblies
         assemblies = sum(map(self.cycle2circular_assemblies, sorted_cycles), [])
-        return [a for a in assemblies if assembly_is_valid(self.fragments, a, True, self.use_all_fragments)]
+        out = [a for a in assemblies if assembly_is_valid(self.fragments, a, True, self.use_all_fragments)]
+        if only_adjacent_edges:
+            out = [a for a in out if self.assembly_uses_only_adjacent_edges(a, True)]
+        return out
 
     def format_insertion_assembly(self, assembly):
         """Sorts the fragment representing a cycle so that they represent an insertion assembly if possible,
@@ -873,12 +877,14 @@ class Assembly:
         shift_by = (edge_pair_index[0] + 1) % len(assembly)
         return assembly[shift_by:] + assembly[:shift_by]
 
-    def get_insertion_assemblies(self):
+    def get_insertion_assemblies(self, only_adjacent_edges: bool = False):
         """Assemblies that represent the insertion of a fragment or series of fragment inside a linear construct. For instance,
         digesting CCCCGAATTCCCCGAATTC with EcoRI and inserting the fragment with two overhangs into the EcoRI site of AAAGAATTCAAA.
         This is not so much meant for the use-case of linear fragments that represent actual linear fragments, but for linear
         fragments that represent a genome region. This can then be used to simulate homologous recombination.
         """
+        if only_adjacent_edges:
+            raise NotImplementedError('only_adjacent_edges not implemented for insertion assemblies')
 
         # We find cycles first
         assemblies = sum(map(self.cycle2circular_assemblies, _nx.cycles.simple_cycles(self.G)), [])
@@ -892,20 +898,70 @@ class Assembly:
             if assembly_is_valid(self.fragments, a, False, self.use_all_fragments, is_insertion=True)
         ]
 
-    def assemble_linear(self):
+    def assemble_linear(self, only_adjacent_edges: bool = False):
         """Assemble linear constructs, from assemblies returned by self.get_linear_assemblies."""
-        assemblies = self.get_linear_assemblies()
+        assemblies = self.get_linear_assemblies(only_adjacent_edges)
         return [assemble(self.fragments, a, False) for a in assemblies]
 
-    def assemble_circular(self):
+    def assemble_circular(self, only_adjacent_edges: bool = False):
         """Assemble circular constructs, from assemblies returned by self.get_circular_assemblies."""
-        assemblies = self.get_circular_assemblies()
+        assemblies = self.get_circular_assemblies(only_adjacent_edges)
         return [assemble(self.fragments, a, True) for a in assemblies]
 
-    def assemble_insertion(self):
+    def assemble_insertion(self, only_adjacent_edges: bool = False):
         """Assemble insertion constructs, from assemblies returned by self.get_insertion_assemblies."""
-        assemblies = self.get_insertion_assemblies()
+        assemblies = self.get_insertion_assemblies(only_adjacent_edges)
         return [assemble(self.fragments, a, False) for a in assemblies]
+
+    def get_locations_on_fragments(self) -> dict[int, list[SimpleLocation]]:
+        """Get a dictionary where the keys are the nodes in the graph, and the values are the locations of the overlaps
+        on the fragments. The locations are sorted by start position."""
+
+        locations_on_fragments = dict()
+        for node in self.G.nodes:
+            locations_on_fragments[node] = list()
+            for edge in self.G.edges(data=True):
+                for i in range(2):
+                    if edge[i] == node:
+                        edge_location = edge[2]['locations'][i]
+                        if edge_location not in locations_on_fragments[node]:
+                            locations_on_fragments[node].append(edge_location)
+            locations_on_fragments[node] = sorted(locations_on_fragments[node], key=lambda x: x.start)
+        return locations_on_fragments
+
+    def assembly_uses_only_adjacent_edges(self, assembly, is_circular: bool) -> bool:
+        """
+        Check whether only adjacent edges within each fragment are used in the assembly. This is useful to check if a cut and ligate assembly is valid,
+          and prevent including partially digested fragments. For example, imagine the following fragment being an input for a digestion
+          and ligation assembly, where the enzyme cuts at the sites indicated by the vertical lines:
+
+                 x       y       z
+          -------|-------|-------|---------
+
+          We would only want assemblies that contain subfragments start-x, x-y, y-z, z-end, and not start-x, y-end, for instance.
+          The latter would indicate that the fragment was partially digested.
+        """
+
+        locations_on_fragments = self.get_locations_on_fragments()
+        allowed_location_pairs = dict()
+        for key in locations_on_fragments:
+            if not is_circular:
+                # We add the existing ends of the fragment
+                value = [None] + locations_on_fragments[key] + [None]
+            else:
+                # For circular assemblies, we add the first location at the end
+                # to allow for the last edge to be used
+                value = locations_on_fragments[key] + [locations_on_fragments[key][0]]
+            allowed_location_pairs[key] = list(zip(value, value[1:]))
+
+        fragment_assembly = edge_representation2subfragment_representation(assembly, is_circular)
+        for node, start_location, end_location in fragment_assembly:
+            print(node, start_location, end_location)
+            if (start_location, end_location) not in allowed_location_pairs[node]:
+                print(*locations_on_fragments[node])
+                print('here')
+                return False
+        return True
 
     def __repr__(self):
         # https://pyformat.info
@@ -960,8 +1016,11 @@ class PCRAssembly(Assembly):
 
         return
 
-    def get_linear_assemblies(self):
+    def get_linear_assemblies(self, only_adjacent_edges: bool = False):
         """Adds extra constrains to prevent clashing primers."""
+        if only_adjacent_edges:
+            raise NotImplementedError('only_adjacent_edges not implemented for PCR assemblies')
+
         assemblies = super().get_linear_assemblies()
         # Error if clashing primers
         for a in assemblies:
@@ -1013,13 +1072,16 @@ class SingleFragmentAssembly(Assembly):
 
         return
 
-    def get_circular_assemblies(self):
+    def get_circular_assemblies(self, only_adjacent_edges: bool = False):
         # We don't want the same location twice
-        assemblies = filter(lambda x: x[0][2] != x[0][3], super().get_circular_assemblies())
+        assemblies = filter(lambda x: x[0][2] != x[0][3], super().get_circular_assemblies(only_adjacent_edges))
         return [a for a in assemblies if assembly_is_valid(self.fragments, a, True, self.use_all_fragments)]
 
-    def get_insertion_assemblies(self):
+    def get_insertion_assemblies(self, only_adjacent_edges: bool = False):
         """This could be renamed splicing assembly, but the essence is similar"""
+
+        if only_adjacent_edges:
+            raise NotImplementedError('only_adjacent_edges not implemented for insertion assemblies')
 
         def splicing_assembly_filter(x):
             # We don't want the same location twice
