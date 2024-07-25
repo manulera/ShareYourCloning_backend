@@ -553,7 +553,7 @@ async def restriction(
 async def ligation(
     source: LigationSource,
     sequences: conlist(TextFileSequence, min_length=1),
-    blunt: bool = Query(False, description='Use blunt ligation instead of sticky ends.'),
+    blunt: bool = Query(False, description='Use blunt ligation as well as sticky ends.'),
     allow_partial_overlap: bool = Query(False, description='Allow for partially overlapping sticky ends.'),
     circular_only: bool = Query(False, description='Only return circular assemblies.'),
 ):
@@ -1037,7 +1037,7 @@ else:
     async def get_other_frontend_files(name: str):
         """Catch-all for frontend files"""
         if name in ['config.json', 'favicon.ico', 'robots.txt', 'logo192.png', 'logo512.png', 'manifest.json']:
-            return FileResponse(f"frontend/{name}")
+            return FileResponse(f'frontend/{name}')
         raise HTTPException(404)
 
 
