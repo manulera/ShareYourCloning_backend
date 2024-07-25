@@ -1041,6 +1041,15 @@ def test_restriction_ligation_assembly():
     assert str(p1.seq) == 'GGTCTCCCCAACCAA'
     assert str(p2.seq) == 'GGTCTCCAACCAATT'
 
+    # Combining both partial and normal overlaps, to ensure that only_adjacent_edges keeps both.
+    # In this case use_all_fragments=2, it should return 2 assemblies for 1 + 2, and
+    fragments = [Dseqrecord('GGTCTCCCCAATT'), Dseqrecord('GGTCTCCAACCAA'), Dseqrecord('GGTCTCCCCAATT')]
+    f = assembly.Assembly(fragments, algorithm=algo, use_fragment_order=False, use_all_fragments=False)
+    products = f.assemble_linear(only_adjacent_edges=True)
+    assert len(products) == 6
+    products_seguid = set(p.seq.seguid() for p in products)
+    assert products_seguid == set([p1.seq.seguid(), p2.seq.seguid(), Dseqrecord('GGTCTCCCCAATT').seguid()])
+
     # Partial overlaps -> enzyme with positive overhang
     fragments = [Dseqrecord('GACACCAGAGTC'), Dseqrecord('GACTAACGGGTC')]
 
@@ -1084,7 +1093,21 @@ def test_restriction_ligation_assembly():
     assert str(products[0].seq) == 'aaGAATTCaa'
 
 
+def test_only_adjacent_edges():
+    """Tests that partially digested fragments are not used in the assembly"""
+    # Partial overlaps -> enzyme with negative overhang
+    fragments = [Dseqrecord('acaGAATTCcccGAATTCtta'), Dseqrecord('aaaGAATTCata')]
+
+    def algo(x, y, _l):
+        return assembly.restriction_ligation_overlap(x, y, [EcoRI])
+
+    f = assembly.Assembly(fragments, algorithm=algo, use_fragment_order=False)
+
+    assert len(f.get_linear_assemblies(only_adjacent_edges=True)) == 4
+
+
 def test_golden_gate():
+    """This also tests that no partial deletionsar"""
 
     # Circular assembly
     insert1 = Dseqrecord('GGTCTCAattaAAAAAttaaAGAGACC')

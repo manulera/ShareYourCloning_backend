@@ -97,12 +97,14 @@ def restriction_ligation_overlap(
     """Find overlaps. Like in stiky and gibson, the order matters"""
     cuts_x = seqx.seq.get_cutsites(*enzymes)
     cuts_y = seqy.seq.get_cutsites(*enzymes)
-    # If blunt ends are allowed, we add the ends of linear sequences as possible cutsites
-    if allow_blunt:
-        if not seqx.circular:
-            cuts_x.append(((len(seqx), 0), None))
-        if not seqy.circular:
-            cuts_y.append(((0, 0), None))
+    # If blunt ends are allowed, something similar to this could be done to allow
+    # joining with linear sequence ends, but for now it messes up with the only_adjacent_edges
+    # case
+    # if allow_blunt:
+    #     if not seqx.circular:
+    #         cuts_x.append(((len(seqx), 0), None))
+    #     if not seqy.circular:
+    #         cuts_y.append(((0, 0), None))
     matches = list()
     for cut_x, cut_y in _itertools.product(cuts_x, cuts_y):
         # A blunt end
