@@ -53,6 +53,7 @@ from assembly2 import (
     restriction_ligation_overlap,
     SingleFragmentAssembly,
     blunt_overlap,
+    combine_algorithms,
 )
 import request_examples
 import ncbi_requests
@@ -572,7 +573,7 @@ async def ligation(
         asm = source.get_assembly_plan()
         blunt = len(asm[0][2]) == 0
 
-    algo = blunt_overlap if blunt else sticky_end_sub_strings
+    algo = combine_algorithms(blunt_overlap, sticky_end_sub_strings) if blunt else sticky_end_sub_strings
     out_sources = []
     if len(fragments) > 1:
         asm = Assembly(

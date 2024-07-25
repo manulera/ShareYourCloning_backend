@@ -327,7 +327,7 @@ class AddGeneTest(unittest.TestCase):
         self.assertIn('synthetic circular DNA', sequence.description)
 
 
-class StickyLigationTest(unittest.TestCase):
+class LigationTest(unittest.TestCase):
     def test_ligation(self):
         """Test whether assembly is executed when the order is provided"""
         # Load dummy sequence
@@ -448,9 +448,7 @@ class StickyLigationTest(unittest.TestCase):
         self.assertEqual(len(sources), 1)
 
         # Check that the assembly is correct, the sequences cannot be compared with the equal operator since their origin is different
-        # TODO there should be something in pydna to test circular molecules being equal but having different frames
-        print(sources[0])
-        self.assertEqual(len(resulting_sequences[0]), len(initial_sequence))
+        self.assertEqual(resulting_sequences[0].seq.seguid(), initial_sequence.seq.seguid())
 
     def test_circularization(self):
         enzyme = CommOnly.format('EcoRI')
@@ -471,8 +469,6 @@ class StickyLigationTest(unittest.TestCase):
         ]
         self.assertEqual(resulting_sequences[0].seq, fragment.looped().seq)
 
-
-class BluntLigationTest(unittest.TestCase):
     def test_blunt_ligation(self):
         seqs = [Dseqrecord('ATCC', circular=False), Dseqrecord('TAAT', circular=False)]
         json_seqs = [format_sequence_genbank(seq) for seq in seqs]
@@ -504,7 +500,7 @@ class BluntLigationTest(unittest.TestCase):
         self.assertEqual(len(resulting_sequences2), 1)
         self.assertEqual(resulting_sequences2[0].seq, resulting_sequences[0].seq)
 
-    def test_circularization(self):
+    def test_blunt_circularization(self):
         seqs = [Dseqrecord('ATCC', circular=False)]
         json_seqs = [format_sequence_genbank(seq) for seq in seqs]
         json_seqs[0].id = 1
@@ -522,6 +518,29 @@ class BluntLigationTest(unittest.TestCase):
         ]
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(resulting_sequences[0].seq, seqs[0].looped().seq)
+
+    def test_mixed_ligation(self):
+        seqs = [
+            Dseqrecord(Dseq.from_full_sequence_and_overhangs('ACCGTA', -3, 0)),
+            Dseqrecord(Dseq.from_full_sequence_and_overhangs('AAGACC', 0, -3)),
+        ]
+        json_seqs = [format_sequence_genbank(seq) for seq in seqs]
+        json_seqs[0].id = 1
+        json_seqs[1].id = 2
+        json_seqs = [seq.model_dump() for seq in json_seqs]
+        source = LigationSource(
+            id=0,
+            input=[1, 2],
+        )
+        data = {'source': source.model_dump(), 'sequences': json_seqs}
+        response = client.post('/ligation', json=data, params={'blunt': True})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        resulting_sequences = [
+            read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']
+        ]
+        self.assertEqual(len(resulting_sequences), 1)
+        self.assertEqual(resulting_sequences[0].seguid(), (seqs[1] + seqs[0]).looped().seguid())
 
 
 class RestrictionTest(unittest.TestCase):
