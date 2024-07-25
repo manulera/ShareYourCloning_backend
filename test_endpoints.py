@@ -1779,5 +1779,13 @@ class RenameSequenceTest(unittest.TestCase):
         self.assertEqual(dseq_resp.name, 'hello')
 
 
+class RestrictionEnzymeListTest(unittest.TestCase):
+
+    def test_restriction_enzyme_list(self):
+        response = client.get('/restriction_enzyme_list')
+        assert response.status_code == 200
+        assert 'EcoRI' in response.json()['enzyme_names']
+
+
 if __name__ == '__main__':
     unittest.main()
