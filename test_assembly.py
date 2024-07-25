@@ -955,8 +955,9 @@ def test_restriction_ligation_assembly():
     seq_pairs = (
         (Dseqrecord('AAAGAATTCAAA'), Dseqrecord('CCCCGAATTCCCC')),
         (Dseqrecord('AAAGCGATCGCAAA'), Dseqrecord('CCCCGCGATCGCCCC')),
+        (Dseqrecord('acaGATATCtta'), Dseqrecord('aaaGATATCata')),
     )
-    enzymes = [EcoRI, RgaI]
+    enzymes = [EcoRI, RgaI, EcoRV]
     for (a, b), enz in zip(seq_pairs, enzymes):
         a1, a2 = a.cut([enz])
         b1, b2 = b.cut([enz])
@@ -964,7 +965,7 @@ def test_restriction_ligation_assembly():
         products = [a1 + b2, a1 + b1.reverse_complement(), b1 + a2, a2.reverse_complement() + b2]
 
         def algo(x, y, _l):
-            return assembly.restriction_ligation_overlap(x, y, [enz])  # noqa: B023
+            return assembly.restriction_ligation_overlap(x, y, [enz], allow_blunt=enz is EcoRV)  # noqa: B023
 
         f = assembly.Assembly([a, b], algorithm=algo, use_fragment_order=False)
 
