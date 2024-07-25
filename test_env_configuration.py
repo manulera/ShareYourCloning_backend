@@ -4,6 +4,8 @@ from importlib import reload
 from fastapi.testclient import TestClient
 from utils import TemporaryFolderOverride
 import shutil
+import glob
+import os
 
 
 class TestServeFrontend(unittest.TestCase):
@@ -13,7 +15,12 @@ class TestServeFrontend(unittest.TestCase):
         self.folder_override = TemporaryFolderOverride('frontend')
         self.folder_override.__enter__()
 
-        shutil.move('test_files/dummy_frontend', './frontend')
+        for f in glob.glob('test_files/dummy_frontend/*'):
+            print(f)
+            if os.path.isdir(f):
+                shutil.copytree(f, f'./frontend/{f.split("/")[-1]}', dirs_exist_ok=True)
+            else:
+                shutil.copy2(f, './frontend')
 
         # Has to be imported here to get the right environment variable
         MonkeyPatch().setenv('SERVE_FRONTEND', '1')

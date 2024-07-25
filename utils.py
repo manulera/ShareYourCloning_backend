@@ -24,4 +24,5 @@ class TemporaryFolderOverride:
 
         if self.target_folder_exists:
             # Restore the original folder
-            shutil.move(self.backup_folder, self.target_folder)
+            shutil.copytree(self.backup_folder, self.target_folder)
+            shutil.rmtree(self.backup_folder)
