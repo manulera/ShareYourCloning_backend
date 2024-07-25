@@ -8,7 +8,6 @@ from pydna.utils import (
 )
 from pydna._pretty import pretty_str as _pretty_str
 from pydna.common_sub_strings import common_sub_strings as common_sub_strings_str
-from pydna.common_sub_strings import terminal_overlap as terminal_overlap_str
 from pydna.dseqrecord import Dseqrecord as _Dseqrecord
 from pydna.dseq import Dseq as _Dseq
 import networkx as _nx
@@ -150,10 +149,6 @@ def blunt_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=None):
 
 def common_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
     return common_sub_strings_str(str(seqx.seq).upper(), str(seqy.seq).upper(), limit)
-
-
-def terminal_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
-    return terminal_overlap_str(str(seqx.seq).upper(), str(seqy.seq).upper(), limit)
 
 
 def gibson_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=25):
