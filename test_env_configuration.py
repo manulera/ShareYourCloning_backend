@@ -59,6 +59,10 @@ class TestServeFrontend(unittest.TestCase):
     # DO this after each test
     def tearDown(self):
         self.folder_override.__exit__(None, None, None)
+        MonkeyPatch().setenv('SERVE_FRONTEND', '0')
+        import main
+
+        reload(main)
 
     def test_serve_frontend(self):
         # The index is served at the root

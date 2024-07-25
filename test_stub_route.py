@@ -25,6 +25,10 @@ class StubRouteTest(unittest.TestCase):
     # Remove the stubs folder after each test
     def tearDown(self):
         shutil.rmtree('stubs', ignore_errors=True)
+        MonkeyPatch().setenv('RECORD_STUBS', '0')
+        import main
+
+        reload(main)
 
     def test_stub_route(self):
         source = ManuallyTypedSource(
