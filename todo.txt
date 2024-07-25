@@ -1,2 +1,0 @@
-* Find all fragments that start at the same location
-* Use the right end to keep only the shortest one (that already solves the partial overlap case), but only if two possible ends don't overlap (solve the case where partial and full overlap are possible)

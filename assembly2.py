@@ -20,6 +20,34 @@ from Bio.Restriction.Restriction import RestrictionBatch, AbstractCut
 import regex
 
 
+def gather_overlapping_locations(locs: list[Location], fragment_length: int):
+    """
+    Turn a list of locations into a list of tuples of those locations, where each tuple contains
+    locations that overlap. For example, if locs = [loc1, loc2, loc3], and loc1 and loc2 overlap,
+    the output will be [(loc1, loc2), (loc3,)].
+    """
+    # Make a graph with all the locations as nodes
+    G = _nx.Graph()
+    for i, loc in enumerate(locs):
+        G.add_node(i, location=loc)
+
+    # Add edges between nodes that overlap
+    for i in range(len(locs)):
+        for j in range(i + 1, len(locs)):
+            if _locations_overlap(locs[i], locs[j], fragment_length):
+                G.add_edge(i, j)
+
+    # Get groups of overlapping locations
+    groups = list()
+    for loc_set in _nx.connected_components(G):
+        groups.append(tuple(locs[i] for i in loc_set))
+
+    # Sort by location of the first element in each group (does not matter which since they are overlapping)
+    groups.sort(key=lambda x: _location_boundaries(x[0])[0])
+
+    return groups
+
+
 def assembly_checksum(G: _nx.MultiDiGraph, edge_list):
     """Calculate a checksum for an assembly, from a list of edges in the form (u, v, key)."""
     checksum_list = list()
@@ -79,8 +107,6 @@ def restriction_ligation_overlap(
     for cut_x, cut_y in _itertools.product(cuts_x, cuts_y):
         # A blunt end
         if allow_blunt and cut_x[0][1] == cut_y[0][1] == 0:
-            print(seqx.id, seqy.id)
-            print(cut_x, cut_y)
             matches.append((cut_x[0][0], cut_y[0][0], 0))
             continue
 
@@ -913,20 +939,45 @@ class Assembly:
         assemblies = self.get_insertion_assemblies(only_adjacent_edges)
         return [assemble(self.fragments, a, False) for a in assemblies]
 
-    def get_locations_on_fragments(self) -> dict[int, list[SimpleLocation]]:
-        """Get a dictionary where the keys are the nodes in the graph, and the values are the locations of the overlaps
-        on the fragments. The locations are sorted by start position."""
+    def get_locations_on_fragments(self) -> dict[int, dict[str, list[Location]]]:
+        """Get a dictionary where the keys are the nodes in the graph, and the values are dictionaries with keys
+        `left`, `right`, containing (for each fragment) the locations where the fragment is joined to another fragment on its left
+        and right side. The values in `left` and `right` are often the same, except in restriction-ligation with partial overlap enabled,
+        where we can end up with a situation like this:
+
+        GGTCTCCCCAATT and aGGTCTCCAACCAA as fragments
+
+        # Partial overlap in assembly 1[9:11]:2[8:10]
+        GGTCTCCxxAACCAA
+        CCAGAGGGGTTxxTT
+
+        # Partial overlap in 2[10:12]:1[7:9]
+        aGGTCTCCxxCCAATT
+        tCCAGAGGTTGGxxAA
+
+        Would return
+        {
+            1: {'left': [7:9], 'right': [9:11]},
+            2: {'left': [8:10], 'right': [10:12]},
+            -1: {'left': [2:4], 'right': [4:6]},
+            -2: {'left': [2:4], 'right': [4:6]}
+        }
+
+        """
 
         locations_on_fragments = dict()
         for node in self.G.nodes:
-            locations_on_fragments[node] = list()
+            this_dict = {'left': list(), 'right': list()}
             for edge in self.G.edges(data=True):
-                for i in range(2):
+                for i, key in enumerate(['right', 'left']):
                     if edge[i] == node:
                         edge_location = edge[2]['locations'][i]
-                        if edge_location not in locations_on_fragments[node]:
-                            locations_on_fragments[node].append(edge_location)
-            locations_on_fragments[node] = sorted(locations_on_fragments[node], key=lambda x: x.start)
+                        if edge_location not in this_dict[key]:
+                            this_dict[key].append(edge_location)
+            this_dict['left'] = sorted(this_dict['left'], key=lambda x: _location_boundaries(x)[0])
+            this_dict['right'] = sorted(this_dict['right'], key=lambda x: _location_boundaries(x)[0])
+            locations_on_fragments[node] = this_dict
+
         return locations_on_fragments
 
     def assembly_uses_only_adjacent_edges(self, assembly, is_circular: bool) -> bool:
@@ -943,23 +994,34 @@ class Assembly:
         """
 
         locations_on_fragments = self.get_locations_on_fragments()
+        for node in locations_on_fragments:
+            fragment_len = len(self.fragments[abs(node) - 1])
+            for side in ['left', 'right']:
+                locations_on_fragments[node][side] = gather_overlapping_locations(
+                    locations_on_fragments[node][side], fragment_len
+                )
+
         allowed_location_pairs = dict()
-        for key in locations_on_fragments:
+        for node in locations_on_fragments:
             if not is_circular:
                 # We add the existing ends of the fragment
-                value = [None] + locations_on_fragments[key] + [None]
+                left = [(None,)] + locations_on_fragments[node]['left']
+                right = locations_on_fragments[node]['right'] + [(None,)]
+
             else:
                 # For circular assemblies, we add the first location at the end
                 # to allow for the last edge to be used
-                value = locations_on_fragments[key] + [locations_on_fragments[key][0]]
-            allowed_location_pairs[key] = list(zip(value, value[1:]))
+                left = locations_on_fragments[node]['left']
+                right = locations_on_fragments[node]['right'][1:] + locations_on_fragments[node]['right'][:1]
+
+            pairs = list()
+            for pair in zip(left, right):
+                pairs += list(_itertools.product(*pair))
+            allowed_location_pairs[node] = pairs
 
         fragment_assembly = edge_representation2subfragment_representation(assembly, is_circular)
         for node, start_location, end_location in fragment_assembly:
-            print(node, start_location, end_location)
             if (start_location, end_location) not in allowed_location_pairs[node]:
-                print(*locations_on_fragments[node])
-                print('here')
                 return False
         return True
 
