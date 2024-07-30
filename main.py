@@ -915,7 +915,8 @@ async def restriction_and_ligation(
 
     # Algorithm used by assembly class
     def algo(x, y, _l):
-        return restriction_ligation_overlap(x, y, enzymes, allow_partial_overlap)
+        # By default, we allow blunt ends
+        return restriction_ligation_overlap(x, y, enzymes, allow_partial_overlap, True)
 
     out_sources = []
     if len(fragments) > 1:
