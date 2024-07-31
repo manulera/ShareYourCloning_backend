@@ -1093,6 +1093,18 @@ def test_restriction_ligation_assembly():
     assert len(products) == 1
     assert str(products[0].seq) == 'aaGAATTCaa'
 
+    # Mixing blunt and normal overhangs
+
+    fragments = [Dseqrecord('aaaGATATCccGAATTCaa'), Dseqrecord('cgcGATATCataGAATTCtta')]
+
+    def algo(x, y, _l):
+        return assembly.restriction_ligation_overlap(x, y, [EcoRI, EcoRV], allow_blunt=True)
+
+    f = assembly.Assembly(fragments, use_fragment_order=False, algorithm=algo)
+    products = f.assemble_circular()
+    assert len(products) == 1
+    assert str(products[0].seq) == 'ATCccGAATTCtatGAT'
+
 
 def test_only_adjacent_edges():
     """Tests that partially digested fragments are not used in the assembly"""

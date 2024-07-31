@@ -1214,7 +1214,6 @@ class GibsonAssemblyTest(unittest.TestCase):
 class RestrictionAndLigationTest(unittest.TestCase):
     def test_restriction_and_ligation(self):
         fragments = [Dseqrecord('AAAGAATTCAAA'), Dseqrecord('CCCCGAATTCCCC')]
-        [format_sequence_genbank(f) for f in fragments]
         json_fragments = [format_sequence_genbank(f) for f in fragments]
         for i, f in enumerate(json_fragments):
             f.id = i + 1
@@ -1232,6 +1231,30 @@ class RestrictionAndLigationTest(unittest.TestCase):
         payload = response.json()
         self.assertEqual(len(payload['sequences']), 4)
         self.assertEqual(len(payload['sources']), 4)
+
+        # Test with blunt ends
+
+        fragments = [Dseqrecord('cccAGCGCTcgcAGCTtat'), Dseqrecord('aaaAGCGCTggaAGCTctt')]
+        json_fragments = [format_sequence_genbank(f) for f in fragments]
+        for i, f in enumerate(json_fragments):
+            f.id = i + 1
+
+        source = RestrictionAndLigationSource(
+            id=0,
+            input=[1, 2],
+            restriction_enzymes=['AfeI', 'AluI'],
+        )
+        data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
+        response = client.post('/restriction_and_ligation', json=data, params={'circular_only': True})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sequences']), 2)
+        self.assertEqual(len(payload['sources']), 2)
+
+        seqs = [read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']]
+        self.assertEqual(str(seqs[0].seq), 'GCTcgcAGGCTggaAG'.upper())
+        self.assertEqual(str(seqs[1].seq), 'GCTcgcAGCTtccAGC'.upper())
 
     def test_golden_gate(self):
         fragments = [
