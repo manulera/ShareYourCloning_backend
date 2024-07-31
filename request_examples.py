@@ -78,3 +78,14 @@ oligonucleotide_hybridization_examples = {
         },
     },
 }
+
+benchling_url_examples = {
+    'default': {
+        'summary': 'Typical example',
+        'value': {
+            'id': 0,
+            'repository_name': 'benchling',
+            'repository_id': 'https://benchling.com/siverson/f/lib_B94YxDHhQh-cidar-moclo-library/seq_kryGidaz-c0062_cd.gb',
+        },
+    },
+}
