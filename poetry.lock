@@ -2103,8 +2103,8 @@ docs = []
 [package.source]
 type = "git"
 url = "https://github.com/genestorian/ShareYourCloning_LinkML"
-reference = "f4d34329806815248194c96812eec5c13a9a4d4d"
-resolved_reference = "f4d34329806815248194c96812eec5c13a9a4d4d"
+reference = "00922ab871e32758b41216c59b50bd3d6a70a0b8"
+resolved_reference = "00922ab871e32758b41216c59b50bd3d6a70a0b8"
 
 [[package]]
 name = "shellingham"
@@ -2562,4 +2562,4 @@ test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "e88d8412ed153737885a6d32330e13e38704549fe6bca7c93917eb8fa1ec0f0c"
+content-hash = "a3fb20ac2890cf1273deecb4026cc0f4831f7c1d700b2af08b3ee013c32bd021"

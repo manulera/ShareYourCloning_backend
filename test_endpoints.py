@@ -24,6 +24,7 @@ from pydantic_models import (
     RestrictionSequenceCut,
     BaseCloningStrategy,
     SimpleSequenceLocation as PydanticSimpleLocation,
+    BenchlingUrlSource,
 )
 from pydna.dseqrecord import Dseqrecord
 import unittest
@@ -1808,6 +1809,48 @@ class RestrictionEnzymeListTest(unittest.TestCase):
         response = client.get('/restriction_enzyme_list')
         assert response.status_code == 200
         assert 'EcoRI' in response.json()['enzyme_names']
+
+
+class BenchlingUrlSourceTest(unittest.TestCase):
+
+    def test_valid_url(self):
+        url = 'https://benchling.com/siverson/f/lib_B94YxDHhQh-cidar-moclo-library/seq_dh1FrJTc-b0015_dh.gb'
+        source = BenchlingUrlSource(id=0, repository_id=url, repository_name='benchling')
+        response = client.post('/repository_id/benchling', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sequences']), 1)
+        self.assertEqual(len(payload['sources']), 1)
+        self.assertEqual(payload['sources'][0], source.model_dump())
+
+    def test_invalid_url(self):
+        # We have to initialize the object with a valid url
+        url = 'https://benchling.com/siverson/f/lib_B94YxDHhQh-cidar-moclo-library/seq_dh1FrJTc-b0015_dh.gb'
+        source_object = BenchlingUrlSource(id=0, repository_id=url, repository_name='benchling')
+
+        # In the dict, we can then edit
+        source_dict = source_object.model_dump()
+
+        # url missing the .gb
+        source_dict['repository_id'] = (
+            'https://benchling.com/siverson/f/lib_B94YxDHhQh-cidar-moclo-library/seq_dh1FrJTc-b0015_dh'
+        )
+        response = client.post('/repository_id/benchling', json=source_dict)
+        self.assertEqual(response.status_code, 422)
+
+        # The /edit url
+        source_dict['repository_id'] = (
+            'https://benchling.com/siverson/f/lib_B94YxDHhQh-cidar-moclo-library/seq_dh1FrJTc-b0015_dh/edit'
+        )
+        response = client.post('/repository_id/benchling', json=source_dict)
+        self.assertEqual(response.status_code, 422)
+
+        # One that matches the pattern but does not exist
+        url = 'https://benchling.com/bluh/blah.gb'
+        source = BenchlingUrlSource(id=0, repository_id=url, repository_name='benchling')
+        response = client.post('/repository_id/benchling', json=source.model_dump())
+        self.assertEqual(response.status_code, 404)
+        self.assertIn('file requested from url not found', response.json()['detail'])
 
 
 if __name__ == '__main__':

@@ -27,6 +27,7 @@ from shareyourcloning_linkml.datamodel import (
     AssemblyJoinComponent as _AssemblyJoinComponent,
     SimpleSequenceLocation as _SimpleSequenceLocation,
     AddGeneIdSource as _AddGeneIdSource,
+    BenchlingUrlSource as _BenchlingUrlSource,
     CloningStrategy as _CloningStrategy,
 )
 from pydna.utils import shift_location as _shift_location
@@ -110,6 +111,10 @@ class RepositoryIdSource(_RepositoryIdSource):
 class AddGeneIdSource(_AddGeneIdSource):
     # TODO: add this to LinkML
     # repository_name: RepositoryName = RepositoryName('addgene')
+    pass
+
+
+class BenchlingUrlSource(_BenchlingUrlSource):
     pass
 
 

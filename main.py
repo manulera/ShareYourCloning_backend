@@ -15,6 +15,7 @@ from dna_functions import (
     read_dsrecord_from_json,
     request_from_addgene,
     oligonucleotide_hybridization_overhangs,
+    get_sequences_from_gb_file_url,
 )
 from pydantic_models import (
     PCRSource,
@@ -37,6 +38,7 @@ from pydantic_models import (
     PolymeraseExtensionSource,
     BaseCloningStrategy,
     PrimerDesignQuery,
+    BenchlingUrlSource,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
@@ -265,11 +267,11 @@ def repository_id_url_error_handler(exception: URLError, source: RepositoryIdSou
     '/repository_id',
     response_model=create_model(
         'RepositoryIdResponse',
-        sources=(list[RepositoryIdSource] | list[AddGeneIdSource], ...),
+        sources=(list[RepositoryIdSource] | list[AddGeneIdSource] | list[BenchlingUrlSource], ...),
         sequences=(list[TextFileSequence], ...),
     ),
 )
-async def get_from_repository_id(source: RepositoryIdSource | AddGeneIdSource):
+async def get_from_repository_id(source: RepositoryIdSource | AddGeneIdSource | BenchlingUrlSource):
     return RedirectResponse(f'/repository_id/{source.repository_name}', status_code=307)
 
 
@@ -312,6 +314,25 @@ def get_from_repository_id_addgene(source: AddGeneIdSource):
             f'The requested plasmid does not have full sequences, see https://www.addgene.org/{source.repository_id}/sequences/',
         )
     return {'sequences': [format_sequence_genbank(s, source.output_name) for s in dseqs], 'sources': sources}
+
+
+@router.post(
+    '/repository_id/benchling',
+    response_model=create_model(
+        'BenchlingUrlResponse', sources=(list[BenchlingUrlSource], ...), sequences=(list[TextFileSequence], ...)
+    ),
+)
+async def get_from_benchling_url(
+    source: Annotated[BenchlingUrlSource, Body(openapi_examples=request_examples.benchling_url_examples)]
+):
+    try:
+        dseqs = get_sequences_from_gb_file_url(source.repository_id)
+        return {
+            'sequences': [format_sequence_genbank(s, source.output_name) for s in dseqs],
+            'sources': [source for s in dseqs],
+        }
+    except HTTPError as exception:
+        repository_id_http_error_handler(exception, source)
 
 
 @router.post(
