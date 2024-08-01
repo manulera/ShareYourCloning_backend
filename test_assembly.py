@@ -11,6 +11,8 @@ from pydna.dseqrecord import Dseqrecord
 from pydna.parsers import parse
 from pydna.utils import eq
 import pytest
+from Bio.Seq import reverse_complement
+from pydna.primer import Primer
 
 
 def test_built():
@@ -807,12 +809,12 @@ def test_fill_dseq():
         assert assembly.fill_dseq(query) == solution
 
 
-def test_pcr_assembly():
+def test_pcr_assembly_normal():
 
-    primer1 = Dseqrecord(Dseq('ACGTACGT'))
-    primer2 = Dseqrecord(Dseq('GCGCGCGC')).reverse_complement()
+    primer1 = Primer('ACGTACGT')
+    primer2 = Primer(reverse_complement('GCGCGCGC'))
 
-    seq = Dseqrecord(Dseq('TTTTACGTACGTAAAAAAGCGCGCGCTTTTT'))
+    seq = Dseqrecord('ccccACGTACGTAAAAAAGCGCGCGCcccc')
 
     asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8)
 
@@ -836,8 +838,8 @@ def test_pcr_assembly():
     assert str(prods[0].seq) == 'ACGTACGTAAAAAAGCGCGCGC'
 
     # Primers with overhangs work
-    primer1 = Dseqrecord(Dseq('TTTACGTACGT'))
-    primer2 = Dseqrecord(Dseq('GCGCGCGCTTT')).reverse_complement()
+    primer1 = Primer('TTTACGTACGT')
+    primer2 = Primer(reverse_complement('GCGCGCGCTTT'))
 
     asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8)
     prods = asm.assemble_linear()
@@ -849,8 +851,8 @@ def test_pcr_assembly():
 @pytest.mark.xfail(reason='U in primers not handled')
 def test_pcr_assembly_uracil():
 
-    primer1 = Dseqrecord('AUUA')
-    primer2 = Dseqrecord('UUAA')
+    primer1 = Primer('AUUA')
+    primer2 = Primer('UUAA')
 
     seq = Dseqrecord(Dseq('aaATTAggccggTTAAaa'))
     asm = assembly.PCRAssembly([primer1, seq, primer2], limit=4)
@@ -858,16 +860,16 @@ def test_pcr_assembly_uracil():
     assert str(asm.assemble_linear()[0].seq) == 'AUUAggccggTTAA'
     assert asm.assemble_linear()[0].seq.crick.startswith('UUAA')
 
-    primer1 = Dseqrecord('ATAUUA')
-    primer2 = Dseqrecord('ATUUAA')
+    primer1 = Primer('ATAUUA')
+    primer2 = Primer('ATUUAA')
     asm = assembly.PCRAssembly([primer1, seq, primer2], limit=6, mismatches=1)
     assert asm.assemble_linear()[0].seq == 'ATAUUAggccggTTAAAT'
 
 
 def test_pcr_assembly_invalid():
 
-    primer1 = Dseqrecord(Dseq('ACGTACGT'))
-    primer2 = Dseqrecord(Dseq('GCGCGCGC')).reverse_complement()
+    primer1 = Primer('ACGTACGT')
+    primer2 = Primer(reverse_complement('GCGCGCGC'))
 
     seq = Dseqrecord(Dseq('TTTTACGTACGTAAAAAAGCGCGCGCTTTTT'))
 
@@ -879,8 +881,8 @@ def test_pcr_assembly_invalid():
 
     # Clashing primers
     seq = Dseqrecord(Dseq('ACGTACGTGCGCGCGC'))
-    primer1 = Dseqrecord(Dseq('ACGTACGTG'))
-    primer2 = Dseqrecord(Dseq('TGCGCGCGC')).reverse_complement()
+    primer1 = Primer('ACGTACGTG')
+    primer2 = Primer(reverse_complement('TGCGCGCGC'))
 
     asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8)
 
@@ -1718,72 +1720,56 @@ def test_alignment_sub_strings():
 
         template_shifted = template.shifted(-shift)
 
-        primer = Dseqrecord('TTAGCAGC')
-        assert [(0, (2 + shift) % len(template), 8)] == assembly.alignment_sub_strings(
-            template_shifted, primer, False, 8, 0
-        )
+        primer = Primer('TTAGCAGC')
+        assert [(0, (2 + shift) % len(template), 8)] == assembly.alignment_sub_strings(primer, template_shifted, 8, 0)
 
         # The alignment is zipped if more bases align than the arg limit
-        assert [(0, (2 + shift) % len(template), 8)] == assembly.alignment_sub_strings(
-            template_shifted, primer, False, 6, 0
-        )
+        assert [(0, (2 + shift) % len(template), 8)] == assembly.alignment_sub_strings(primer, template_shifted, 6, 0)
 
         # Extra primer on the left
-        primer_extra_left = Dseqrecord('GGGCTTTAGCAGC')
+        primer_extra_left = Primer('GGGCTTTAGCAGC')
         assert [(5, (2 + shift) % len(template), 8)] == assembly.alignment_sub_strings(
-            template_shifted, primer_extra_left, False, 8, 0
+            primer_extra_left, template_shifted, 8, 0
         )
 
         # Extra primer on the right does not work
-        primer_extra_right = Dseqrecord('TTAGCAGCA')
-        assert [] == assembly.alignment_sub_strings(template_shifted, primer_extra_right, False, 8, 0)
+        primer_extra_right = Primer('TTAGCAGCA')
+        assert [] == assembly.alignment_sub_strings(primer_extra_right, template_shifted, 8, 0)
 
         # Too short primer does not work either
-        primer2short = Dseqrecord('TAGCAGC')
-        assert [] == assembly.alignment_sub_strings(template_shifted, primer2short, False, 8, 0)
+        primer2short = Primer('TAGCAGC')
+        assert [] == assembly.alignment_sub_strings(primer2short, template_shifted, 8, 0)
 
         # Mismatch
-        primer = Dseqrecord('TaAGCAGC')
-        assert [(2, (4 + shift) % len(template), 6)] == assembly.alignment_sub_strings(
-            template_shifted, primer, False, 8, 1
-        )
-        primer = Dseqrecord('aaAGCAGC')
-        assert [(2, (4 + shift) % len(template), 6)] == assembly.alignment_sub_strings(
-            template_shifted, primer, False, 8, 2
-        )
+        primer = Primer('TaAGCAGC')
+        assert [(2, (4 + shift) % len(template), 6)] == assembly.alignment_sub_strings(primer, template_shifted, 8, 1)
+        primer = Primer('aaAGCAGC')
+        assert [(2, (4 + shift) % len(template), 6)] == assembly.alignment_sub_strings(primer, template_shifted, 8, 2)
 
         # Too many mismatches for argument
-        primer = Dseqrecord('AAAGCAGC')
-        assert [] == assembly.alignment_sub_strings(template_shifted, primer, False, 8, 1)
+        primer = Primer('AAAGCAGC')
+        assert [] == assembly.alignment_sub_strings(primer, template_shifted, 8, 1)
 
         # Reverse primer
-        primer = Dseqrecord('GCGATCGA')
-        assert [((8 + shift) % len(template), 0, 8)] == assembly.alignment_sub_strings(
-            template_shifted, primer, True, 8, 0
-        )
+        primer = Primer('GCGATCGA')
+        assert [((8 + shift) % len(template), 0, 8)] == assembly.alignment_sub_strings(template_shifted, primer, 8, 0)
 
         # The alignment is zipped if more bases align than the arg limit
-        assert [((8 + shift) % len(template), 0, 8)] == assembly.alignment_sub_strings(
-            template_shifted, primer, True, 6, 0
-        )
+        assert [((8 + shift) % len(template), 0, 8)] == assembly.alignment_sub_strings(template_shifted, primer, 6, 0)
 
         # Reverse primer with 5' extension
-        primer = Dseqrecord('GCGATCGAAAAA')
-        assert [((8 + shift) % len(template), 0, 8)] == assembly.alignment_sub_strings(
-            template_shifted, primer, True, 8, 0
-        )
+        primer = Primer('GCGATCGAAAAA')
+        assert [((8 + shift) % len(template), 0, 8)] == assembly.alignment_sub_strings(template_shifted, primer, 8, 0)
 
         # Extra bases on the 3' should not work
-        primer = Dseqrecord('AAGCGATCGA')
-        assert [] == assembly.alignment_sub_strings(template_shifted, primer, True, 8, 0)
+        primer = Primer('AAGCGATCGA')
+        assert [] == assembly.alignment_sub_strings(template_shifted, primer, 8, 0)
 
         # Mismatches
-        primer = Dseqrecord('GCGtTCGA')
-        assert [((8 + shift) % len(template), 0, 3)] == assembly.alignment_sub_strings(
-            template_shifted, primer, True, 8, 1
-        )
+        primer = Primer('GCGtTCGA')
+        assert [((8 + shift) % len(template), 0, 3)] == assembly.alignment_sub_strings(template_shifted, primer, 8, 1)
 
     # Multiple matches
-    primer = Dseqrecord('AATTAGCA')
+    primer = Primer('AATTAGCA')
     template = Dseqrecord('AATTAGCAGCGATCAATTAGCA')
-    assert [(0, 0, 8), (0, 14, 8)] == assembly.alignment_sub_strings(template, primer, False, 8, 1)
+    assert [(0, 0, 8), (0, 14, 8)] == assembly.alignment_sub_strings(primer, template, 8, 1)

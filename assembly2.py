@@ -10,6 +10,8 @@ from pydna._pretty import pretty_str as _pretty_str
 from pydna.common_sub_strings import common_sub_strings as common_sub_strings_str
 from pydna.dseqrecord import Dseqrecord as _Dseqrecord
 from pydna.dseq import Dseq as _Dseq
+from pydna.primer import Primer as _Primer
+from pydna.seqrecord import SeqRecord as _SeqRecord
 import networkx as _nx
 import itertools as _itertools
 from Bio.SeqFeature import SimpleLocation, Location
@@ -197,7 +199,7 @@ def sticky_end_sub_strings(seqx: _Dseqrecord, seqy: _Dseqrecord, limit=0):
     return []
 
 
-def zip_match_leftwards(seqx: _Dseqrecord, seqy: _Dseqrecord, match: tuple[int, int, int]):
+def zip_match_leftwards(seqx: _SeqRecord, seqy: _SeqRecord, match: tuple[int, int, int]):
     """Starting from the rightmost edge of the match, return a new match encompassing the max
     number of bases. This can be used to return a longer match if a primer aligns for longer
     than the limit or a shorter match if there are mismatches. This is convenient to maintain
@@ -218,8 +220,8 @@ def zip_match_leftwards(seqx: _Dseqrecord, seqy: _Dseqrecord, match: tuple[int, 
 
     """
 
-    query_x = dseqrecord2str_for_alignment(seqx)
-    query_y = dseqrecord2str_for_alignment(seqy)
+    query_x = seqrecord2str_for_alignment(seqx)
+    query_y = seqrecord2str_for_alignment(seqy)
 
     # In circular sequences, the match may go beyond the left-most edge of the sequence if it spans
     # the origin:
@@ -232,11 +234,11 @@ def zip_match_leftwards(seqx: _Dseqrecord, seqy: _Dseqrecord, match: tuple[int, 
     # For those cases we shift by length, then go back
 
     end_on_x = match[0] + match[2]
-    if seqx.circular and end_on_x <= len(seqx):
+    if isinstance(seqx, _Dseqrecord) and seqx.circular and end_on_x <= len(seqx):
         end_on_x += len(seqx)
 
     end_on_y = match[1] + match[2]
-    if seqy.circular and end_on_y <= len(seqy):
+    if isinstance(seqy, _Dseqrecord) and seqy.circular and end_on_y <= len(seqy):
         end_on_y += len(seqy)
 
     count = 0
@@ -255,8 +257,8 @@ def zip_match_leftwards(seqx: _Dseqrecord, seqy: _Dseqrecord, match: tuple[int, 
 def zip_match_rightwards(seqx: _Dseqrecord, seqy: _Dseqrecord, match: tuple[int, int, int]):
     """Same as zip_match_leftwards, towards the right."""
 
-    query_x = dseqrecord2str_for_alignment(seqx)
-    query_y = dseqrecord2str_for_alignment(seqy)
+    query_x = seqrecord2str_for_alignment(seqx)
+    query_y = seqrecord2str_for_alignment(seqy)
 
     start_on_x, start_on_y, _ = match
     count = 0
@@ -267,17 +269,28 @@ def zip_match_rightwards(seqx: _Dseqrecord, seqy: _Dseqrecord, match: tuple[int,
     return (start_on_x, start_on_y, count)
 
 
-def dseqrecord2str_for_alignment(dseqr: _Dseqrecord):
+def seqrecord2str_for_alignment(seqr: _SeqRecord):
     """Transform a Dseqrecord to a string representation where U is replaced by T, everything is upper case and
     circular sequences are repeated twice."""
-    out = str(dseqr.seq).upper().replace('U', 'T')
-    if dseqr.circular:
+    out = str(seqr.seq).upper().replace('U', 'T')
+    if isinstance(seqr, _Dseqrecord) and seqr.circular:
         return out * 2
     return out
 
 
-def alignment_sub_strings(template: _Dseqrecord, primer: _Dseqrecord, reverse_primer: bool, limit=25, mismatches=0):
-    """Find alignments of a primer in a template."""
+def alignment_sub_strings(seqx: _Dseqrecord | _Primer, seqy: _Dseqrecord | _Primer, limit=25, mismatches=0):
+    """"""
+
+    if isinstance(seqx, _Primer) and isinstance(seqy, _Dseqrecord):
+        primer = seqx
+        template = seqy
+        reverse_primer = False
+    elif isinstance(seqx, _Dseqrecord) and isinstance(seqy, _Primer):
+        primer = seqy
+        template = seqx
+        reverse_primer = True
+    else:
+        raise ValueError('One of the sequences must be a primer and the other a Dseqrecord')
 
     if len(primer) < limit:
         return []
@@ -285,12 +298,10 @@ def alignment_sub_strings(template: _Dseqrecord, primer: _Dseqrecord, reverse_pr
     if len(template) < len(primer):
         return []
 
-    if reverse_primer:
-        query = dseqrecord2str_for_alignment(primer[:limit])
-    else:
-        query = dseqrecord2str_for_alignment(primer[-limit:])
-
-    subject = dseqrecord2str_for_alignment(template)
+    subject = seqrecord2str_for_alignment(template)
+    query = (
+        seqrecord2str_for_alignment(primer[:limit]) if reverse_primer else seqrecord2str_for_alignment(primer[-limit:])
+    )
 
     re_matches = list(regex.finditer('(' + query + '){s<=' + str(mismatches) + '}', subject, overlapped=True))
     re_matches += list(regex.finditer('(?r)(' + query + '){s<=' + str(mismatches) + '}', subject, overlapped=True))
@@ -497,7 +508,9 @@ def assemble(fragments, assembly, is_circular):
     """Execute an assembly, from the representation returned by get_linear_assemblies or get_circular_assemblies."""
 
     subfragment_representation = edge_representation2subfragment_representation(assembly, is_circular)
-    subfragments = get_assembly_subfragments(fragments, subfragment_representation)
+    # We transform into Dseqrecords (for primers)
+    dseqr_fragments = [f if isinstance(f, _Dseqrecord) else _Dseqrecord(f) for f in fragments]
+    subfragments = get_assembly_subfragments(dseqr_fragments, subfragment_representation)
 
     # if assembly_has_mismatches(fragments, assembly):
     #     if is_circular or len(assembly) != 2:
@@ -1039,7 +1052,7 @@ class Assembly:
 
 
 class PCRAssembly(Assembly):
-    def __init__(self, frags: tuple[_Dseqrecord, _Dseqrecord, _Dseqrecord], limit=25, mismatches=0):
+    def __init__(self, frags: list[_Dseqrecord | _Primer], limit=25, mismatches=0):
 
         # TODO: allow for the same fragment to be included more than once?
         self.G = _nx.MultiDiGraph()
@@ -1052,15 +1065,7 @@ class PCRAssembly(Assembly):
 
         combinations = ((1, 2), (1, -2), (2, -3), (-2, -3))
         for u, v in combinations:
-            reverse_primer = abs(u) == 2
-            if reverse_primer:
-                primer = self.G.nodes[v]['seq']
-                template = self.G.nodes[u]['seq']
-            else:
-                primer = self.G.nodes[u]['seq']
-                template = self.G.nodes[v]['seq']
-
-            matches = alignment_sub_strings(template, primer, reverse_primer, limit, mismatches)
+            matches = alignment_sub_strings(self.G.nodes[u]['seq'], self.G.nodes[v]['seq'], limit, mismatches)
 
             for match in matches:
                 self.add_edges_from_match(match, u, v, self.G.nodes[u]['seq'], self.G.nodes[v]['seq'])
