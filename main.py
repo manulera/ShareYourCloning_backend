@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydna.dseqrecord import Dseqrecord
+from pydna.primer import Primer as PydnaPrimer
 from pydna.dseq import Dseq
 from pydna.crispr import cas9
 from pydantic import conlist, create_model
@@ -642,8 +643,8 @@ async def pcr(
 ):
 
     dseq = read_dsrecord_from_json(sequences[0])
-    forward_primer = next((Dseqrecord(Dseq(p.sequence)) for p in primers if p.id == source.forward_primer), None)
-    reverse_primer = next((Dseqrecord(Dseq(p.sequence)) for p in primers if p.id == source.reverse_primer), None)
+    forward_primer = next((PydnaPrimer(p.sequence) for p in primers if p.id == source.forward_primer), None)
+    reverse_primer = next((PydnaPrimer(p.sequence) for p in primers if p.id == source.reverse_primer), None)
     if forward_primer is None or reverse_primer is None:
         raise HTTPException(404, 'Invalid primer id.')
 
