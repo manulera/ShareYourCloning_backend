@@ -1057,18 +1057,22 @@ class PCRAssembly(Assembly):
         # TODO: allow for the same fragment to be included more than once?
         self.G = _nx.MultiDiGraph()
         # Add positive and negative nodes for forward and reverse fragments
-        forward_primer, template, reverse_primer = frags
-        self.G.add_node(1, seq=forward_primer)
-        self.G.add_node(2, seq=template)
-        self.G.add_node(-2, seq=template.reverse_complement())
-        self.G.add_node(-3, seq=reverse_primer.reverse_complement())
+        self.G.add_nodes_from((i + 1, {'seq': f}) for (i, f) in enumerate(frags))
+        self.G.add_nodes_from((-(i + 1), {'seq': f.reverse_complement()}) for (i, f) in enumerate(frags))
 
-        combinations = ((1, 2), (1, -2), (2, -3), (-2, -3))
-        for u, v in combinations:
-            matches = alignment_sub_strings(self.G.nodes[u]['seq'], self.G.nodes[v]['seq'], limit, mismatches)
+        primer_ids = [i + 1 for i, f in enumerate(frags) if isinstance(f, _Primer)]
+        template_ids = [i + 1 for i, f in enumerate(frags) if not isinstance(f, _Primer)]
 
+        # All combinations of template + primer
+        forward_binding = list(_itertools.product(primer_ids, template_ids))
+        reverse_binding = list(_itertools.product(template_ids, [-i for i in primer_ids]))
+
+        for u, v in forward_binding + reverse_binding:
+            u_seq = self.G.nodes[u]['seq']
+            v_seq = self.G.nodes[v]['seq']
+            matches = alignment_sub_strings(u_seq, v_seq, limit, mismatches)
             for match in matches:
-                self.add_edges_from_match(match, u, v, self.G.nodes[u]['seq'], self.G.nodes[v]['seq'])
+                self.add_edges_from_match(match, u, v, u_seq, v_seq)
 
         # These two are constrained
         self.use_fragment_order = True
