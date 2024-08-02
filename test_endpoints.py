@@ -1581,10 +1581,7 @@ class CrisprTest(unittest.TestCase):
 
         guide = PrimerModel(sequence='AAAAAAAA', id=3, name='guide_1')
 
-        source = CRISPRSource(
-            id=0,
-            guides=[3],
-        )
+        source = CRISPRSource(id=0, guides=[3])
 
         data = {
             'source': source.model_dump(),

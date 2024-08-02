@@ -55,10 +55,7 @@ class StubRouteTest(unittest.TestCase):
         json_seq.id = 1
 
         # One enzyme
-        source = RestrictionEnzymeDigestionSource(
-            id=0,
-            input=[1],
-        )
+        source = RestrictionEnzymeDigestionSource(id=0)
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = self.client.post('/restriction', json=data, params={'restriction_enzymes': ['helloworld']})
         self.assertEqual(response.status_code, 404)

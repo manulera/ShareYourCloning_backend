@@ -81,7 +81,6 @@ class AssemblySourceTest(TestCase):
 
         asm = AssemblySource(
             id=1,
-            input=[2, 3],
             assembly=[join],
         )
 
