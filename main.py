@@ -418,9 +418,7 @@ async def crispr(
     TODO: Support repair through NHEJ
     TODO: Check support for circular DNA targets
     """
-    template, insert = [
-        next((read_dsrecord_from_json(seq) for seq in sequences if seq.id == id), None) for id in source.input
-    ]
+    template, insert = [read_dsrecord_from_json(seq) for seq in sequences]
 
     # TODO: check input method for guide (currently as a primer)
     # TODO: support user input PAM
@@ -582,10 +580,7 @@ async def ligation(
     circular_only: bool = Query(False, description='Only return circular assemblies.'),
 ):
 
-    # Fragments in the same order as in source.input
-    fragments = [
-        next((read_dsrecord_from_json(seq) for seq in sequences if seq.id == id), None) for id in source.input
-    ]
+    fragments = [read_dsrecord_from_json(seq) for seq in sequences]
 
     # Lambda function for code clarity
     def create_source(a, is_circular):
@@ -788,9 +783,6 @@ async def polymerase_extension(
 ):
     """Return the sequence from a polymerase extension reaction"""
 
-    if source.input[0] != sequences[0].id:
-        raise HTTPException(404, 'The provided input does not match the sequence id.')
-
     dseq = read_dsrecord_from_json(sequences[0])
 
     if dseq.circular:
@@ -818,9 +810,7 @@ async def homologous_recombination(
     minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.'),
 ):
     # source.input contains the ids of the sequences in the order template, insert
-    template, insert = [
-        next((read_dsrecord_from_json(seq) for seq in sequences if seq.id == id), None) for id in source.input
-    ]
+    template, insert = [read_dsrecord_from_json(seq) for seq in sequences]
 
     if template.circular:
         raise HTTPException(400, 'The template and the insert must be linear.')

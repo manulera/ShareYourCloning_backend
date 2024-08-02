@@ -1595,7 +1595,6 @@ class PolymeraseExtensionTest(unittest.TestCase):
         cases = [
             (Dseqrecord('ACGTT'), 400, 1),  # No overhangs
             (Dseqrecord('ACGTT', circular=True), 400, 1),  # circular
-            (Dseqrecord(Dseq.from_full_sequence_and_overhangs('ACGTT', 1, 1)), 404, 3),  # wrong id
         ]
 
         for template, status_code, id in cases:
