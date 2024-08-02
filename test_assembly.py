@@ -862,7 +862,32 @@ def test_pcr_overlap_extension():
     assert len(prods) == 1
     assert str(prods[0].seq) == 'gaagccgaaaaggagACGTACGTAAAAAAGCGCGCGC'
 
-    # Splicing-like
+    # Splicing-like (remove the aaaa[...] lowercase bit)
+    seq = Dseqrecord(
+        'ccccCAGTAATGATGGATGACATTCAAAGCACTGATTCTATTGCTGaaaaaaaGTGGTCTGAACTCGGTGTTGAGCCCGCTGATGTTCCACAAcccc'
+    )
+
+    primer1 = Primer('CAGTAATGATGGATGACATT')
+    primer2 = Primer(reverse_complement('AAGCACTGATTCTATTGCTGgtggtctgaac'))
+    primer3 = Primer('tctattgctgGTGGTCTGAACTCGGTGTTG')
+    primer4 = Primer(reverse_complement('AGCCCGCTGATGTTCCACAA'))
+
+    asm = assembly.PCRAssembly([primer1, seq, primer2, primer3, seq, primer4], limit=8, overlap_extension=8)
+    prods = asm.assemble_linear()
+
+    assert len(prods) == 1
+    assert (
+        str(prods[0].seq).upper()
+        == 'CAGTAATGATGGATGACATTCAAAGCACTGATTCTATTGCTGGTGGTCTGAACTCGGTGTTGAGCCCGCTGATGTTCCACAA'
+    )
+
+    # Introducing a mutation
+    seq = Dseqrecord('ccccCAGTAATGATGGATGACATTCAAAGCACTGATTCTATTGCTGGTGGTCTGAACTCGGTGTTGAGCCCGCTGATGTTCCACAAccc')
+
+    primer1 = Primer('CAGTAATGATGGATGACATT')
+    primer2 = Primer('GGATGACATTCAAAGCACTGATTCTATTagcGGTGGTCTGAACTC')
+    primer3 = Primer('GTGGTCTGAACTCGGTGTTG')
+    primer4 = Primer('CCTACTGTAAGTTTCGTGACTAAGATAAtcgCCACCAGACTTGAG')
 
 
 @pytest.mark.xfail(reason='U in primers not handled')

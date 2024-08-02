@@ -1058,20 +1058,34 @@ class Assembly:
 class PCRAssembly(Assembly):
     def __init__(self, frags: list[_Dseqrecord | _Primer], limit=25, mismatches=0, overlap_extension=0):
 
+        format_error = ValueError('PCRAssembly assembly must be initialised with a series of primer, template, primer')
+        # Validate the inputs: should be a series of primer, template, primer
+        if len(frags) % 3 != 0:
+            raise format_error
+
+        for i, f in enumerate(frags):
+            if i % 3 in [0, 2]:
+                if not isinstance(f, _Primer):
+                    raise format_error
+            elif isinstance(f, _Primer):
+                raise format_error
+
         # TODO: allow for the same fragment to be included more than once?
         self.G = _nx.MultiDiGraph()
         # Add positive and negative nodes for forward and reverse fragments
         self.G.add_nodes_from((i + 1, {'seq': f}) for (i, f) in enumerate(frags))
         self.G.add_nodes_from((-(i + 1), {'seq': f.reverse_complement()}) for (i, f) in enumerate(frags))
 
-        primer_ids = [i + 1 for i, f in enumerate(frags) if isinstance(f, _Primer)]
-        template_ids = [i + 1 for i, f in enumerate(frags) if not isinstance(f, _Primer)]
+        pairs = list()
+        primer_ids = list()
+        for i in range(0, len(frags), 3):
+            # primer, template, primer
+            p1, t, p2 = (i + 1, i + 2, i + 3)
+            primer_ids += [p1, p2]
+            pairs += list(_itertools.product([p1, p2], [t, -t]))
+            pairs += list(_itertools.product([t, -t], [-p1, -p2]))
 
-        # All combinations of template + primer
-        forward_binding = list(_itertools.product(primer_ids, template_ids))
-        reverse_binding = list(_itertools.product(template_ids, [-i for i in primer_ids]))
-
-        for u, v in forward_binding + reverse_binding:
+        for u, v in pairs:
             u_seq = self.G.nodes[u]['seq']
             v_seq = self.G.nodes[v]['seq']
             matches = alignment_sub_strings(u_seq, v_seq, limit, mismatches)
@@ -1109,6 +1123,9 @@ class PCRAssembly(Assembly):
     def primers_clash(self, assembly):
         edge_pairs = zip(assembly, assembly[1:])
         for (_u1, _v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
+            # Only for primer joins
+            if not isinstance(self.fragments[abs(_v1) - 1], _Dseqrecord):
+                continue
             if _locations_overlap(start_location, end_location, len(self.fragments[abs(_v1) - 1])):
                 return True
         return False
