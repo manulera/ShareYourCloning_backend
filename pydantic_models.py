@@ -275,25 +275,7 @@ class AssemblySource(_AssemblySource, AssemblySourceCommonClass):
 
 
 class PCRSource(_PCRSource, AssemblySourceCommonClass):
-    """Documents a PCR, and the selection of one of the products."""
-
-    # TODO: add this to LinkML
-    # input: conlist(int, min_length=1, max_length=1)
-    # circular has to be false
-
-    @classmethod
-    def from_assembly(
-        cls,
-        assembly: list[tuple[int, int, Location, Location]],
-        input: list[int],
-        id: int,
-        forward_primer: int,
-        reverse_primer: int,
-    ):
-        """Creates a PCRSource from an assembly, input and id"""
-        return super().from_assembly(
-            assembly, input, id, False, forward_primer=forward_primer, reverse_primer=reverse_primer
-        )
+    pass
 
 
 class LigationSource(_LigationSource, AssemblySourceCommonClass):

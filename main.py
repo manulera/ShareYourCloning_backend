@@ -641,12 +641,11 @@ async def pcr(
     minimal_annealing: int = Query(20, description='The minimal annealing length for each primer.'),
     allowed_mismatches: int = Query(0, description='The number of mismatches allowed'),
 ):
+    if len(primers) != len(sequences) * 2:
+        raise HTTPException(400, 'The number of primers should be twice the number of sequences.')
 
-    dseq = read_dsrecord_from_json(sequences[0])
-    forward_primer = next((PydnaPrimer(p.sequence) for p in primers if p.id == source.forward_primer), None)
-    reverse_primer = next((PydnaPrimer(p.sequence) for p in primers if p.id == source.reverse_primer), None)
-    if forward_primer is None or reverse_primer is None:
-        raise HTTPException(404, 'Invalid primer id.')
+    pydna_sequences = [read_dsrecord_from_json(s) for s in sequences]
+    pydna_primers = [PydnaPrimer(p.sequence) for p in primers]
 
     # TODO: This may have to be re-written if we allow mismatches
     # If an assembly is provided, we ignore minimal_annealing
@@ -660,7 +659,13 @@ async def pcr(
         # allowed mistmatches
         # TODO: tests for this
         allowed_mismatches = 0
-    fragments = [forward_primer, dseq, reverse_primer]
+
+    # Arrange the fragments in the order primer, sequence, primer
+    fragments = list()
+    while len(pydna_primers):
+        fragments.append(pydna_primers.pop(0))
+        fragments.append(pydna_sequences.pop(0))
+        fragments.append(pydna_primers.pop(0))
 
     asm = PCRAssembly(fragments, limit=minimal_annealing, mismatches=allowed_mismatches)
     try:
@@ -668,19 +673,17 @@ async def pcr(
     except ValueError as e:
         raise HTTPException(400, *e.args)
 
-    # TODO: this might belong elsewhere
-    # In the case where both primers are identical, remove
+    # Edge case: where both primers are identical, remove
     # duplicate assemblies that represent just reverse complement
-    if source.forward_primer == source.reverse_primer:
-        possible_assemblies = [a for a in possible_assemblies if a[0][1] != -2]
+    if len(sequences) == 1 and primers[0].id == primers[1].id:
+        possible_assemblies = [a for a in possible_assemblies if (a[0][0] == 1 and a[0][1] == 2)]
 
     out_sources = [
         PCRSource.from_assembly(
             id=source.id,
             input=source.input,
             assembly=a,
-            forward_primer=source.forward_primer,
-            reverse_primer=source.reverse_primer,
+            circular=False,
         )
         for a in possible_assemblies
     ]

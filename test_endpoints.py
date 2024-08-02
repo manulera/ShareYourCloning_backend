@@ -879,8 +879,6 @@ class PCRTest(unittest.TestCase):
         submitted_source = PCRSource(
             id=0,
             input=[1],
-            forward_primer=2,
-            reverse_primer=3,
         )
 
         primer_fwd = PrimerModel(sequence='ACGTACGT', id=2, name='forward')
@@ -906,8 +904,6 @@ class PCRTest(unittest.TestCase):
 
         # The sequence matches what we expect
         self.assertEqual(str(dseq1.seq), 'ACGTACGTAAAAAAGCGCGCGC')
-        self.assertEqual(source1.forward_primer, primer_fwd.id)
-        self.assertEqual(source1.reverse_primer, primer_rvs.id)
 
         # Now we submit the deterministic PCR (we already know which fragment we want)
 
@@ -943,8 +939,6 @@ class PCRTest(unittest.TestCase):
         submitted_source = PCRSource(
             id=0,
             input=[1],
-            forward_primer=2,
-            reverse_primer=2,
         )
 
         primer_fwd = PrimerModel(sequence='ACGTACGT', id=2, name='forward')
@@ -952,7 +946,7 @@ class PCRTest(unittest.TestCase):
         data = {
             'source': submitted_source.model_dump(),
             'sequences': [json_seq.model_dump()],
-            'primers': [primer_fwd.model_dump()],
+            'primers': [primer_fwd.model_dump(), primer_fwd.model_dump()],
         }
 
         response = client.post('/pcr', json=data, params={'minimal_annealing': 8})
@@ -970,7 +964,7 @@ class PCRTest(unittest.TestCase):
         json_seq = format_sequence_genbank(template)
         json_seq.id = 1
 
-        submitted_source = PCRSource(id=0, input=[1], forward_primer=2, reverse_primer=3)
+        submitted_source = PCRSource(id=0, input=[1])
 
         primer_fwd = PrimerModel(sequence='CCCCCCCC', id=2, name='forward')
 
@@ -996,12 +990,11 @@ class PCRTest(unittest.TestCase):
         submitted_source = PCRSource.from_assembly(
             id=0,
             input=[1],
-            forward_primer=2,
-            reverse_primer=3,
             assembly=[
                 (1, 2, SimpleLocation(0, 8), SimpleLocation(4, 12)),
                 (2, -3, SimpleLocation(18, 26), SimpleLocation(0, 8)),
             ],
+            circular=False,
         )
 
         data = {
@@ -1017,12 +1010,11 @@ class PCRTest(unittest.TestCase):
         submitted_source = PCRSource.from_assembly(
             id=0,
             input=[1],
-            forward_primer=2,
-            reverse_primer=3,
             assembly=[
                 (2, -3, SimpleLocation(18, 26), SimpleLocation(0, 8)),
                 (1, 2, SimpleLocation(0, 8), SimpleLocation(4, 12)),
             ],
+            circular=False,
         )
 
         data = {
@@ -1044,8 +1036,6 @@ class PCRTest(unittest.TestCase):
         submitted_source = PCRSource(
             id=0,
             input=[1],
-            forward_primer=2,
-            reverse_primer=3,
         )
 
         primer_fwd = PrimerModel(sequence='ACGTACGTG', id=2, name='forward')
