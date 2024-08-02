@@ -93,11 +93,8 @@ class AssemblySourceTest(TestCase):
             (1, 2, SimpleLocation(0, 10), SimpleLocation(10, 20)),
             (2, 3, SimpleLocation(0, 10), SimpleLocation(10, 20)),
         ]
-        # Dummy input to double-check it's not used
-        input = []
+
         fragments = [DummyFragment(4), DummyFragment(5), DummyFragment(6)]
-        assembly_source = AssemblySource.from_assembly(
-            assembly=assembly, fragments=fragments, id=0, circular=False, input=input
-        )
+        assembly_source = AssemblySource.from_assembly(assembly=assembly, fragments=fragments, id=0, circular=False)
 
         assert [str(join) for join in assembly_source.assembly] == ['4[0:10]:5[10:20]', '5[0:10]:6[10:20]']

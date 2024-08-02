@@ -348,7 +348,6 @@ class LigationTest(unittest.TestCase):
         # Assign ids to define deterministic assembly
         source = LigationSource.from_assembly(
             id=0,
-            input=[1, 2],
             assembly=[(1, 2, SimpleLocation(7, 11), SimpleLocation(0, 4))],
             circular=False,
             fragments=model_seqs,
@@ -372,7 +371,6 @@ class LigationTest(unittest.TestCase):
         # Check that the inverse assembly will not pass
         source = LigationSource.from_assembly(
             id=0,
-            input=[2, 1],
             assembly=[(1, 2, SimpleLocation(8, 11), SimpleLocation(1, 4))],
             circular=False,
             fragments=model_seqs,
@@ -386,7 +384,6 @@ class LigationTest(unittest.TestCase):
         # Check that the circular assembly does not pass either
         source = LigationSource.from_assembly(
             id=0,
-            input=[1, 2],
             assembly=[(1, 2, SimpleLocation(7, 11), SimpleLocation(0, 4))],
             circular=True,
             fragments=model_seqs,
@@ -414,10 +411,7 @@ class LigationTest(unittest.TestCase):
         json_seqs = [seq.model_dump() for seq in json_seqs]
 
         # We don't set the fragments_inverted, so we will get all possibilities (in this case only one)
-        source = LigationSource(
-            id=0,
-            input=[1, 2],
-        )
+        source = LigationSource(id=0)
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post('/ligation', json=data)
         payload = response.json()
@@ -445,10 +439,7 @@ class LigationTest(unittest.TestCase):
         json_seqs[1].id = 2
         json_seqs = [seq.model_dump() for seq in json_seqs]
 
-        source = LigationSource(
-            id=0,
-            input=[1, 2],
-        )
+        source = LigationSource(id=0)
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post('/ligation', json=data)
         payload = response.json()
@@ -469,10 +460,7 @@ class LigationTest(unittest.TestCase):
         json_seqs = [format_sequence_genbank(fragment)]
         json_seqs[0].id = 1
         json_seqs = [seq.model_dump() for seq in json_seqs]
-        source = LigationSource(
-            id=0,
-            input=[1],
-        )
+        source = LigationSource(id=0)
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post('/ligation', json=data)
         self.assertEqual(response.status_code, 200)
@@ -488,10 +476,7 @@ class LigationTest(unittest.TestCase):
         json_seqs[0].id = 1
         json_seqs[1].id = 2
         json_seqs = [seq.model_dump() for seq in json_seqs]
-        source = LigationSource(
-            id=0,
-            input=[1, 2],
-        )
+        source = LigationSource(id=0)
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post('/ligation', json=data, params={'blunt': True})
         self.assertEqual(response.status_code, 200)
@@ -518,10 +503,7 @@ class LigationTest(unittest.TestCase):
         json_seqs = [format_sequence_genbank(seq) for seq in seqs]
         json_seqs[0].id = 1
         json_seqs = [seq.model_dump() for seq in json_seqs]
-        source = LigationSource(
-            id=0,
-            input=[1],
-        )
+        source = LigationSource(id=0)
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post('/ligation', json=data, params={'blunt': True})
         self.assertEqual(response.status_code, 200)
@@ -541,10 +523,7 @@ class LigationTest(unittest.TestCase):
         json_seqs[0].id = 1
         json_seqs[1].id = 2
         json_seqs = [seq.model_dump() for seq in json_seqs]
-        source = LigationSource(
-            id=0,
-            input=[1, 2],
-        )
+        source = LigationSource(id=0)
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post('/ligation', json=data, params={'blunt': True})
         self.assertEqual(response.status_code, 200)
@@ -563,20 +542,14 @@ class RestrictionTest(unittest.TestCase):
         json_seq.id = 1
 
         # One enzyme
-        source = RestrictionEnzymeDigestionSource(
-            id=0,
-            input=[1],
-        )
+        source = RestrictionEnzymeDigestionSource(id=0)
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data, params={'restriction_enzymes': ['helloworld']})
         self.assertEqual(response.status_code, 404)
         self.assertTrue(response.json()['detail'] == 'These enzymes do not exist: helloworld')
 
         # More than one
-        source = RestrictionEnzymeDigestionSource(
-            id=0,
-            input=[1],
-        )
+        source = RestrictionEnzymeDigestionSource(id=0)
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data, params={'restriction_enzymes': ['helloworld', 'byebye']})
         self.assertEqual(response.status_code, 404)
@@ -589,30 +562,21 @@ class RestrictionTest(unittest.TestCase):
         json_seq.id = 1
 
         # See if we get the right responses
-        source = RestrictionEnzymeDigestionSource(
-            id=0,
-            input=[1],
-        )
+        source = RestrictionEnzymeDigestionSource(id=0)
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data, params={'restriction_enzymes': ['FbaI']})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()['detail'], 'These enzymes do not cut: FbaI')
 
         # Returns when one does not cut
-        source = RestrictionEnzymeDigestionSource(
-            id=0,
-            input=[1],
-        )
+        source = RestrictionEnzymeDigestionSource(id=0)
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data, params={'restriction_enzymes': ['EcoRI', 'BamHI']})
         self.assertEqual(response.status_code, 400)
         self.assertTrue(response.json()['detail'] == 'These enzymes do not cut: BamHI')
 
         # Returns all that don't cut
-        source = RestrictionEnzymeDigestionSource(
-            id=0,
-            input=[1],
-        )
+        source = RestrictionEnzymeDigestionSource(id=0)
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data, params={'restriction_enzymes': ['BamHI', 'FbaI']})
         self.assertEqual(response.status_code, 400)
@@ -626,10 +590,7 @@ class RestrictionTest(unittest.TestCase):
         json_seq.id = 1
 
         # See if we get the right responses
-        source = RestrictionEnzymeDigestionSource(
-            id=0,
-            input=[1],
-        )
+        source = RestrictionEnzymeDigestionSource(id=0)
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data, params={'restriction_enzymes': ['EcoRI']})
         payload = response.json()
@@ -656,7 +617,7 @@ class RestrictionTest(unittest.TestCase):
 
         # Now we specify the output
         source = RestrictionEnzymeDigestionSource(
-            id=0, input=[1], left_edge=None, right_edge=RestrictionSequenceCut.from_cutsite_tuple(((7, -4), 'EcoRI'))
+            id=0, left_edge=None, right_edge=RestrictionSequenceCut.from_cutsite_tuple(((7, -4), 'EcoRI'))
         )
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data)
@@ -681,10 +642,7 @@ class RestrictionTest(unittest.TestCase):
         json_seq.id = 1
 
         # See if we get the right responses
-        source = RestrictionEnzymeDigestionSource(
-            id=0,
-            input=[1],
-        )
+        source = RestrictionEnzymeDigestionSource(id=0)
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data, params={'restriction_enzymes': ['EcoRI']})
         payload = response.json()
@@ -719,7 +677,6 @@ class RestrictionTest(unittest.TestCase):
             # See if we get the right responses
             source = RestrictionEnzymeDigestionSource(
                 id=0,
-                input=[1],
             )
             data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
             response = client.post('/restriction', json=data, params={'restriction_enzymes': ['EcoRI']})
@@ -750,10 +707,7 @@ class RestrictionTest(unittest.TestCase):
         json_seq.id = 1
 
         # We try EcoRV, which gives blunt ends
-        source = RestrictionEnzymeDigestionSource(
-            id=0,
-            input=[1],
-        )
+        source = RestrictionEnzymeDigestionSource(id=0)
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data, params={'restriction_enzymes': ['BamHI', 'EcoRV']})
         payload = response.json()
@@ -793,7 +747,7 @@ class RestrictionTest(unittest.TestCase):
         # Submitting the known fragments
 
         for i in range(len(edges)):
-            source = RestrictionEnzymeDigestionSource(id=0, input=[1], left_edge=edges[i][0], right_edge=edges[i][1])
+            source = RestrictionEnzymeDigestionSource(id=0, left_edge=edges[i][0], right_edge=edges[i][1])
             data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
             response = client.post('/restriction', json=data)
             payload = response.json()
@@ -814,10 +768,7 @@ class RestrictionTest(unittest.TestCase):
         json_seq.id = 1
 
         # We try EcoRV, which gives blunt ends
-        source = RestrictionEnzymeDigestionSource(
-            id=0,
-            input=[1],
-        )
+        source = RestrictionEnzymeDigestionSource(id=0)
         data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
         response = client.post('/restriction', json=data, params={'restriction_enzymes': ['BamHI', 'EcoRV']})
         payload = response.json()
@@ -862,7 +813,6 @@ class RestrictionTest(unittest.TestCase):
         for i in range(len(edges)):
             source = RestrictionEnzymeDigestionSource(
                 id=0,
-                input=[1],
                 left_edge=edges[i][0],
                 right_edge=edges[i][1],
             )
@@ -888,10 +838,7 @@ class PCRTest(unittest.TestCase):
         json_seq = format_sequence_genbank(template)
         json_seq.id = 1
 
-        submitted_source = PCRSource(
-            id=0,
-            input=[1],
-        )
+        submitted_source = PCRSource(id=0)
 
         primer_fwd = PrimerModel(sequence='ACGTACGT', id=2, name='forward')
 
@@ -948,10 +895,7 @@ class PCRTest(unittest.TestCase):
         json_seq = format_sequence_genbank(template)
         json_seq.id = 1
 
-        submitted_source = PCRSource(
-            id=0,
-            input=[1],
-        )
+        submitted_source = PCRSource(id=0)
 
         primer_fwd = PrimerModel(sequence='ACGTACGT', id=2, name='forward')
 
@@ -1001,7 +945,6 @@ class PCRTest(unittest.TestCase):
 
         submitted_source = PCRSource.from_assembly(
             id=0,
-            input=[1],
             assembly=[
                 (1, 2, SimpleLocation(0, 8), SimpleLocation(4, 12)),
                 (2, -3, SimpleLocation(18, 26), SimpleLocation(0, 8)),
@@ -1022,7 +965,6 @@ class PCRTest(unittest.TestCase):
         # This is the wrong annealing info
         submitted_source = PCRSource.from_assembly(
             id=0,
-            input=[1],
             assembly=[
                 (2, -3, SimpleLocation(18, 26), SimpleLocation(0, 8)),
                 (1, 2, SimpleLocation(0, 8), SimpleLocation(4, 12)),
@@ -1047,10 +989,7 @@ class PCRTest(unittest.TestCase):
         json_seq = format_sequence_genbank(template)
         json_seq.id = 1
 
-        submitted_source = PCRSource(
-            id=0,
-            input=[1],
-        )
+        submitted_source = PCRSource(id=0)
 
         primer_fwd = PrimerModel(sequence='ACGTACGTG', id=2, name='forward')
 
@@ -1123,10 +1062,7 @@ class HomologousRecombinationTest(unittest.TestCase):
         json_insert = format_sequence_genbank(insert)
         json_insert.id = 2
         # One enzyme
-        source = HomologousRecombinationSource(
-            id=0,
-            input=[1, 2],
-        )
+        source = HomologousRecombinationSource(id=0)
         data = {'source': source.model_dump(), 'sequences': [json_template.model_dump(), json_insert.model_dump()]}
         response = client.post('/homologous_recombination', params={'minimal_homology': 5}, json=data)
         self.assertEqual(response.status_code, 200)
@@ -1163,10 +1099,7 @@ class GibsonAssemblyTest(unittest.TestCase):
         for i, f in enumerate(json_fragments):
             f.id = i + 1
 
-        source = GibsonAssemblySource(
-            id=0,
-            input=[1, 2, 3],
-        )
+        source = GibsonAssemblySource(id=0)
 
         data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
         response = client.post('/gibson_assembly', json=data, params={'minimal_homology': 4})
@@ -1184,10 +1117,7 @@ class GibsonAssemblyTest(unittest.TestCase):
         for i, f in enumerate(json_fragments):
             f.id = i + 1
 
-        source = GibsonAssemblySource(
-            id=0,
-            input=[1],
-        )
+        source = GibsonAssemblySource(id=0)
         data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
         response = client.post('/gibson_assembly', json=data, params={'minimal_homology': 7})
 
@@ -1205,10 +1135,7 @@ class GibsonAssemblyTest(unittest.TestCase):
         for i, f in enumerate(json_fragments):
             f.id = i + 1
 
-        source = GibsonAssemblySource(
-            id=0,
-            input=[1, 2],
-        )
+        source = GibsonAssemblySource(id=0)
 
         data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
         response = client.post('/gibson_assembly', json=data, params={'minimal_homology': 4, 'circular_only': True})
@@ -1225,7 +1152,6 @@ class RestrictionAndLigationTest(unittest.TestCase):
 
         source = RestrictionAndLigationSource(
             id=0,
-            input=[1, 2],
             restriction_enzymes=['EcoRI'],
         )
 
@@ -1246,7 +1172,6 @@ class RestrictionAndLigationTest(unittest.TestCase):
 
         source = RestrictionAndLigationSource(
             id=0,
-            input=[1, 2],
             restriction_enzymes=['AfeI', 'AluI'],
         )
         data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
@@ -1275,7 +1200,6 @@ class RestrictionAndLigationTest(unittest.TestCase):
 
         source = RestrictionAndLigationSource(
             id=0,
-            input=[1, 2, 3, 4],
             restriction_enzymes=['BsaI'],
         )
 
@@ -1295,7 +1219,6 @@ class RestrictionAndLigationTest(unittest.TestCase):
 
         source = RestrictionAndLigationSource(
             id=0,
-            input=[1],
             restriction_enzymes=['EcoRI'],
         )
 
@@ -1334,7 +1257,6 @@ class RestrictionAndLigationTest(unittest.TestCase):
         # Enzyme that does not exist
         source = RestrictionAndLigationSource(
             id=0,
-            input=[1],
             restriction_enzymes=['dummy'],
         )
 
@@ -1345,7 +1267,6 @@ class RestrictionAndLigationTest(unittest.TestCase):
         # enzyme that does not cut
         source = RestrictionAndLigationSource(
             id=0,
-            input=[1],
             restriction_enzymes=['HindIII'],
         )
 
@@ -1575,7 +1496,6 @@ class PolymeraseExtensionTest(unittest.TestCase):
 
         source = PolymeraseExtensionSource(
             id=2,
-            input=[1],
         )
 
         data = {'source': source.model_dump(), 'sequences': [json_template.model_dump()]}
@@ -1603,7 +1523,6 @@ class PolymeraseExtensionTest(unittest.TestCase):
 
             source = PolymeraseExtensionSource(
                 id=2,
-                input=[1],
             )
 
             data = {'source': source.model_dump(), 'sequences': [json_template.model_dump()]}
@@ -1626,7 +1545,6 @@ class CrisprTest(unittest.TestCase):
         guide = PrimerModel(sequence='ttcaatgcaaacagtaatga', id=3, name='guide_1')
         source = CRISPRSource(
             id=0,
-            input=[1, 2],
             guides=[3],
         )
         data = {
@@ -1665,7 +1583,6 @@ class CrisprTest(unittest.TestCase):
 
         source = CRISPRSource(
             id=0,
-            input=[1, 2],
             guides=[3],
         )
 

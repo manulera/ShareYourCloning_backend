@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from pydantic import BaseModel, Field, model_validator
 from enum import Enum
 from typing import Optional, List
 from Bio.SeqFeature import SeqFeature, Location, SimpleLocation as BioSimpleLocation
@@ -68,25 +68,6 @@ class SeqFeatureModel(BaseModel):
 
 
 # Sources =========================================
-
-
-class Source(BaseModel):
-    """A class to represent sources of DNA"""
-
-    # Fields required to execute a source step
-    id: Optional[int] = Field(None, description='Unique identifier of the source')
-    kind: str = Field('source', description='The kind entity (always equal to "source"). Should probably be removed.')
-    input: list[int] = Field(
-        [],
-        description='Identifiers of the sequences that are an input to this source. \
-                             If the source represents external import of a sequence, it\'s empty.',
-    )
-    output: Optional[int] = Field(None, description='Identifier of the sequence that is an output of this source.')
-    type: Optional[SourceType] = Field(..., description='The type source (PCR, restriction, etc.)')
-    info: dict = Field(
-        {}, description='Additional information about the source (not used much yet, and probably should be removed)'
-    )
-    model_config = ConfigDict(extra='forbid')
 
 
 class ManuallyTypedSource(_ManuallyTypedSource):
@@ -276,7 +257,6 @@ class AssemblySourceCommonClass:
     def from_assembly(
         cls,
         assembly: list[tuple[int, int, Location, Location]],
-        input: list[int],
         id: int,
         circular: bool,
         fragments: list[_SeqRecord],
@@ -291,8 +271,8 @@ class AssemblySourceCommonClass:
         ids_assembly = [(pos2id(u), pos2id(v), lu, lv) for u, v, lu, lv in assembly]
         return cls(
             id=id,
+            input=fragment_ids,
             assembly=[AssemblyJoin.from_join_tuple(join) for join in ids_assembly],
-            input=input,
             circular=circular,
             **kwargs,
         )
@@ -335,12 +315,11 @@ class CRISPRSource(_CRISPRSource, AssemblySourceCommonClass):
     def from_assembly(
         cls,
         assembly: list[tuple[int, int, Location, Location]],
-        input: list[int],
         id: int,
         fragments: list[_SeqRecord],
         guides: list[int],
     ):
-        return super().from_assembly(assembly, input, id, False, fragments, guides=guides)
+        return super().from_assembly(assembly, id, False, fragments, guides=guides)
 
 
 class RestrictionAndLigationSource(_RestrictionAndLigationSource, AssemblySourceCommonClass):
@@ -351,13 +330,12 @@ class RestrictionAndLigationSource(_RestrictionAndLigationSource, AssemblySource
     def from_assembly(
         cls,
         assembly: list[tuple[int, int, Location, Location]],
-        input: list[int],
         circular: bool,
         id: int,
         fragments: list[_SeqRecord],
         restriction_enzymes=list['str'],
     ):
-        return super().from_assembly(assembly, input, id, circular, fragments, restriction_enzymes=restriction_enzymes)
+        return super().from_assembly(assembly, id, circular, fragments, restriction_enzymes=restriction_enzymes)
 
 
 class OligoHybridizationSource(_OligoHybridizationSource):

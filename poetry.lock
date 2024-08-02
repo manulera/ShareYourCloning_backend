@@ -2104,7 +2104,7 @@ docs = []
 type = "git"
 url = "https://github.com/genestorian/ShareYourCloning_LinkML"
 reference = "new_PCR_model"
-resolved_reference = "50c2075ee1e4b85f192af053c2682a479ca96464"
+resolved_reference = "d693f7c9ccd294a325dc9bf5be00ea8bbdad0814"
 
 [[package]]
 name = "shellingham"

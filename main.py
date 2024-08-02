@@ -468,9 +468,7 @@ async def crispr(
     # meant for linear DNA
 
     out_sources = [
-        CRISPRSource.from_assembly(
-            id=source.id, input=source.input, assembly=a, guides=source.guides, fragments=fragments
-        )
+        CRISPRSource.from_assembly(id=source.id, assembly=a, guides=source.guides, fragments=fragments)
         for a in valid_assemblies
     ]
 
@@ -584,9 +582,7 @@ async def ligation(
 
     # Lambda function for code clarity
     def create_source(a, is_circular):
-        return LigationSource.from_assembly(
-            assembly=a, circular=is_circular, id=source.id, input=source.input, fragments=fragments
-        )
+        return LigationSource.from_assembly(assembly=a, circular=is_circular, id=source.id, fragments=fragments)
 
     # If the assembly is known, the blunt parameter is ignored, and we set the algorithm type from the assembly
     # (blunt ligations have features without length)
@@ -680,7 +676,6 @@ async def pcr(
     out_sources = [
         PCRSource.from_assembly(
             id=source.id,
-            input=source.input,
             assembly=a,
             circular=False,
             fragments=fragments,
@@ -809,7 +804,7 @@ async def homologous_recombination(
     sequences: conlist(TextFileSequence, min_length=2, max_length=2),
     minimal_homology: int = Query(40, description='The minimum homology between the template and the insert.'),
 ):
-    # source.input contains the ids of the sequences in the order template, insert
+
     template, insert = [read_dsrecord_from_json(seq) for seq in sequences]
 
     if template.circular:
@@ -829,7 +824,7 @@ async def homologous_recombination(
 
     out_sources = [
         HomologousRecombinationSource.from_assembly(
-            id=source.id, input=source.input, assembly=a, circular=False, fragments=[template, insert]
+            id=source.id, assembly=a, circular=False, fragments=[template, insert]
         )
         for a in possible_assemblies
     ]
@@ -864,9 +859,7 @@ async def gibson_assembly(
 
     # Lambda function for code clarity
     def create_source(a, is_circular):
-        return GibsonAssemblySource.from_assembly(
-            assembly=a, circular=is_circular, id=source.id, input=source.input, fragments=fragments
-        )
+        return GibsonAssemblySource.from_assembly(assembly=a, circular=is_circular, id=source.id, fragments=fragments)
 
     out_sources = []
     if len(fragments) > 1:
@@ -935,7 +928,6 @@ async def restriction_and_ligation(
             assembly=a,
             circular=is_circular,
             id=source.id,
-            input=source.input,
             restriction_enzymes=source.restriction_enzymes,
             fragments=fragments,
         )
