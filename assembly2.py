@@ -508,8 +508,19 @@ def assemble_mismatch_PCR(subfragments, subfragment_representation):
     temp_loc_left, temp_loc_right = subfragment_representation[1]
 
 
-def assemble(fragments, assembly, is_circular):
+def assembly_is_circular(assembly, fragments):
+    if assembly[0][0] != assembly[-1][1]:
+        return False
+    elif isinstance(fragments[abs(assembly[0][0]) - 1], _Dseqrecord) and fragments[abs(assembly[0][0]) - 1].circular:
+        return True
+    else:
+        return _location_boundaries(assembly[0][2])[0] > _location_boundaries(assembly[-1][3])[0]
+
+
+def assemble(fragments, assembly):
     """Execute an assembly, from the representation returned by get_linear_assemblies or get_circular_assemblies."""
+
+    is_circular = assembly_is_circular(assembly, fragments)
 
     subfragment_representation = edge_representation2subfragment_representation(assembly, is_circular)
     # We transform into Dseqrecords (for primers)
@@ -941,17 +952,17 @@ class Assembly:
     def assemble_linear(self, only_adjacent_edges: bool = False):
         """Assemble linear constructs, from assemblies returned by self.get_linear_assemblies."""
         assemblies = self.get_linear_assemblies(only_adjacent_edges)
-        return [assemble(self.fragments, a, False) for a in assemblies]
+        return [assemble(self.fragments, a) for a in assemblies]
 
     def assemble_circular(self, only_adjacent_edges: bool = False):
         """Assemble circular constructs, from assemblies returned by self.get_circular_assemblies."""
         assemblies = self.get_circular_assemblies(only_adjacent_edges)
-        return [assemble(self.fragments, a, True) for a in assemblies]
+        return [assemble(self.fragments, a) for a in assemblies]
 
     def assemble_insertion(self, only_adjacent_edges: bool = False):
         """Assemble insertion constructs, from assemblies returned by self.get_insertion_assemblies."""
         assemblies = self.get_insertion_assemblies(only_adjacent_edges)
-        return [assemble(self.fragments, a, False) for a in assemblies]
+        return [assemble(self.fragments, a) for a in assemblies]
 
     def get_locations_on_fragments(self) -> dict[int, dict[str, list[Location]]]:
         """Get a dictionary where the keys are the nodes in the graph, and the values are dictionaries with keys

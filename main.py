@@ -105,7 +105,7 @@ def format_known_assembly_response(
     for s in out_sources:
         if s == source:
             return {
-                'sequences': [format_sequence_genbank(assemble(fragments, assembly_plan, s.circular), s.output_name)],
+                'sequences': [format_sequence_genbank(assemble(fragments, assembly_plan), s.output_name)],
                 'sources': [s],
             }
     raise HTTPException(400, 'The provided assembly is not valid.')
@@ -479,7 +479,7 @@ async def crispr(
         return format_known_assembly_response(source, out_sources, [template, insert])
 
     out_sequences = [
-        format_sequence_genbank(assemble([template, insert], a, False), source.output_name) for a in valid_assemblies
+        format_sequence_genbank(assemble([template, insert], a), source.output_name) for a in valid_assemblies
     ]
     return {'sources': out_sources, 'sequences': out_sequences}
 
@@ -621,8 +621,7 @@ async def ligation(
         raise HTTPException(400, 'No ligations were found.')
 
     out_sequences = [
-        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(), s.circular), source.output_name)
-        for s in out_sources
+        format_sequence_genbank(assemble(fragments, s.get_assembly_plan()), source.output_name) for s in out_sources
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
@@ -696,7 +695,7 @@ async def pcr(
         raise HTTPException(400, 'No pair of annealing primers was found. Try changing the annealing settings.')
 
     out_sequences = [
-        format_sequence_genbank(assemble(fragments, a, s.circular), source.output_name)
+        format_sequence_genbank(assemble(fragments, a), source.output_name)
         for s, a in zip(out_sources, possible_assemblies)
     ]
 
@@ -842,8 +841,7 @@ async def homologous_recombination(
         return format_known_assembly_response(source, out_sources, [template, insert])
 
     out_sequences = [
-        format_sequence_genbank(assemble([template, insert], a, False), source.output_name)
-        for a in possible_assemblies
+        format_sequence_genbank(assemble([template, insert], a), source.output_name) for a in possible_assemblies
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
@@ -902,8 +900,7 @@ async def gibson_assembly(
         )
 
     out_sequences = [
-        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(), s.circular), source.output_name)
-        for s in out_sources
+        format_sequence_genbank(assemble(fragments, s.get_assembly_plan()), source.output_name) for s in out_sources
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
@@ -968,8 +965,7 @@ async def restriction_and_ligation(
         raise HTTPException(400, 'No compatible restriction-ligation was found.')
 
     out_sequences = [
-        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(), s.circular), source.output_name)
-        for s in out_sources
+        format_sequence_genbank(assemble(fragments, s.get_assembly_plan()), source.output_name) for s in out_sources
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}

@@ -1239,7 +1239,7 @@ def test_insertion_assembly():
         '3CGTACGCACAyyyyCGTACGCACAxxxxCGTACGCACAT4',
     ]
 
-    assembly_products = [str(assembly.assemble([a, b], assem, False).seq) for assem in f.get_insertion_assemblies()]
+    assembly_products = [str(assembly.assemble([a, b], assem).seq) for assem in f.get_insertion_assemblies()]
     assert sorted(assembly_products) == sorted(results)
 
     # TODO: debatable whether this kind of homologous recombination should happen, or how
@@ -1250,7 +1250,7 @@ def test_insertion_assembly():
     f = assembly.Assembly([a, b], use_fragment_order=False, limit=10)
     results = ['1CGTACGCACAyyyyCGTACGCACAxxxxC2']
     for assem, result in zip(f.get_insertion_assemblies(), results):
-        assert result == str(assembly.assemble([a, b], assem, False).seq)
+        assert result == str(assembly.assemble([a, b], assem).seq)
 
     a = Dseqrecord('1CGTACGCACAxxxxC2')
     b = Dseqrecord('3CGTACGCACAyyyyT4')
@@ -1292,7 +1292,7 @@ def circles_assembly():
     f = assembly.Assembly([a, b], use_fragment_order=False, limit=5)
     circular_assemblies = f.get_circular_assemblies()
     assert len(circular_assemblies) == 1
-    assert str(assembly.assemble([a, b], circular_assemblies[0], True)) == 'ACGTAyyyxxxACGTAbbbb'
+    assert str(assembly.assemble([a, b], circular_assemblies[0])) == 'ACGTAyyyxxxACGTAbbbb'
 
     # When more than two are provided, sequential homologous recombinations are returned
     a = Dseqrecord('aaACGTAACGTAaa', circular=True)
@@ -1306,7 +1306,7 @@ def circles_assembly():
         'ACGTAACGTAaaaaACGTAACGTAggggACGTAACGTAcccc',
     ]
     for assem, result in zip(f.get_insertion_assemblies(), results):
-        assert result == str(assembly.assemble([a, b, c], assem, False).seq)
+        assert result == str(assembly.assemble([a, b, c], assem).seq)
 
     # TODO: debatable whether this kind of homologous recombination should happen, same as above
     a = Dseqrecord('xxxACGTAyyy', circular=True)
@@ -1314,7 +1314,7 @@ def circles_assembly():
 
     f = assembly.Assembly([a, b], use_fragment_order=False, limit=5)
     assert len(circular_assemblies) == 1
-    assert str(assembly.assemble([a, b], circular_assemblies[0], True)) == 'ACGTAyyyxxxACGTAbb'
+    assert str(assembly.assemble([a, b], circular_assemblies[0])) == 'ACGTAyyyxxxACGTAbb'
 
 
 def test_assemble_function():
@@ -1348,7 +1348,7 @@ def test_assemble_function():
             (1, 2, f1_shifted.features[1].location, f2.features[1].location),
         ]
 
-        result = assembly.assemble([f1_shifted, f2], assembly_plan, False)
+        result = assembly.assemble([f1_shifted, f2], assembly_plan)
         assert str(result.seq) == 'ccccTTTctaGGGaaa'
         assert len(result.features) == 4
         assert set(str(f.location.extract(result.seq)) for f in result.features) == {'TTT', 'GGG'}
@@ -1359,7 +1359,7 @@ def test_assemble_function():
             (2, 1, f2.features[1].location, f1_shifted.features[1].location),
         ]
 
-        result = assembly.assemble([f1_shifted, f2], assembly_plan, True)
+        result = assembly.assemble([f1_shifted, f2], assembly_plan)
         assert str(result.seq) == 'GGGcccaaaTTTatg'
         assert len(result.features) == 4
         assert set(str(f.location.extract(result.seq)) for f in result.features) == {'TTT', 'GGG'}
@@ -1369,7 +1369,7 @@ def test_assemble_function():
         # assembly_plan = [
         #     (2, 1, f2.features[1].location, f1_shifted.features[1].location),
         # ]
-        # result = assembly.assemble([f1_shifted, f2], assembly_plan, False)
+        # result = assembly.assemble([f1_shifted, f2], assembly_plan)
 
     # Now both are circular, using a single insertion site
     f1 = Dseqrecord('aaaTTTcta', circular=True)
@@ -1388,7 +1388,7 @@ def test_assemble_function():
                 (2, 1, f2_shifted.features[0].location, f1_shifted.features[0].location),
             ]
 
-            result = assembly.assemble([f1_shifted, f2_shifted], assembly_plan, True)
+            result = assembly.assemble([f1_shifted, f2_shifted], assembly_plan)
             assert result.seq.seguid() == Dseq('aaaTTTatgccccTTTcta', circular=True).seguid()
             assert len(result.features) == 4
             assert set(str(f.location.extract(result.seq)) for f in result.features) == {'TTT'}
@@ -1402,14 +1402,14 @@ def test_assemble_function():
     assembly_plan = [
         (1, 2, loc_end, loc_start),
     ]
-    assert fragments[0] + fragments[1] == assembly.assemble(fragments, assembly_plan, False)
+    assert fragments[0] + fragments[1] == assembly.assemble(fragments, assembly_plan)
 
     # A circular assembly
     assembly_plan = [
         (1, 2, loc_end, loc_start),
         (2, 1, loc_end, loc_start),
     ]
-    assert (fragments[0] + fragments[1]).looped() == assembly.assemble(fragments, assembly_plan, True)
+    assert (fragments[0] + fragments[1]).looped() == assembly.assemble(fragments, assembly_plan)
 
 
 def test_assembly_is_valid():
@@ -1506,7 +1506,7 @@ def test_assembly_is_valid():
             ]
             assert assembly.assembly_is_valid(fragments, assembly_plan, False, True)
             # Does not really belong here, but
-            assert str(assembly.assemble(fragments, assembly_plan, False).seq) == 'ccTTTAAACCCg'
+            assert str(assembly.assemble(fragments, assembly_plan).seq) == 'ccTTTAAACCCg'
 
 
 def test_extract_subfragment():

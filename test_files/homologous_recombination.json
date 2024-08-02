@@ -106,9 +106,7 @@
           }
         }
       ],
-      "circular": false,
-      "forward_primer": 1,
-      "reverse_primer": 2
+      "circular": false
     },
     {
       "id": 9,
