@@ -848,6 +848,23 @@ def test_pcr_assembly_normal():
     assert str(prods[0].seq) == 'TTTACGTACGTAAAAAAGCGCGCGCTTT'
 
 
+def test_pcr_overlap_extension():
+
+    seq = Dseqrecord('ccccACGTACGTAAAAAAGCGCGCGCcccc')
+
+    # Primers with overhangs that can circularise
+    primer1 = Primer('gaagccgaaaaggagACGTACGT')
+    primer2 = Primer(reverse_complement('GCGCGCGCgaagccgaaaaggag'))
+
+    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8, overlap_extension=15)
+    prods = asm.assemble_circular()
+
+    assert len(prods) == 1
+    assert str(prods[0].seq) == 'gaagccgaaaaggagACGTACGTAAAAAAGCGCGCGC'
+
+    # Splicing-like
+
+
 @pytest.mark.xfail(reason='U in primers not handled')
 def test_pcr_assembly_uracil():
 

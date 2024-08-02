@@ -431,7 +431,9 @@ def assembly2str_tuple(assembly):
     return str(tuple((u, v, str(lu), str(lv)) for u, v, lu, lv in assembly))
 
 
-def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, is_insertion=False):
+def assembly_is_valid(
+    fragments: list[_Dseqrecord | _Primer], assembly, is_circular, use_all_fragments, is_insertion=False
+):
     """Function used to filter paths returned from the graph, see conditions tested below."""
     if is_circular is None:
         return False
@@ -474,7 +476,9 @@ def assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, is_in
     for (_u1, v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
         # Incompatible as described in figure above
         fragment = fragments[abs(v1) - 1]
-        if not fragment.circular and _location_boundaries(start_location)[1] >= _location_boundaries(end_location)[1]:
+        if (isinstance(fragment, _Primer) or not fragment.circular) and _location_boundaries(start_location)[
+            1
+        ] >= _location_boundaries(end_location)[1]:
             return False
 
     # Fragments are used only once
@@ -1052,7 +1056,7 @@ class Assembly:
 
 
 class PCRAssembly(Assembly):
-    def __init__(self, frags: list[_Dseqrecord | _Primer], limit=25, mismatches=0):
+    def __init__(self, frags: list[_Dseqrecord | _Primer], limit=25, mismatches=0, overlap_extension=0):
 
         # TODO: allow for the same fragment to be included more than once?
         self.G = _nx.MultiDiGraph()
@@ -1074,15 +1078,40 @@ class PCRAssembly(Assembly):
             for match in matches:
                 self.add_edges_from_match(match, u, v, u_seq, v_seq)
 
+        # If overlap_extension is set, we add links between primers in opposite directions
+        if overlap_extension != 0:
+
+            def algorithm_overlap_extension(x, y):
+                return [
+                    m for m in common_sub_strings(x, y, overlap_extension) if (m[1] == 0 and m[0] + m[2] == len(x))
+                ]
+
+            # We want primers facing away from each other
+            primer_pairs = [(-u, v) for u, v in _itertools.combinations(primer_ids, 2)]
+            for u, v in primer_pairs:
+                u_seq = self.G.nodes[u]['seq']
+                v_seq = self.G.nodes[v]['seq']
+                matches = algorithm_overlap_extension(u_seq, v_seq)
+                for match in matches:
+                    self.add_edges_from_match(match, u, v, u_seq, v_seq)
+
         # These two are constrained
-        self.use_fragment_order = True
+        self.use_fragment_order = False
         self.use_all_fragments = True
 
         self.fragments = frags
         self.limit = limit
         self.algorithm = alignment_sub_strings
+        self.overlap_extension = overlap_extension
 
         return
+
+    def primers_clash(self, assembly):
+        edge_pairs = zip(assembly, assembly[1:])
+        for (_u1, _v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
+            if _locations_overlap(start_location, end_location, len(self.fragments[abs(_v1) - 1])):
+                return True
+        return False
 
     def get_linear_assemblies(self, only_adjacent_edges: bool = False):
         """Adds extra constrains to prevent clashing primers."""
@@ -1092,20 +1121,35 @@ class PCRAssembly(Assembly):
         assemblies = super().get_linear_assemblies()
         # Error if clashing primers
         for a in assemblies:
-            edge_pairs = zip(a, a[1:])
-            for (_u1, _v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
-                # Incompatible as described in figure above
-                # TODO: fix this issue#140
-                if _locations_overlap(start_location, end_location, len(self.fragments[1])):
-                    raise ValueError('Clashing primers in assembly ' + assembly2str(a))
+            if self.primers_clash(a):
+                raise ValueError('Clashing primers in assembly ' + assembly2str(a))
 
         return assemblies
 
-    def get_circular_assemblies(self):
-        raise NotImplementedError('Circular PCR assembly not implemented')
+    def get_circular_assemblies(self, only_adjacent_edges: bool = False):
+        if only_adjacent_edges:
+            raise NotImplementedError('only_adjacent_edges not implemented for PCR assemblies')
 
-    def get_insertion_assemblies(self):
-        raise NotImplementedError('Insertion PCR assembly not implemented')
+        if not self.overlap_extension:
+            raise ValueError('Circular PCR assembly requires overlap_extension to be set')
+        assemblies = super().get_circular_assemblies()
+        # Error if clashing primers
+        for a in assemblies:
+            if self.primers_clash(a):
+                raise ValueError('Clashing primers in assembly ' + assembly2str(a))
+
+        return assemblies
+
+    def get_insertion_assemblies(self, only_adjacent_edges: bool = False):
+        if not self.overlap_extension:
+            raise ValueError('Insertion PCR assembly requires overlap_extension to be set')
+        assemblies = super().get_insertion_assemblies()
+        # Error if clashing primers
+        for a in assemblies:
+            if self.primers_clash(a):
+                raise ValueError('Clashing primers in assembly ' + assembly2str(a))
+
+        return assemblies
 
 
 class SingleFragmentAssembly(Assembly):
