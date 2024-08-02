@@ -340,14 +340,18 @@ class LigationTest(unittest.TestCase):
         output_list: list[Dseqrecord] = initial_sequence.cut([enzyme])
 
         # Convert to json to use as input
-        json_seqs = [format_sequence_genbank(seq) for seq in output_list]
-        json_seqs[0].id = 1
-        json_seqs[1].id = 2
-        json_seqs = [seq.model_dump() for seq in json_seqs]
+        model_seqs = [format_sequence_genbank(seq) for seq in output_list]
+        model_seqs[0].id = 1
+        model_seqs[1].id = 2
+        json_seqs = [seq.model_dump() for seq in model_seqs]
 
         # Assign ids to define deterministic assembly
         source = LigationSource.from_assembly(
-            id=0, input=[1, 2], assembly=[(1, 2, SimpleLocation(7, 11), SimpleLocation(0, 4))], circular=False
+            id=0,
+            input=[1, 2],
+            assembly=[(1, 2, SimpleLocation(7, 11), SimpleLocation(0, 4))],
+            circular=False,
+            fragments=model_seqs,
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post('/ligation', json=data)
@@ -367,7 +371,11 @@ class LigationTest(unittest.TestCase):
 
         # Check that the inverse assembly will not pass
         source = LigationSource.from_assembly(
-            id=0, input=[2, 1], assembly=[(1, 2, SimpleLocation(8, 11), SimpleLocation(1, 4))], circular=False
+            id=0,
+            input=[2, 1],
+            assembly=[(1, 2, SimpleLocation(8, 11), SimpleLocation(1, 4))],
+            circular=False,
+            fragments=model_seqs,
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post('/ligation', json=data)
@@ -377,7 +385,11 @@ class LigationTest(unittest.TestCase):
 
         # Check that the circular assembly does not pass either
         source = LigationSource.from_assembly(
-            id=0, input=[1, 2], assembly=[(1, 2, SimpleLocation(7, 11), SimpleLocation(0, 4))], circular=True
+            id=0,
+            input=[1, 2],
+            assembly=[(1, 2, SimpleLocation(7, 11), SimpleLocation(0, 4))],
+            circular=True,
+            fragments=model_seqs,
         )
         data = {'source': source.model_dump(), 'sequences': json_seqs}
         response = client.post('/ligation', json=data)
@@ -995,6 +1007,7 @@ class PCRTest(unittest.TestCase):
                 (2, -3, SimpleLocation(18, 26), SimpleLocation(0, 8)),
             ],
             circular=False,
+            fragments=[primer_fwd, json_seq, primer_rvs],
         )
 
         data = {
@@ -1015,6 +1028,7 @@ class PCRTest(unittest.TestCase):
                 (1, 2, SimpleLocation(0, 8), SimpleLocation(4, 12)),
             ],
             circular=False,
+            fragments=[primer_fwd, json_seq, primer_rvs],
         )
 
         data = {

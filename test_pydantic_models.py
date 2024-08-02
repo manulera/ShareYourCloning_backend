@@ -4,6 +4,11 @@ from assembly2 import assembly2str
 from Bio.SeqFeature import SimpleLocation
 
 
+class DummyFragment:
+    def __init__(self, id):
+        self.id = id
+
+
 class AssemblyJoinTest(TestCase):
     def test_str(self):
         join = AssemblyJoin(
@@ -40,7 +45,7 @@ class AssemblyJoinTest(TestCase):
         self.assertEqual(join1.right.location.start, 10)
         self.assertEqual(join1.right.location.end, 20)
 
-        self.assertEqual(join1.to_join_tuple(), join_tuple_1)
+        self.assertEqual(join1.to_join_tuple([DummyFragment(1), DummyFragment(2)]), join_tuple_1)
 
         join_tuple_2 = (-1, -2, SimpleLocation(0, 10), SimpleLocation(10, 20))
         join2 = AssemblyJoin.from_join_tuple(join_tuple_2)
@@ -55,7 +60,7 @@ class AssemblyJoinTest(TestCase):
         self.assertEqual(join2.right.location.start, 10)
         self.assertEqual(join2.right.location.end, 20)
 
-        self.assertEqual(join2.to_join_tuple(), join_tuple_2)
+        self.assertEqual(join2.to_join_tuple([DummyFragment(1), DummyFragment(2)]), join_tuple_2)
 
 
 class AssemblySourceTest(TestCase):
@@ -63,12 +68,12 @@ class AssemblySourceTest(TestCase):
 
         join = AssemblyJoin(
             left=AssemblyJoinComponent(
-                sequence=1,
+                sequence=4,
                 reverse_complemented=False,
                 location=SimpleSequenceLocation(start=1, end=10),
             ),
             right=AssemblyJoinComponent(
-                sequence=2,
+                sequence=5,
                 reverse_complemented=False,
                 location=SimpleSequenceLocation(start=20, end=30),
             ),
@@ -80,4 +85,19 @@ class AssemblySourceTest(TestCase):
             assembly=[join],
         )
 
-        print(assembly2str(asm.get_assembly_plan()))
+        assert assembly2str(asm.get_assembly_plan([DummyFragment(4), DummyFragment(5)])) == "('1[1:10]:2[20:30]',)"
+        assert assembly2str(asm.get_assembly_plan([DummyFragment(5), DummyFragment(4)])) == "('2[1:10]:1[20:30]',)"
+
+    def test_from_assembly(self):
+        assembly = [
+            (1, 2, SimpleLocation(0, 10), SimpleLocation(10, 20)),
+            (2, 3, SimpleLocation(0, 10), SimpleLocation(10, 20)),
+        ]
+        # Dummy input to double-check it's not used
+        input = []
+        fragments = [DummyFragment(4), DummyFragment(5), DummyFragment(6)]
+        assembly_source = AssemblySource.from_assembly(
+            assembly=assembly, fragments=fragments, id=0, circular=False, input=input
+        )
+
+        assert [str(join) for join in assembly_source.assembly] == ['4[0:10]:5[10:20]', '5[0:10]:6[10:20]']

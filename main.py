@@ -101,7 +101,7 @@ def format_known_assembly_response(
 ):
     """Common function for assembly sources, when assembly is known"""
     # If a specific assembly is requested
-    assembly_plan = source.get_assembly_plan()
+    assembly_plan = source.get_assembly_plan(fragments)
     for s in out_sources:
         if s == source:
             return {
@@ -470,7 +470,9 @@ async def crispr(
     # meant for linear DNA
 
     out_sources = [
-        CRISPRSource.from_assembly(id=source.id, input=source.input, assembly=a, guides=source.guides)
+        CRISPRSource.from_assembly(
+            id=source.id, input=source.input, assembly=a, guides=source.guides, fragments=fragments
+        )
         for a in valid_assemblies
     ]
 
@@ -587,12 +589,14 @@ async def ligation(
 
     # Lambda function for code clarity
     def create_source(a, is_circular):
-        return LigationSource.from_assembly(assembly=a, circular=is_circular, id=source.id, input=source.input)
+        return LigationSource.from_assembly(
+            assembly=a, circular=is_circular, id=source.id, input=source.input, fragments=fragments
+        )
 
     # If the assembly is known, the blunt parameter is ignored, and we set the algorithm type from the assembly
     # (blunt ligations have features without length)
     if len(source.assembly):
-        asm = source.get_assembly_plan()
+        asm = source.get_assembly_plan(fragments)
         blunt = len(asm[0][2]) == 0
 
     algo = combine_algorithms(blunt_overlap, sticky_end_sub_strings) if blunt else sticky_end_sub_strings
@@ -621,7 +625,8 @@ async def ligation(
         raise HTTPException(400, 'No ligations were found.')
 
     out_sequences = [
-        format_sequence_genbank(assemble(fragments, s.get_assembly_plan()), source.output_name) for s in out_sources
+        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(fragments)), source.output_name)
+        for s in out_sources
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
@@ -644,7 +649,7 @@ async def pcr(
         raise HTTPException(400, 'The number of primers should be twice the number of sequences.')
 
     pydna_sequences = [read_dsrecord_from_json(s) for s in sequences]
-    pydna_primers = [PydnaPrimer(p.sequence) for p in primers]
+    pydna_primers = [PydnaPrimer(p.sequence, id=str(p.id)) for p in primers]
 
     # TODO: This may have to be re-written if we allow mismatches
     # If an assembly is provided, we ignore minimal_annealing
@@ -683,6 +688,7 @@ async def pcr(
             input=source.input,
             assembly=a,
             circular=False,
+            fragments=fragments,
         )
         for a in possible_assemblies
     ]
@@ -832,7 +838,9 @@ async def homologous_recombination(
         raise HTTPException(400, 'No homologous recombination was found.')
 
     out_sources = [
-        HomologousRecombinationSource.from_assembly(id=source.id, input=source.input, assembly=a, circular=False)
+        HomologousRecombinationSource.from_assembly(
+            id=source.id, input=source.input, assembly=a, circular=False, fragments=[template, insert]
+        )
         for a in possible_assemblies
     ]
 
@@ -866,7 +874,9 @@ async def gibson_assembly(
 
     # Lambda function for code clarity
     def create_source(a, is_circular):
-        return GibsonAssemblySource.from_assembly(assembly=a, circular=is_circular, id=source.id, input=source.input)
+        return GibsonAssemblySource.from_assembly(
+            assembly=a, circular=is_circular, id=source.id, input=source.input, fragments=fragments
+        )
 
     out_sources = []
     if len(fragments) > 1:
@@ -900,7 +910,8 @@ async def gibson_assembly(
         )
 
     out_sequences = [
-        format_sequence_genbank(assemble(fragments, s.get_assembly_plan()), source.output_name) for s in out_sources
+        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(fragments)), source.output_name)
+        for s in out_sources
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}
@@ -928,12 +939,16 @@ async def restriction_and_ligation(
         raise HTTPException(404, 'These enzymes do not exist: ' + ', '.join(invalid_enzymes))
     enzymes = RestrictionBatch(first=[e for e in source.restriction_enzymes if e is not None])
 
-    # Arguments that are common when instantiating an Assembly pydantic object
-    common_args = {'id': source.id, 'input': source.input, 'restriction_enzymes': source.restriction_enzymes}
-
     # Lambda function for code clarity
     def create_source(a, is_circular):
-        return RestrictionAndLigationSource.from_assembly(assembly=a, circular=is_circular, **common_args)
+        return RestrictionAndLigationSource.from_assembly(
+            assembly=a,
+            circular=is_circular,
+            id=source.id,
+            input=source.input,
+            restriction_enzymes=source.restriction_enzymes,
+            fragments=fragments,
+        )
 
     # Algorithm used by assembly class
     def algo(x, y, _l):
@@ -965,7 +980,8 @@ async def restriction_and_ligation(
         raise HTTPException(400, 'No compatible restriction-ligation was found.')
 
     out_sequences = [
-        format_sequence_genbank(assemble(fragments, s.get_assembly_plan()), source.output_name) for s in out_sources
+        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(fragments)), source.output_name)
+        for s in out_sources
     ]
 
     return {'sources': out_sources, 'sequences': out_sequences}

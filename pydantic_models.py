@@ -4,6 +4,7 @@ from typing import Optional, List
 from Bio.SeqFeature import SeqFeature, Location, SimpleLocation as BioSimpleLocation
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
 from Bio.Restriction.Restriction import RestrictionType, RestrictionBatch
+from Bio.SeqRecord import SeqRecord as _SeqRecord
 from shareyourcloning_linkml.datamodel import (
     OligoHybridizationSource as _OligoHybridizationSource,
     PolymeraseExtensionSource as _PolymeraseExtensionSource,
@@ -221,7 +222,21 @@ class AssemblyJoin(_AssemblyJoin):
             ),
         )
 
-    def to_join_tuple(self) -> tuple[int, int, BioSimpleLocation, BioSimpleLocation]:
+    def to_join_tuple(self, fragments) -> tuple[int, int, BioSimpleLocation, BioSimpleLocation]:
+        fragment_ids = [int(f.id) for f in fragments]
+
+        def id2pos(id):
+            # Find the position of id in the fragments list
+            return fragment_ids.index(abs(id)) + 1
+
+        return (
+            id2pos(self.left.sequence) * (-1 if self.left.reverse_complemented else 1),
+            id2pos(self.right.sequence) * (-1 if self.right.reverse_complemented else 1),
+            self.left.location.to_biopython_location(),
+            self.right.location.to_biopython_location(),
+        )
+
+    def to_join_tuple_with_ids(self) -> tuple[int, int, BioSimpleLocation, BioSimpleLocation]:
         return (
             self.left.sequence * (-1 if self.left.reverse_complemented else 1),
             self.right.sequence * (-1 if self.right.reverse_complemented else 1),
@@ -230,7 +245,7 @@ class AssemblyJoin(_AssemblyJoin):
         )
 
     def __str__(self) -> str:
-        u, v, lu, lv = self.to_join_tuple()
+        u, v, lu, lv = self.to_join_tuple_with_ids()
         return f'{u}{lu}:{v}{lv}'
 
     def __repr__(self) -> str:
@@ -253,17 +268,30 @@ class AssemblySourceCommonClass:
             all_overlaps.append(f.right.location.end - f.right.location.start)
         return min(all_overlaps)
 
-    def get_assembly_plan(self):
+    def get_assembly_plan(self, fragments: list[_SeqRecord]) -> tuple:
         """Returns the assembly plan"""
-        return tuple(j.to_join_tuple() for j in self.assembly)
+        return tuple(j.to_join_tuple(fragments) for j in self.assembly)
 
     @classmethod
     def from_assembly(
-        cls, assembly: list[tuple[int, int, Location, Location]], input: list[int], id: int, circular: bool, **kwargs
+        cls,
+        assembly: list[tuple[int, int, Location, Location]],
+        input: list[int],
+        id: int,
+        circular: bool,
+        fragments: list[_SeqRecord],
+        **kwargs,
     ):
+        fragment_ids = [int(f.id) for f in fragments]
+
+        def pos2id(pos):
+            sign = -1 if pos < 0 else 1
+            return fragment_ids[abs(pos) - 1] * sign
+
+        ids_assembly = [(pos2id(u), pos2id(v), lu, lv) for u, v, lu, lv in assembly]
         return cls(
             id=id,
-            assembly=[AssemblyJoin.from_join_tuple(join) for join in assembly],
+            assembly=[AssemblyJoin.from_join_tuple(join) for join in ids_assembly],
             input=input,
             circular=circular,
             **kwargs,
@@ -309,9 +337,10 @@ class CRISPRSource(_CRISPRSource, AssemblySourceCommonClass):
         assembly: list[tuple[int, int, Location, Location]],
         input: list[int],
         id: int,
+        fragments: list[_SeqRecord],
         guides: list[int],
     ):
-        return super().from_assembly(assembly, input, id, False, guides=guides)
+        return super().from_assembly(assembly, input, id, False, fragments, guides=guides)
 
 
 class RestrictionAndLigationSource(_RestrictionAndLigationSource, AssemblySourceCommonClass):
@@ -325,9 +354,10 @@ class RestrictionAndLigationSource(_RestrictionAndLigationSource, AssemblySource
         input: list[int],
         circular: bool,
         id: int,
+        fragments: list[_SeqRecord],
         restriction_enzymes=list['str'],
     ):
-        return super().from_assembly(assembly, input, id, circular, restriction_enzymes=restriction_enzymes)
+        return super().from_assembly(assembly, input, id, circular, fragments, restriction_enzymes=restriction_enzymes)
 
 
 class OligoHybridizationSource(_OligoHybridizationSource):
