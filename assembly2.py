@@ -1174,7 +1174,7 @@ class PCRAssembly(Assembly):
     def get_insertion_assemblies(self, only_adjacent_edges: bool = False):
         if not self.overlap_extension:
             raise ValueError('Insertion PCR assembly requires overlap_extension to be set')
-        return super().get_insertion_assemblies()
+        return super().get_insertion_assemblies(only_adjacent_edges)
 
 
 class SingleFragmentAssembly(Assembly):
