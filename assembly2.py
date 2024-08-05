@@ -21,6 +21,17 @@ from Bio.Restriction.Restriction import RestrictionBatch, AbstractCut
 import regex
 
 
+def primers_clash(assembly, fragments):
+    edge_pairs = zip(assembly, assembly[1:])
+    for (_u1, _v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
+        # Only for primer joins
+        if not isinstance(fragments[abs(_v1) - 1], _Dseqrecord):
+            continue
+        if _locations_overlap(start_location, end_location, len(fragments[abs(_v1) - 1])):
+            return True
+    return False
+
+
 def gather_overlapping_locations(locs: list[Location], fragment_length: int):
     """
     Turn a list of locations into a list of tuples of those locations, where each tuple contains
@@ -431,64 +442,6 @@ def assembly2str_tuple(assembly):
     return str(tuple((u, v, str(lu), str(lv)) for u, v, lu, lv in assembly))
 
 
-def assembly_is_valid(
-    fragments: list[_Dseqrecord | _Primer], assembly, is_circular, use_all_fragments, is_insertion=False
-):
-    """Function used to filter paths returned from the graph, see conditions tested below."""
-    if is_circular is None:
-        return False
-
-    # Linear assemblies may get begin-1-end, begin-2-end, these are removed here.
-    if len(assembly) == 0:
-        return False
-
-    if use_all_fragments and len(fragments) != len(set(flatten(map(abs, e[:2]) for e in assembly))):
-        return False
-
-    # Here we check whether subsequent pairs of fragments are compatible, for instance:
-    # Compatible (overlap of 1 and 2 occurs before overlap of 2 and 3):
-    # (1,2,[2:9],[0:7]), (2,3,[12:19],[0:7])
-    #    -- A --
-    # 1 gtatcgtgt     -- B --
-    # 2   atcgtgtactgtcatattc
-    # 3               catattcaa
-    # Incompatible (overlap of 1 and 2 occurs after overlap of 2 and 3):
-    # (1,2,[2:9],[13:20]), (2,3,[0:7],[0:7])
-    #                 -- A --
-    #  1 -- B --    gtatcgtgt
-    #  2 catattcccccccatcgtgtactgt
-    #  3 catattcaa
-    # Redundant: overlap of 1 and 2 ends at the same spot as overlap of 2 and 3
-    # (1,2,[2:9],[1:8]), (2,3,[0:8],[0:8])
-    #    -- A --
-    #  gtatcgtgt
-    #   catcgtgtactgtcatattc
-    #   catcgtgtactgtcatattc
-    #   -- B ---
-    if is_circular:
-        # In a circular assembly, first and last fragment must be the same
-        if assembly[0][0] != assembly[-1][1]:
-            return False
-        edge_pairs = zip(assembly, assembly[1:] + assembly[:1])
-    else:
-        edge_pairs = zip(assembly, assembly[1:])
-
-    for (_u1, v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
-        # Incompatible as described in figure above
-        fragment = fragments[abs(v1) - 1]
-        if (isinstance(fragment, _Primer) or not fragment.circular) and _location_boundaries(start_location)[
-            1
-        ] >= _location_boundaries(end_location)[1]:
-            return False
-
-    # Fragments are used only once
-    nodes_used = [f[0] for f in edge_representation2subfragment_representation(assembly, is_circular or is_insertion)]
-    if len(nodes_used) != len(set(map(abs, nodes_used))):
-        return False
-
-    return True
-
-
 def assembly_has_mismatches(fragments, assembly):
     for u, v, loc_u, loc_v in assembly:
         seq_u = fragments[u - 1] if u > 0 else fragments[-u - 1].reverse_complement()
@@ -797,6 +750,66 @@ class Assembly:
 
         return
 
+    @classmethod
+    def assembly_is_valid(
+        cls, fragments: list[_Dseqrecord | _Primer], assembly, is_circular, use_all_fragments, is_insertion=False
+    ):
+        """Function used to filter paths returned from the graph, see conditions tested below."""
+        if is_circular is None:
+            return False
+
+        # Linear assemblies may get begin-1-end, begin-2-end, these are removed here.
+        if len(assembly) == 0:
+            return False
+
+        if use_all_fragments and len(fragments) != len(set(flatten(map(abs, e[:2]) for e in assembly))):
+            return False
+
+        # Here we check whether subsequent pairs of fragments are compatible, for instance:
+        # Compatible (overlap of 1 and 2 occurs before overlap of 2 and 3):
+        # (1,2,[2:9],[0:7]), (2,3,[12:19],[0:7])
+        #    -- A --
+        # 1 gtatcgtgt     -- B --
+        # 2   atcgtgtactgtcatattc
+        # 3               catattcaa
+        # Incompatible (overlap of 1 and 2 occurs after overlap of 2 and 3):
+        # (1,2,[2:9],[13:20]), (2,3,[0:7],[0:7])
+        #                 -- A --
+        #  1 -- B --    gtatcgtgt
+        #  2 catattcccccccatcgtgtactgt
+        #  3 catattcaa
+        # Redundant: overlap of 1 and 2 ends at the same spot as overlap of 2 and 3
+        # (1,2,[2:9],[1:8]), (2,3,[0:8],[0:8])
+        #    -- A --
+        #  gtatcgtgt
+        #   catcgtgtactgtcatattc
+        #   catcgtgtactgtcatattc
+        #   -- B ---
+        if is_circular:
+            # In a circular assembly, first and last fragment must be the same
+            if assembly[0][0] != assembly[-1][1]:
+                return False
+            edge_pairs = zip(assembly, assembly[1:] + assembly[:1])
+        else:
+            edge_pairs = zip(assembly, assembly[1:])
+
+        for (_u1, v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
+            # Incompatible as described in figure above
+            fragment = fragments[abs(v1) - 1]
+            if (isinstance(fragment, _Primer) or not fragment.circular) and _location_boundaries(start_location)[
+                1
+            ] >= _location_boundaries(end_location)[1]:
+                return False
+
+        # Fragments are used only once
+        nodes_used = [
+            f[0] for f in edge_representation2subfragment_representation(assembly, is_circular or is_insertion)
+        ]
+        if len(nodes_used) != len(set(map(abs, nodes_used))):
+            return False
+
+        return True
+
     def add_edges_from_match(self, match, u: int, v: int, first: _Dseqrecord, secnd: _Dseqrecord):
         """Add edges to the graph from a match returned by an `algorithm` function (see pydna.common_substrings). For
         format of edges (see documentation of the Assembly class).
@@ -857,7 +870,7 @@ class Assembly:
                 G.add_edge(node, 'end')
 
         assemblies = [tuple(map(self.format_assembly_edge, x)) for x in unique_linear_paths(G)]
-        out = [a for a in assemblies if assembly_is_valid(self.fragments, a, False, self.use_all_fragments)]
+        out = [a for a in assemblies if self.assembly_is_valid(self.fragments, a, False, self.use_all_fragments)]
         if only_adjacent_edges:
             out = [a for a in out if self.assembly_uses_only_adjacent_edges(a, False)]
         return remove_subassemblies(out)
@@ -884,7 +897,7 @@ class Assembly:
         sorted_cycles = filter(lambda x: x[0] > 0, sorted_cycles)
         # cycles.simple_cycles returns lists [1,2,3] not assemblies, see self.cycle2circular_assemblies
         assemblies = sum(map(self.cycle2circular_assemblies, sorted_cycles), [])
-        out = [a for a in assemblies if assembly_is_valid(self.fragments, a, True, self.use_all_fragments)]
+        out = [a for a in assemblies if self.assembly_is_valid(self.fragments, a, True, self.use_all_fragments)]
         if only_adjacent_edges:
             out = [a for a in out if self.assembly_uses_only_adjacent_edges(a, True)]
         return out
@@ -946,7 +959,7 @@ class Assembly:
         return [
             a
             for a in assemblies
-            if assembly_is_valid(self.fragments, a, False, self.use_all_fragments, is_insertion=True)
+            if self.assembly_is_valid(self.fragments, a, False, self.use_all_fragments, is_insertion=True)
         ]
 
     def assemble_linear(self, only_adjacent_edges: bool = False):
@@ -1131,28 +1144,24 @@ class PCRAssembly(Assembly):
 
         return
 
-    def primers_clash(self, assembly):
-        edge_pairs = zip(assembly, assembly[1:])
-        for (_u1, _v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
-            # Only for primer joins
-            if not isinstance(self.fragments[abs(_v1) - 1], _Dseqrecord):
-                continue
-            if _locations_overlap(start_location, end_location, len(self.fragments[abs(_v1) - 1])):
-                return True
-        return False
+    @classmethod
+    def assembly_is_valid(
+        cls, fragments: list[_Dseqrecord | _Primer], assembly, is_circular, use_all_fragments, is_insertion=False
+    ):
+        is_valid = super().assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, is_insertion)
+        if not is_valid:
+            return False
+        # Error if clashing primers
+        if primers_clash(assembly, fragments):
+            raise ValueError('Clashing primers in assembly ' + assembly2str(assembly))
+        return True
 
     def get_linear_assemblies(self, only_adjacent_edges: bool = False):
         """Adds extra constrains to prevent clashing primers."""
         if only_adjacent_edges:
             raise NotImplementedError('only_adjacent_edges not implemented for PCR assemblies')
 
-        assemblies = super().get_linear_assemblies()
-        # Error if clashing primers
-        for a in assemblies:
-            if self.primers_clash(a):
-                raise ValueError('Clashing primers in assembly ' + assembly2str(a))
-
-        return assemblies
+        return super().get_linear_assemblies()
 
     def get_circular_assemblies(self, only_adjacent_edges: bool = False):
         if only_adjacent_edges:
@@ -1160,24 +1169,12 @@ class PCRAssembly(Assembly):
 
         if not self.overlap_extension:
             raise ValueError('Circular PCR assembly requires overlap_extension to be set')
-        assemblies = super().get_circular_assemblies()
-        # Error if clashing primers
-        for a in assemblies:
-            if self.primers_clash(a):
-                raise ValueError('Clashing primers in assembly ' + assembly2str(a))
-
-        return assemblies
+        return super().get_circular_assemblies()
 
     def get_insertion_assemblies(self, only_adjacent_edges: bool = False):
         if not self.overlap_extension:
             raise ValueError('Insertion PCR assembly requires overlap_extension to be set')
-        assemblies = super().get_insertion_assemblies()
-        # Error if clashing primers
-        for a in assemblies:
-            if self.primers_clash(a):
-                raise ValueError('Clashing primers in assembly ' + assembly2str(a))
-
-        return assemblies
+        return super().get_insertion_assemblies()
 
 
 class SingleFragmentAssembly(Assembly):
@@ -1215,7 +1212,7 @@ class SingleFragmentAssembly(Assembly):
     def get_circular_assemblies(self, only_adjacent_edges: bool = False):
         # We don't want the same location twice
         assemblies = filter(lambda x: x[0][2] != x[0][3], super().get_circular_assemblies(only_adjacent_edges))
-        return [a for a in assemblies if assembly_is_valid(self.fragments, a, True, self.use_all_fragments)]
+        return [a for a in assemblies if self.assembly_is_valid(self.fragments, a, True, self.use_all_fragments)]
 
     def get_insertion_assemblies(self, only_adjacent_edges: bool = False):
         """This could be renamed splicing assembly, but the essence is similar"""
@@ -1239,7 +1236,7 @@ class SingleFragmentAssembly(Assembly):
         return [
             a
             for a in assemblies
-            if assembly_is_valid(self.fragments, a, False, self.use_all_fragments, is_insertion=True)
+            if self.assembly_is_valid(self.fragments, a, False, self.use_all_fragments, is_insertion=True)
         ]
 
     def get_linear_assemblies(self):

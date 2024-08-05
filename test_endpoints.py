@@ -1005,6 +1005,23 @@ class PCRTest(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn('Clashing primers', payload['detail'])
 
+    def test_wrong_stoichiometry(self):
+        # If not 2 primers per sequence, bad request
+        template = Dseqrecord(Dseq('ACGTACGTGCGCGCGC'))
+
+        json_seq = format_sequence_genbank(template)
+        submitted_source = PCRSource(id=0)
+
+        primer_fwd = PrimerModel(sequence='ACGTACGTG', id=2, name='forward')
+
+        data = {
+            'source': submitted_source.model_dump(),
+            'sequences': [json_seq.model_dump()],
+            'primers': [primer_fwd.model_dump()],
+        }
+        response = client.post('/pcr', json=data, params={'minimal_annealing': 8})
+        self.assertEqual(response.status_code, 400)
+
 
 class OligoHybridizationTest(unittest.TestCase):
 

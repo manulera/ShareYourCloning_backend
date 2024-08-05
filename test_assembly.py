@@ -938,11 +938,39 @@ def test_pcr_assembly_invalid():
     for shift in range(len(seq)):
         seq_shifted = seq.shifted(shift)
         asm = assembly.PCRAssembly([primer1, seq_shifted, primer2], limit=8)
-        try:
+        with pytest.raises(ValueError):
             asm.assemble_linear()
-            AssertionError('Clashing primers should give ValueError')
-        except ValueError:
-            pass
+
+    # PCR assembly, if circular, requires overlap extension
+    with pytest.raises(ValueError) as e:
+        asm.get_circular_assemblies()
+    assert 'overlap_extension' in str(e.value)
+
+    # Clashing primers on circular PCR assembly
+    seq = Dseqrecord('ccccACGTACGTAAAAAAGCGCGCGCcccc')
+    # Primers with overhangs that can circularise but clash
+    primer1 = Primer('gaagccgaaaaggagACGTACGT')
+    primer2 = Primer(reverse_complement('CGTAAAAAAgaagccgaaaaggag'))
+
+    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8, overlap_extension=15)
+    with pytest.raises(ValueError):
+        prods = asm.assemble_circular()
+
+    # Error if length is not multiple of 3
+    with pytest.raises(ValueError):
+        assembly.PCRAssembly([primer1, seq], limit=8)
+
+    # Error if not primer, seq, primer
+    with pytest.raises(ValueError):
+        assembly.PCRAssembly([seq, seq, seq], limit=8)
+    with pytest.raises(ValueError):
+        assembly.PCRAssembly([primer1, primer1, primer1], limit=8)
+
+    # PCR assembly does not support only_adjacent_edges
+    with pytest.raises(NotImplementedError):
+        asm.get_linear_assemblies(only_adjacent_edges=True)
+    with pytest.raises(NotImplementedError):
+        asm.get_circular_assemblies(only_adjacent_edges=True)
 
 
 def test_fragments_only_once():
@@ -1430,7 +1458,7 @@ def test_assembly_is_valid():
         (2, 3, SimpleLocation(3, 6), SimpleLocation(0, 3)),
     ]
 
-    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True)
+    assert assembly.Assembly.assembly_is_valid(fragments, assembly_plan, False, True)
 
     # Partial overlap should be allowed, a fragment could act like a "bridge"
     # 1 ------
@@ -1444,7 +1472,7 @@ def test_assembly_is_valid():
         (2, 3, SimpleLocation(2, 6), SimpleLocation(0, 4)),
     ]
 
-    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True)
+    assert assembly.Assembly.assembly_is_valid(fragments, assembly_plan, False, True)
 
     # Complete overlap in linear assemblies should be discarded as is redundant
     # 1 ------
@@ -1459,7 +1487,7 @@ def test_assembly_is_valid():
         (2, 3, SimpleLocation(0, 4), SimpleLocation(0, 4)),
     ]
 
-    assert not assembly.assembly_is_valid(fragments, assembly_plan, False, True)
+    assert not assembly.Assembly.assembly_is_valid(fragments, assembly_plan, False, True)
 
     # Invalid assembly
     # 1   ------
@@ -1473,7 +1501,7 @@ def test_assembly_is_valid():
         (2, 3, SimpleLocation(0, 2), SimpleLocation(0, 2)),
     ]
 
-    assert not assembly.assembly_is_valid(fragments, assembly_plan, False, True)
+    assert not assembly.Assembly.assembly_is_valid(fragments, assembly_plan, False, True)
 
     # Assembly plan including two fragments extracted from circular molecules:
     f1 = Dseqrecord('ccTTTc')
@@ -1504,7 +1532,7 @@ def test_assembly_is_valid():
                 ),
                 (3, 4, find_feature_by_id(f3_shifted, 'f3_f4').location, f4.features[0].location),
             ]
-            assert assembly.assembly_is_valid(fragments, assembly_plan, False, True)
+            assert assembly.Assembly.assembly_is_valid(fragments, assembly_plan, False, True)
             # Does not really belong here, but
             assert str(assembly.assemble(fragments, assembly_plan).seq) == 'ccTTTAAACCCg'
 
@@ -1815,3 +1843,10 @@ def test_alignment_sub_strings():
     primer = Primer('AATTAGCA')
     template = Dseqrecord('AATTAGCAGCGATCAATTAGCA')
     assert [(0, 0, 8), (0, 14, 8)] == assembly.alignment_sub_strings(primer, template, 8, 1)
+
+    # Gives the right error when passed sequences are not primer and sequence
+    with pytest.raises(ValueError):
+        assembly.alignment_sub_strings(primer, primer, 8, 1)
+
+    with pytest.raises(ValueError):
+        assembly.alignment_sub_strings(template, template, 8, 1)
