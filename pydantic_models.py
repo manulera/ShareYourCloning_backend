@@ -5,6 +5,7 @@ from Bio.SeqFeature import SeqFeature, Location, SimpleLocation as BioSimpleLoca
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
 from Bio.Restriction.Restriction import RestrictionType, RestrictionBatch
 from Bio.SeqRecord import SeqRecord as _SeqRecord
+from pydna.primer import Primer as _PydnaPrimer
 from shareyourcloning_linkml.datamodel import (
     OligoHybridizationSource as _OligoHybridizationSource,
     PolymeraseExtensionSource as _PolymeraseExtensionSource,
@@ -263,6 +264,7 @@ class AssemblySourceCommonClass:
         **kwargs,
     ):
         fragment_ids = [int(f.id) for f in fragments]
+        input_ids = [int(f.id) for f in fragments if not isinstance(f, _PydnaPrimer)]
 
         def pos2id(pos):
             sign = -1 if pos < 0 else 1
@@ -271,7 +273,7 @@ class AssemblySourceCommonClass:
         ids_assembly = [(pos2id(u), pos2id(v), lu, lv) for u, v, lu, lv in assembly]
         return cls(
             id=id,
-            input=fragment_ids,
+            input=input_ids,
             assembly=[AssemblyJoin.from_join_tuple(join) for join in ids_assembly],
             circular=circular,
             **kwargs,
