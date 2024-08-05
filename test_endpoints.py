@@ -960,7 +960,7 @@ class PCRTest(unittest.TestCase):
         }
         response = client.post('/pcr', json=data)
         payload = response.json()
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 400)
 
         # This is the wrong annealing info
         submitted_source = PCRSource.from_assembly(
