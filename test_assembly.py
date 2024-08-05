@@ -11,6 +11,8 @@ from pydna.dseqrecord import Dseqrecord
 from pydna.parsers import parse
 from pydna.utils import eq
 import pytest
+from Bio.Seq import reverse_complement
+from pydna.primer import Primer
 
 
 def test_built():
@@ -807,12 +809,12 @@ def test_fill_dseq():
         assert assembly.fill_dseq(query) == solution
 
 
-def test_pcr_assembly():
+def test_pcr_assembly_normal():
 
-    primer1 = Dseqrecord(Dseq('ACGTACGT'))
-    primer2 = Dseqrecord(Dseq('GCGCGCGC')).reverse_complement()
+    primer1 = Primer('ACGTACGT')
+    primer2 = Primer(reverse_complement('GCGCGCGC'))
 
-    seq = Dseqrecord(Dseq('TTTTACGTACGTAAAAAAGCGCGCGCTTTTT'))
+    seq = Dseqrecord('ccccACGTACGTAAAAAAGCGCGCGCcccc')
 
     asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8)
 
@@ -836,8 +838,8 @@ def test_pcr_assembly():
     assert str(prods[0].seq) == 'ACGTACGTAAAAAAGCGCGCGC'
 
     # Primers with overhangs work
-    primer1 = Dseqrecord(Dseq('TTTACGTACGT'))
-    primer2 = Dseqrecord(Dseq('GCGCGCGCTTT')).reverse_complement()
+    primer1 = Primer('TTTACGTACGT')
+    primer2 = Primer(reverse_complement('GCGCGCGCTTT'))
 
     asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8)
     prods = asm.assemble_linear()
@@ -846,11 +848,53 @@ def test_pcr_assembly():
     assert str(prods[0].seq) == 'TTTACGTACGTAAAAAAGCGCGCGCTTT'
 
 
+def test_pcr_overlap_extension():
+
+    seq = Dseqrecord('ccccACGTACGTAAAAAAGCGCGCGCcccc')
+
+    # Primers with overhangs that can circularise
+    primer1 = Primer('gaagccgaaaaggagACGTACGT')
+    primer2 = Primer(reverse_complement('GCGCGCGCgaagccgaaaaggag'))
+
+    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8, overlap_extension=15)
+    prods = asm.assemble_circular()
+
+    assert len(prods) == 1
+    assert str(prods[0].seq) == 'gaagccgaaaaggagACGTACGTAAAAAAGCGCGCGC'
+
+    # Splicing-like (remove the aaaa[...] lowercase bit)
+    seq = Dseqrecord(
+        'ccccCAGTAATGATGGATGACATTCAAAGCACTGATTCTATTGCTGaaaaaaaGTGGTCTGAACTCGGTGTTGAGCCCGCTGATGTTCCACAAcccc'
+    )
+
+    primer1 = Primer('CAGTAATGATGGATGACATT')
+    primer2 = Primer(reverse_complement('AAGCACTGATTCTATTGCTGgtggtctgaac'))
+    primer3 = Primer('tctattgctgGTGGTCTGAACTCGGTGTTG')
+    primer4 = Primer(reverse_complement('AGCCCGCTGATGTTCCACAA'))
+
+    asm = assembly.PCRAssembly([primer1, seq, primer2, primer3, seq, primer4], limit=8, overlap_extension=8)
+    prods = asm.assemble_linear()
+
+    assert len(prods) == 1
+    assert (
+        str(prods[0].seq).upper()
+        == 'CAGTAATGATGGATGACATTCAAAGCACTGATTCTATTGCTGGTGGTCTGAACTCGGTGTTGAGCCCGCTGATGTTCCACAA'
+    )
+
+    # Introducing a mutation
+    seq = Dseqrecord('ccccCAGTAATGATGGATGACATTCAAAGCACTGATTCTATTGCTGGTGGTCTGAACTCGGTGTTGAGCCCGCTGATGTTCCACAAccc')
+
+    primer1 = Primer('CAGTAATGATGGATGACATT')
+    primer2 = Primer('GGATGACATTCAAAGCACTGATTCTATTagcGGTGGTCTGAACTC')
+    primer3 = Primer('GTGGTCTGAACTCGGTGTTG')
+    primer4 = Primer('CCTACTGTAAGTTTCGTGACTAAGATAAtcgCCACCAGACTTGAG')
+
+
 @pytest.mark.xfail(reason='U in primers not handled')
 def test_pcr_assembly_uracil():
 
-    primer1 = Dseqrecord('AUUA')
-    primer2 = Dseqrecord('UUAA')
+    primer1 = Primer('AUUA')
+    primer2 = Primer('UUAA')
 
     seq = Dseqrecord(Dseq('aaATTAggccggTTAAaa'))
     asm = assembly.PCRAssembly([primer1, seq, primer2], limit=4)
@@ -858,16 +902,16 @@ def test_pcr_assembly_uracil():
     assert str(asm.assemble_linear()[0].seq) == 'AUUAggccggTTAA'
     assert asm.assemble_linear()[0].seq.crick.startswith('UUAA')
 
-    primer1 = Dseqrecord('ATAUUA')
-    primer2 = Dseqrecord('ATUUAA')
+    primer1 = Primer('ATAUUA')
+    primer2 = Primer('ATUUAA')
     asm = assembly.PCRAssembly([primer1, seq, primer2], limit=6, mismatches=1)
     assert asm.assemble_linear()[0].seq == 'ATAUUAggccggTTAAAT'
 
 
 def test_pcr_assembly_invalid():
 
-    primer1 = Dseqrecord(Dseq('ACGTACGT'))
-    primer2 = Dseqrecord(Dseq('GCGCGCGC')).reverse_complement()
+    primer1 = Primer('ACGTACGT')
+    primer2 = Primer(reverse_complement('GCGCGCGC'))
 
     seq = Dseqrecord(Dseq('TTTTACGTACGTAAAAAAGCGCGCGCTTTTT'))
 
@@ -879,8 +923,8 @@ def test_pcr_assembly_invalid():
 
     # Clashing primers
     seq = Dseqrecord(Dseq('ACGTACGTGCGCGCGC'))
-    primer1 = Dseqrecord(Dseq('ACGTACGTG'))
-    primer2 = Dseqrecord(Dseq('TGCGCGCGC')).reverse_complement()
+    primer1 = Primer('ACGTACGTG')
+    primer2 = Primer(reverse_complement('TGCGCGCGC'))
 
     asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8)
 
@@ -894,11 +938,43 @@ def test_pcr_assembly_invalid():
     for shift in range(len(seq)):
         seq_shifted = seq.shifted(shift)
         asm = assembly.PCRAssembly([primer1, seq_shifted, primer2], limit=8)
-        try:
+        with pytest.raises(ValueError):
             asm.assemble_linear()
-            AssertionError('Clashing primers should give ValueError')
-        except ValueError:
-            pass
+
+    # PCR assembly, if circular, requires overlap extension
+    with pytest.raises(ValueError) as e:
+        asm.get_circular_assemblies()
+    assert 'overlap_extension' in str(e.value)
+
+    # Clashing primers on circular PCR assembly
+    seq = Dseqrecord('ccccACGTACGTAAAAAAGCGCGCGCcccc')
+    # Primers with overhangs that can circularise but clash
+    primer1 = Primer('gaagccgaaaaggagACGTACGT')
+    primer2 = Primer(reverse_complement('CGTAAAAAAgaagccgaaaaggag'))
+
+    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8, overlap_extension=15)
+    with pytest.raises(ValueError):
+        prods = asm.assemble_circular()
+
+    # Error if length is not multiple of 3
+    with pytest.raises(ValueError):
+        assembly.PCRAssembly([primer1, seq], limit=8)
+
+    # Error if not primer, seq, primer
+    with pytest.raises(ValueError):
+        assembly.PCRAssembly([seq, seq, seq], limit=8)
+    with pytest.raises(ValueError):
+        assembly.PCRAssembly([primer1, primer1, primer1], limit=8)
+
+    # PCR assembly does not support only_adjacent_edges
+    with pytest.raises(NotImplementedError):
+        asm.get_linear_assemblies(only_adjacent_edges=True)
+    with pytest.raises(NotImplementedError):
+        asm.get_circular_assemblies(only_adjacent_edges=True)
+
+    # PCR assembly does not support insertion
+    with pytest.raises(NotImplementedError):
+        asm.get_insertion_assemblies()
 
 
 def test_fragments_only_once():
@@ -1195,7 +1271,7 @@ def test_insertion_assembly():
         '3CGTACGCACAyyyyCGTACGCACAxxxxCGTACGCACAT4',
     ]
 
-    assembly_products = [str(assembly.assemble([a, b], assem, False).seq) for assem in f.get_insertion_assemblies()]
+    assembly_products = [str(assembly.assemble([a, b], assem).seq) for assem in f.get_insertion_assemblies()]
     assert sorted(assembly_products) == sorted(results)
 
     # TODO: debatable whether this kind of homologous recombination should happen, or how
@@ -1206,7 +1282,7 @@ def test_insertion_assembly():
     f = assembly.Assembly([a, b], use_fragment_order=False, limit=10)
     results = ['1CGTACGCACAyyyyCGTACGCACAxxxxC2']
     for assem, result in zip(f.get_insertion_assemblies(), results):
-        assert result == str(assembly.assemble([a, b], assem, False).seq)
+        assert result == str(assembly.assemble([a, b], assem).seq)
 
     a = Dseqrecord('1CGTACGCACAxxxxC2')
     b = Dseqrecord('3CGTACGCACAyyyyT4')
@@ -1248,7 +1324,7 @@ def circles_assembly():
     f = assembly.Assembly([a, b], use_fragment_order=False, limit=5)
     circular_assemblies = f.get_circular_assemblies()
     assert len(circular_assemblies) == 1
-    assert str(assembly.assemble([a, b], circular_assemblies[0], True)) == 'ACGTAyyyxxxACGTAbbbb'
+    assert str(assembly.assemble([a, b], circular_assemblies[0])) == 'ACGTAyyyxxxACGTAbbbb'
 
     # When more than two are provided, sequential homologous recombinations are returned
     a = Dseqrecord('aaACGTAACGTAaa', circular=True)
@@ -1262,7 +1338,7 @@ def circles_assembly():
         'ACGTAACGTAaaaaACGTAACGTAggggACGTAACGTAcccc',
     ]
     for assem, result in zip(f.get_insertion_assemblies(), results):
-        assert result == str(assembly.assemble([a, b, c], assem, False).seq)
+        assert result == str(assembly.assemble([a, b, c], assem).seq)
 
     # TODO: debatable whether this kind of homologous recombination should happen, same as above
     a = Dseqrecord('xxxACGTAyyy', circular=True)
@@ -1270,7 +1346,7 @@ def circles_assembly():
 
     f = assembly.Assembly([a, b], use_fragment_order=False, limit=5)
     assert len(circular_assemblies) == 1
-    assert str(assembly.assemble([a, b], circular_assemblies[0], True)) == 'ACGTAyyyxxxACGTAbb'
+    assert str(assembly.assemble([a, b], circular_assemblies[0])) == 'ACGTAyyyxxxACGTAbb'
 
 
 def test_assemble_function():
@@ -1304,7 +1380,7 @@ def test_assemble_function():
             (1, 2, f1_shifted.features[1].location, f2.features[1].location),
         ]
 
-        result = assembly.assemble([f1_shifted, f2], assembly_plan, False)
+        result = assembly.assemble([f1_shifted, f2], assembly_plan)
         assert str(result.seq) == 'ccccTTTctaGGGaaa'
         assert len(result.features) == 4
         assert set(str(f.location.extract(result.seq)) for f in result.features) == {'TTT', 'GGG'}
@@ -1315,7 +1391,7 @@ def test_assemble_function():
             (2, 1, f2.features[1].location, f1_shifted.features[1].location),
         ]
 
-        result = assembly.assemble([f1_shifted, f2], assembly_plan, True)
+        result = assembly.assemble([f1_shifted, f2], assembly_plan)
         assert str(result.seq) == 'GGGcccaaaTTTatg'
         assert len(result.features) == 4
         assert set(str(f.location.extract(result.seq)) for f in result.features) == {'TTT', 'GGG'}
@@ -1325,7 +1401,7 @@ def test_assemble_function():
         # assembly_plan = [
         #     (2, 1, f2.features[1].location, f1_shifted.features[1].location),
         # ]
-        # result = assembly.assemble([f1_shifted, f2], assembly_plan, False)
+        # result = assembly.assemble([f1_shifted, f2], assembly_plan)
 
     # Now both are circular, using a single insertion site
     f1 = Dseqrecord('aaaTTTcta', circular=True)
@@ -1344,7 +1420,7 @@ def test_assemble_function():
                 (2, 1, f2_shifted.features[0].location, f1_shifted.features[0].location),
             ]
 
-            result = assembly.assemble([f1_shifted, f2_shifted], assembly_plan, True)
+            result = assembly.assemble([f1_shifted, f2_shifted], assembly_plan)
             assert result.seq.seguid() == Dseq('aaaTTTatgccccTTTcta', circular=True).seguid()
             assert len(result.features) == 4
             assert set(str(f.location.extract(result.seq)) for f in result.features) == {'TTT'}
@@ -1358,14 +1434,14 @@ def test_assemble_function():
     assembly_plan = [
         (1, 2, loc_end, loc_start),
     ]
-    assert fragments[0] + fragments[1] == assembly.assemble(fragments, assembly_plan, False)
+    assert fragments[0] + fragments[1] == assembly.assemble(fragments, assembly_plan)
 
     # A circular assembly
     assembly_plan = [
         (1, 2, loc_end, loc_start),
         (2, 1, loc_end, loc_start),
     ]
-    assert (fragments[0] + fragments[1]).looped() == assembly.assemble(fragments, assembly_plan, True)
+    assert (fragments[0] + fragments[1]).looped() == assembly.assemble(fragments, assembly_plan)
 
 
 def test_assembly_is_valid():
@@ -1386,7 +1462,7 @@ def test_assembly_is_valid():
         (2, 3, SimpleLocation(3, 6), SimpleLocation(0, 3)),
     ]
 
-    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True)
+    assert assembly.Assembly.assembly_is_valid(fragments, assembly_plan, False, True)
 
     # Partial overlap should be allowed, a fragment could act like a "bridge"
     # 1 ------
@@ -1400,7 +1476,7 @@ def test_assembly_is_valid():
         (2, 3, SimpleLocation(2, 6), SimpleLocation(0, 4)),
     ]
 
-    assert assembly.assembly_is_valid(fragments, assembly_plan, False, True)
+    assert assembly.Assembly.assembly_is_valid(fragments, assembly_plan, False, True)
 
     # Complete overlap in linear assemblies should be discarded as is redundant
     # 1 ------
@@ -1415,7 +1491,7 @@ def test_assembly_is_valid():
         (2, 3, SimpleLocation(0, 4), SimpleLocation(0, 4)),
     ]
 
-    assert not assembly.assembly_is_valid(fragments, assembly_plan, False, True)
+    assert not assembly.Assembly.assembly_is_valid(fragments, assembly_plan, False, True)
 
     # Invalid assembly
     # 1   ------
@@ -1429,7 +1505,7 @@ def test_assembly_is_valid():
         (2, 3, SimpleLocation(0, 2), SimpleLocation(0, 2)),
     ]
 
-    assert not assembly.assembly_is_valid(fragments, assembly_plan, False, True)
+    assert not assembly.Assembly.assembly_is_valid(fragments, assembly_plan, False, True)
 
     # Assembly plan including two fragments extracted from circular molecules:
     f1 = Dseqrecord('ccTTTc')
@@ -1460,9 +1536,9 @@ def test_assembly_is_valid():
                 ),
                 (3, 4, find_feature_by_id(f3_shifted, 'f3_f4').location, f4.features[0].location),
             ]
-            assert assembly.assembly_is_valid(fragments, assembly_plan, False, True)
+            assert assembly.Assembly.assembly_is_valid(fragments, assembly_plan, False, True)
             # Does not really belong here, but
-            assert str(assembly.assemble(fragments, assembly_plan, False).seq) == 'ccTTTAAACCCg'
+            assert str(assembly.assemble(fragments, assembly_plan).seq) == 'ccTTTAAACCCg'
 
 
 def test_extract_subfragment():
@@ -1718,72 +1794,63 @@ def test_alignment_sub_strings():
 
         template_shifted = template.shifted(-shift)
 
-        primer = Dseqrecord('TTAGCAGC')
-        assert [(0, (2 + shift) % len(template), 8)] == assembly.alignment_sub_strings(
-            template_shifted, primer, False, 8, 0
-        )
+        primer = Primer('TTAGCAGC')
+        assert [(0, (2 + shift) % len(template), 8)] == assembly.alignment_sub_strings(primer, template_shifted, 8, 0)
 
         # The alignment is zipped if more bases align than the arg limit
-        assert [(0, (2 + shift) % len(template), 8)] == assembly.alignment_sub_strings(
-            template_shifted, primer, False, 6, 0
-        )
+        assert [(0, (2 + shift) % len(template), 8)] == assembly.alignment_sub_strings(primer, template_shifted, 6, 0)
 
         # Extra primer on the left
-        primer_extra_left = Dseqrecord('GGGCTTTAGCAGC')
+        primer_extra_left = Primer('GGGCTTTAGCAGC')
         assert [(5, (2 + shift) % len(template), 8)] == assembly.alignment_sub_strings(
-            template_shifted, primer_extra_left, False, 8, 0
+            primer_extra_left, template_shifted, 8, 0
         )
 
         # Extra primer on the right does not work
-        primer_extra_right = Dseqrecord('TTAGCAGCA')
-        assert [] == assembly.alignment_sub_strings(template_shifted, primer_extra_right, False, 8, 0)
+        primer_extra_right = Primer('TTAGCAGCA')
+        assert [] == assembly.alignment_sub_strings(primer_extra_right, template_shifted, 8, 0)
 
         # Too short primer does not work either
-        primer2short = Dseqrecord('TAGCAGC')
-        assert [] == assembly.alignment_sub_strings(template_shifted, primer2short, False, 8, 0)
+        primer2short = Primer('TAGCAGC')
+        assert [] == assembly.alignment_sub_strings(primer2short, template_shifted, 8, 0)
 
         # Mismatch
-        primer = Dseqrecord('TaAGCAGC')
-        assert [(2, (4 + shift) % len(template), 6)] == assembly.alignment_sub_strings(
-            template_shifted, primer, False, 8, 1
-        )
-        primer = Dseqrecord('aaAGCAGC')
-        assert [(2, (4 + shift) % len(template), 6)] == assembly.alignment_sub_strings(
-            template_shifted, primer, False, 8, 2
-        )
+        primer = Primer('TaAGCAGC')
+        assert [(2, (4 + shift) % len(template), 6)] == assembly.alignment_sub_strings(primer, template_shifted, 8, 1)
+        primer = Primer('aaAGCAGC')
+        assert [(2, (4 + shift) % len(template), 6)] == assembly.alignment_sub_strings(primer, template_shifted, 8, 2)
 
         # Too many mismatches for argument
-        primer = Dseqrecord('AAAGCAGC')
-        assert [] == assembly.alignment_sub_strings(template_shifted, primer, False, 8, 1)
+        primer = Primer('AAAGCAGC')
+        assert [] == assembly.alignment_sub_strings(primer, template_shifted, 8, 1)
 
         # Reverse primer
-        primer = Dseqrecord('GCGATCGA')
-        assert [((8 + shift) % len(template), 0, 8)] == assembly.alignment_sub_strings(
-            template_shifted, primer, True, 8, 0
-        )
+        primer = Primer('GCGATCGA')
+        assert [((8 + shift) % len(template), 0, 8)] == assembly.alignment_sub_strings(template_shifted, primer, 8, 0)
 
         # The alignment is zipped if more bases align than the arg limit
-        assert [((8 + shift) % len(template), 0, 8)] == assembly.alignment_sub_strings(
-            template_shifted, primer, True, 6, 0
-        )
+        assert [((8 + shift) % len(template), 0, 8)] == assembly.alignment_sub_strings(template_shifted, primer, 6, 0)
 
         # Reverse primer with 5' extension
-        primer = Dseqrecord('GCGATCGAAAAA')
-        assert [((8 + shift) % len(template), 0, 8)] == assembly.alignment_sub_strings(
-            template_shifted, primer, True, 8, 0
-        )
+        primer = Primer('GCGATCGAAAAA')
+        assert [((8 + shift) % len(template), 0, 8)] == assembly.alignment_sub_strings(template_shifted, primer, 8, 0)
 
         # Extra bases on the 3' should not work
-        primer = Dseqrecord('AAGCGATCGA')
-        assert [] == assembly.alignment_sub_strings(template_shifted, primer, True, 8, 0)
+        primer = Primer('AAGCGATCGA')
+        assert [] == assembly.alignment_sub_strings(template_shifted, primer, 8, 0)
 
         # Mismatches
-        primer = Dseqrecord('GCGtTCGA')
-        assert [((8 + shift) % len(template), 0, 3)] == assembly.alignment_sub_strings(
-            template_shifted, primer, True, 8, 1
-        )
+        primer = Primer('GCGtTCGA')
+        assert [((8 + shift) % len(template), 0, 3)] == assembly.alignment_sub_strings(template_shifted, primer, 8, 1)
 
     # Multiple matches
-    primer = Dseqrecord('AATTAGCA')
+    primer = Primer('AATTAGCA')
     template = Dseqrecord('AATTAGCAGCGATCAATTAGCA')
-    assert [(0, 0, 8), (0, 14, 8)] == assembly.alignment_sub_strings(template, primer, False, 8, 1)
+    assert [(0, 0, 8), (0, 14, 8)] == assembly.alignment_sub_strings(primer, template, 8, 1)
+
+    # Gives the right error when passed sequences are not primer and sequence
+    with pytest.raises(ValueError):
+        assembly.alignment_sub_strings(primer, primer, 8, 1)
+
+    with pytest.raises(ValueError):
+        assembly.alignment_sub_strings(template, template, 8, 1)

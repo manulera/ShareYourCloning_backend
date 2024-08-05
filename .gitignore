@@ -13,3 +13,6 @@ stubs/
 
 # Frontend build
 frontend/
+
+# Env secrets
+.env.secret
