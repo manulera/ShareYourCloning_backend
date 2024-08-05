@@ -38,6 +38,7 @@ jobs:
       - name: Run tests
         env:
           PYTHONUNBUFFERED: "1"
+          NCBI_API_KEY: ${{ secrets.NCBI_API_KEY }}
         run: poetry run python -u -m pytest --tb=short -v --capture=no --cov='.' --cov-report term --cov-report xml:coverage.xml
 
       - uses: actions/cache@v4

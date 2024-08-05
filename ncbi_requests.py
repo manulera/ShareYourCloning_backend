@@ -2,6 +2,14 @@ import requests
 from fastapi import HTTPException
 from urllib.error import HTTPError
 from pydna.genbank import Genbank
+import os
+
+NCBI_API_KEY = os.environ.get('NCBI_API_KEY')
+
+if NCBI_API_KEY is None:
+    headers = None
+else:
+    headers = {'api_key': NCBI_API_KEY}
 
 
 # TODO: this does not return old assembly accessions, see https://github.com/ncbi/datasets/issues/380#issuecomment-2231142816
@@ -9,7 +17,7 @@ def get_assembly_accession_from_sequence_accession(sequence_accession: str) -> l
     """Get the assembly accession from a sequence accession"""
 
     url = f'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/sequence_accession/{sequence_accession}/sequence_assemblies'
-    resp = requests.get(url)
+    resp = requests.get(url, headers=headers)
     data = resp.json()
     if 'accessions' in data:
         return data['accessions']
@@ -20,7 +28,7 @@ def get_assembly_accession_from_sequence_accession(sequence_accession: str) -> l
 def get_sequence_accessions_from_assembly_accession(assembly_accession: str) -> list[str]:
     """Get the sequence accessions from an assembly accession"""
     url = f'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/{assembly_accession}/sequence_reports'
-    resp = requests.get(url)
+    resp = requests.get(url, headers=headers)
     data = resp.json()
     if 'reports' in data:
         return [report['refseq_accession'] for report in data['reports']] + [
@@ -34,7 +42,7 @@ def get_sequence_accessions_from_assembly_accession(assembly_accession: str) -> 
 
 def get_annotation_from_locus_tag(locus_tag: str, assembly_accession: str) -> dict:
     url = f'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/{assembly_accession}/annotation_report?search_text={locus_tag}'
-    resp = requests.get(url)
+    resp = requests.get(url, headers=headers)
     if resp.status_code == 404:
         raise HTTPException(404, 'wrong accession number')
     data = resp.json()
