@@ -972,6 +972,10 @@ def test_pcr_assembly_invalid():
     with pytest.raises(NotImplementedError):
         asm.get_circular_assemblies(only_adjacent_edges=True)
 
+    # PCR assembly does not support insertion
+    with pytest.raises(NotImplementedError):
+        asm.get_insertion_assemblies()
+
 
 def test_fragments_only_once():
 

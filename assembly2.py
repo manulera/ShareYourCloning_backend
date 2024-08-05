@@ -1172,9 +1172,7 @@ class PCRAssembly(Assembly):
         return super().get_circular_assemblies()
 
     def get_insertion_assemblies(self, only_adjacent_edges: bool = False):
-        if not self.overlap_extension:
-            raise ValueError('Insertion PCR assembly requires overlap_extension to be set')
-        return super().get_insertion_assemblies(only_adjacent_edges)
+        raise NotImplementedError('get_insertion_assemblies not implemented for PCR assemblies')
 
 
 class SingleFragmentAssembly(Assembly):

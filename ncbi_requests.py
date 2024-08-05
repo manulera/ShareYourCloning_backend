@@ -7,7 +7,7 @@ import os
 NCBI_API_KEY = os.environ.get('NCBI_API_KEY')
 
 if NCBI_API_KEY is None:
-    headers = None
+    headers = None  # pragma: no cover
 else:
     headers = {'api_key': NCBI_API_KEY}
 
