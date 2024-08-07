@@ -1,5 +1,4 @@
 from pydantic import BaseModel, Field, model_validator
-from enum import Enum
 from typing import Optional, List
 from Bio.SeqFeature import SeqFeature, Location, SimpleLocation as BioSimpleLocation
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
@@ -31,19 +30,11 @@ from shareyourcloning_linkml.datamodel import (
     AddGeneIdSource as _AddGeneIdSource,
     BenchlingUrlSource as _BenchlingUrlSource,
     CloningStrategy as _CloningStrategy,
+    OverlapExtensionPCRLigationSource as _OverlapExtensionPCRLigationSource,
 )
 from pydna.utils import shift_location as _shift_location
 
 SequenceFileFormat = _SequenceFileFormat
-
-
-class SourceType(str, Enum):
-    ligation = 'ligation'
-    PCR = 'PCR'
-    homologous_recombination = 'homologous_recombination'
-    crispr = 'crispr'
-    gibson_assembly = 'gibson_assembly'
-    restriction_and_ligation = 'restriction_and_ligation'
 
 
 class TextFileSequence(_TextFileSequence):
@@ -304,6 +295,10 @@ class GibsonAssemblySource(_GibsonAssemblySource, AssemblySourceCommonClass):
 
     # TODO: add this to LinkML
     # input: conlist(int, min_length=1)
+    pass
+
+
+class OverlapExtensionPCRLigationSource(_OverlapExtensionPCRLigationSource, AssemblySourceCommonClass):
     pass
 
 

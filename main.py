@@ -1,5 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter
-from typing import Annotated
+from typing import Annotated, Union
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydna.dseqrecord import Dseqrecord
@@ -40,6 +40,7 @@ from pydantic_models import (
     BaseCloningStrategy,
     PrimerDesignQuery,
     BenchlingUrlSource,
+    OverlapExtensionPCRLigationSource,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
@@ -843,12 +844,14 @@ async def homologous_recombination(
 @router.post(
     '/gibson_assembly',
     response_model=create_model(
-        'GibsonAssemblyResponse', sources=(list[GibsonAssemblySource], ...), sequences=(list[TextFileSequence], ...)
+        'GibsonAssemblyResponse',
+        sources=(list[Union[GibsonAssemblySource, OverlapExtensionPCRLigationSource]], ...),
+        sequences=(list[TextFileSequence], ...),
     ),
 )
 async def gibson_assembly(
-    source: GibsonAssemblySource,
     sequences: conlist(TextFileSequence, min_length=1),
+    source: Union[GibsonAssemblySource, OverlapExtensionPCRLigationSource],
     minimal_homology: int = Query(
         40, description='The minimum homology between consecutive fragments in the assembly.'
     ),
@@ -859,7 +862,7 @@ async def gibson_assembly(
 
     # Lambda function for code clarity
     def create_source(a, is_circular):
-        return GibsonAssemblySource.from_assembly(assembly=a, circular=is_circular, id=source.id, fragments=fragments)
+        return source.__class__.from_assembly(assembly=a, circular=is_circular, id=source.id, fragments=fragments)
 
     out_sources = []
     if len(fragments) > 1:
