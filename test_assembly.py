@@ -848,48 +848,6 @@ def test_pcr_assembly_normal():
     assert str(prods[0].seq) == 'TTTACGTACGTAAAAAAGCGCGCGCTTT'
 
 
-def test_pcr_overlap_extension():
-
-    seq = Dseqrecord('ccccACGTACGTAAAAAAGCGCGCGCcccc')
-
-    # Primers with overhangs that can circularise
-    primer1 = Primer('gaagccgaaaaggagACGTACGT')
-    primer2 = Primer(reverse_complement('GCGCGCGCgaagccgaaaaggag'))
-
-    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8, overlap_extension=15)
-    prods = asm.assemble_circular()
-
-    assert len(prods) == 1
-    assert str(prods[0].seq) == 'gaagccgaaaaggagACGTACGTAAAAAAGCGCGCGC'
-
-    # Splicing-like (remove the aaaa[...] lowercase bit)
-    seq = Dseqrecord(
-        'ccccCAGTAATGATGGATGACATTCAAAGCACTGATTCTATTGCTGaaaaaaaGTGGTCTGAACTCGGTGTTGAGCCCGCTGATGTTCCACAAcccc'
-    )
-
-    primer1 = Primer('CAGTAATGATGGATGACATT')
-    primer2 = Primer(reverse_complement('AAGCACTGATTCTATTGCTGgtggtctgaac'))
-    primer3 = Primer('tctattgctgGTGGTCTGAACTCGGTGTTG')
-    primer4 = Primer(reverse_complement('AGCCCGCTGATGTTCCACAA'))
-
-    asm = assembly.PCRAssembly([primer1, seq, primer2, primer3, seq, primer4], limit=8, overlap_extension=8)
-    prods = asm.assemble_linear()
-
-    assert len(prods) == 1
-    assert (
-        str(prods[0].seq).upper()
-        == 'CAGTAATGATGGATGACATTCAAAGCACTGATTCTATTGCTGGTGGTCTGAACTCGGTGTTGAGCCCGCTGATGTTCCACAA'
-    )
-
-    # Introducing a mutation
-    seq = Dseqrecord('ccccCAGTAATGATGGATGACATTCAAAGCACTGATTCTATTGCTGGTGGTCTGAACTCGGTGTTGAGCCCGCTGATGTTCCACAAccc')
-
-    primer1 = Primer('CAGTAATGATGGATGACATT')
-    primer2 = Primer('GGATGACATTCAAAGCACTGATTCTATTagcGGTGGTCTGAACTC')
-    primer3 = Primer('GTGGTCTGAACTCGGTGTTG')
-    primer4 = Primer('CCTACTGTAAGTTTCGTGACTAAGATAAtcgCCACCAGACTTGAG')
-
-
 @pytest.mark.xfail(reason='U in primers not handled')
 def test_pcr_assembly_uracil():
 
@@ -941,20 +899,9 @@ def test_pcr_assembly_invalid():
         with pytest.raises(ValueError):
             asm.assemble_linear()
 
-    # PCR assembly, if circular, requires overlap extension
-    with pytest.raises(ValueError) as e:
+    # PCR assembly, raises error in case of circular assembly and insertion
+    with pytest.raises(NotImplementedError):
         asm.get_circular_assemblies()
-    assert 'overlap_extension' in str(e.value)
-
-    # Clashing primers on circular PCR assembly
-    seq = Dseqrecord('ccccACGTACGTAAAAAAGCGCGCGCcccc')
-    # Primers with overhangs that can circularise but clash
-    primer1 = Primer('gaagccgaaaaggagACGTACGT')
-    primer2 = Primer(reverse_complement('CGTAAAAAAgaagccgaaaaggag'))
-
-    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8, overlap_extension=15)
-    with pytest.raises(ValueError):
-        prods = asm.assemble_circular()
 
     # Error if length is not multiple of 3
     with pytest.raises(ValueError):
@@ -969,8 +916,6 @@ def test_pcr_assembly_invalid():
     # PCR assembly does not support only_adjacent_edges
     with pytest.raises(NotImplementedError):
         asm.get_linear_assemblies(only_adjacent_edges=True)
-    with pytest.raises(NotImplementedError):
-        asm.get_circular_assemblies(only_adjacent_edges=True)
 
     # PCR assembly does not support insertion
     with pytest.raises(NotImplementedError):
