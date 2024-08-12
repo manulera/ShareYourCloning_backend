@@ -203,5 +203,12 @@ def oligonucleotide_hybridization_overhangs(
     fwd_oligo_seq: str, rvs_oligo_seq: str, minimal_annealing: int
 ) -> list[int]:
     matches = common_sub_strings(fwd_oligo_seq.lower(), reverse_complement(rvs_oligo_seq.lower()), minimal_annealing)
+
+    for m in matches:
+        if not (
+            (m[0] == 0 and m[1] + m[2] == len(fwd_oligo_seq)) or (m[1] == 0 and m[0] + m[2] == len(rvs_oligo_seq))
+        ):
+            raise ValueError('The oligonucleotides can anneal with mismatches')
+
     # Return possible overhangs
     return [start_on_rvs - start_on_fwd for start_on_fwd, start_on_rvs, length in matches]

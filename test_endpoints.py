@@ -1069,6 +1069,17 @@ class OligoHybridizationTest(unittest.TestCase):
         response = client.post('/oligonucleotide_hybridization', json=invalid_oligo_example)
         self.assertEqual(response.status_code, 404)
 
+    def test_hybridization_in_the_middle(self):
+        default_example = request_examples.oligonucleotide_hybridization_examples['default']['value']
+        default_example['primers'][0]['sequence'] = 'aaaACGGCAGCCCGTaaa'
+        default_example['primers'][1]['sequence'] = 'cccTGCCGTCGGGCAccc'[::-1]
+        response = client.post(
+            '/oligonucleotide_hybridization', json=default_example, params={'minimal_annealing': 12}
+        )
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertIn('mismatch', payload['detail'])
+
 
 class HomologousRecombinationTest(unittest.TestCase):
     def test_homologous_recombination(self):

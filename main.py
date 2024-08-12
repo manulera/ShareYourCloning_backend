@@ -732,7 +732,10 @@ async def oligonucleotide_hybridization(
         if ovhg_watson > 0:
             minimal_annealing -= ovhg_watson
 
-    possible_overhangs = oligonucleotide_hybridization_overhangs(watson_seq, crick_seq, minimal_annealing)
+    try:
+        possible_overhangs = oligonucleotide_hybridization_overhangs(watson_seq, crick_seq, minimal_annealing)
+    except ValueError as e:
+        raise HTTPException(400, *e.args)
 
     if len(possible_overhangs) == 0:
         raise HTTPException(400, 'No pair of annealing oligos was found. Try changing the annealing settings.')
