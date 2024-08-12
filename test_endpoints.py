@@ -33,6 +33,7 @@ import request_examples
 import copy
 import json
 import tempfile
+import pytest
 
 client = TestClient(app)
 
@@ -1372,6 +1373,7 @@ class GenomeRegionTest(unittest.TestCase):
         else:
             self.assertEqual(response_code, expected, msg)
 
+    @pytest.mark.flaky(reruns=3, reruns_delay=2)
     def test_examples(self):
         for example_name in request_examples.genome_region_examples:
             example = request_examples.genome_region_examples[example_name]
@@ -1395,6 +1397,7 @@ class GenomeRegionTest(unittest.TestCase):
             elif example_name == 'viral_sequence':
                 self.assertEqual(response_source, request_source, msg)
 
+    @pytest.mark.flaky(reruns=3, reruns_delay=2)
     def test_exceptions(self):
         # Load first example
         correct_source = GenomeCoordinatesSource.model_validate(

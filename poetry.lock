@@ -1690,6 +1690,21 @@ pytest = ">=4.6"
 testing = ["fields", "hunter", "process-tests", "pytest-xdist", "six", "virtualenv"]
 
 [[package]]
+name = "pytest-rerunfailures"
+version = "14.0"
+description = "pytest plugin to re-run tests to eliminate flaky failures"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "pytest-rerunfailures-14.0.tar.gz", hash = "sha256:4a400bcbcd3c7a4ad151ab8afac123d90eca3abe27f98725dc4d9702887d2e92"},
+    {file = "pytest_rerunfailures-14.0-py3-none-any.whl", hash = "sha256:4197bdd2eaeffdbf50b5ea6e7236f47ff0e44d1def8dae08e409f536d84e7b32"},
+]
+
+[package.dependencies]
+packaging = ">=17.1"
+pytest = ">=7.2"
+
+[[package]]
 name = "python-dateutil"
 version = "2.8.2"
 description = "Extensions to the standard Python datetime module"
@@ -2087,17 +2102,24 @@ testing-integration = ["build[virtualenv] (>=1.0.3)", "filelock (>=3.4.0)", "jar
 
 [[package]]
 name = "shareyourcloning-linkml"
-version = "0.1.5.10a0"
+version = "0.1.0"
 description = "A LinkML data model for ShareYourCloning"
 optional = false
-python-versions = "<4.0,>=3.9"
-files = [
-    {file = "shareyourcloning_linkml-0.1.5.10a0-py3-none-any.whl", hash = "sha256:a4afcf22d45ac558f21de1926760a65b3c27011ada3bbe50e720cb0ef8d98857"},
-    {file = "shareyourcloning_linkml-0.1.5.10a0.tar.gz", hash = "sha256:9256bba9be2348efaf18bb7c5c5b30dfd59f1276e3931436a70183a97a2cb40b"},
-]
+python-versions = "^3.9"
+files = []
+develop = false
 
 [package.dependencies]
-pydantic = ">=2.7.1,<3.0.0"
+pydantic = "^2.7.1"
+
+[package.extras]
+docs = []
+
+[package.source]
+type = "git"
+url = "https://github.com/genestorian/ShareYourCloning_LinkML"
+reference = "HEAD"
+resolved_reference = "4987203469e8da2b63d067de0550955552f5dfef"
 
 [[package]]
 name = "shellingham"
@@ -2555,4 +2577,4 @@ test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "1d8cad11454ef6e3345346bdd4ee93d11dea60117d42a731d8c79f11d36589bb"
+content-hash = "6cc80c410e78b027e51aaf32cabc15a809ab2e0826c1c4f10209215a2d38ace3"

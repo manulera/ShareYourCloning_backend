@@ -1080,19 +1080,22 @@ class Assembly:
 
 
 class PCRAssembly(Assembly):
-    def __init__(self, frags: list[_Dseqrecord | _Primer], limit=25, mismatches=0, overlap_extension=0):
+    def __init__(self, frags: list[_Dseqrecord | _Primer], limit=25, mismatches=0):
 
-        format_error = ValueError('PCRAssembly assembly must be initialised with a series of primer, template, primer')
+        value_error = ValueError(
+            'PCRAssembly assembly must be initialised with a list/tuple of primer, template, primer'
+        )
+        if len(frags) != 3:
+            raise value_error
+
         # Validate the inputs: should be a series of primer, template, primer
-        if len(frags) % 3 != 0:
-            raise format_error
-
-        for i, f in enumerate(frags):
-            if i % 3 in [0, 2]:
-                if not isinstance(f, _Primer):
-                    raise format_error
-            elif isinstance(f, _Primer):
-                raise format_error
+        wrong_fragment_class = (
+            not isinstance(frags[0], _Primer),
+            isinstance(frags[1], _Primer),
+            not isinstance(frags[2], _Primer),
+        )
+        if any(wrong_fragment_class):
+            raise value_error
 
         # TODO: allow for the same fragment to be included more than once?
         self.G = _nx.MultiDiGraph()
@@ -1116,23 +1119,6 @@ class PCRAssembly(Assembly):
             for match in matches:
                 self.add_edges_from_match(match, u, v, u_seq, v_seq)
 
-        # If overlap_extension is set, we add links between primers in opposite directions
-        if overlap_extension != 0:
-
-            def algorithm_overlap_extension(x, y):
-                return [
-                    m for m in common_sub_strings(x, y, overlap_extension) if (m[1] == 0 and m[0] + m[2] == len(x))
-                ]
-
-            # We want primers facing away from each other
-            primer_pairs = [(-u, v) for u, v in _itertools.combinations(primer_ids, 2)]
-            for u, v in primer_pairs:
-                u_seq = self.G.nodes[u]['seq']
-                v_seq = self.G.nodes[v]['seq']
-                matches = algorithm_overlap_extension(u_seq, v_seq)
-                for match in matches:
-                    self.add_edges_from_match(match, u, v, u_seq, v_seq)
-
         # These two are constrained
         self.use_fragment_order = False
         self.use_all_fragments = True
@@ -1140,7 +1126,6 @@ class PCRAssembly(Assembly):
         self.fragments = frags
         self.limit = limit
         self.algorithm = alignment_sub_strings
-        self.overlap_extension = overlap_extension
 
         return
 
@@ -1164,12 +1149,7 @@ class PCRAssembly(Assembly):
         return super().get_linear_assemblies()
 
     def get_circular_assemblies(self, only_adjacent_edges: bool = False):
-        if only_adjacent_edges:
-            raise NotImplementedError('only_adjacent_edges not implemented for PCR assemblies')
-
-        if not self.overlap_extension:
-            raise ValueError('Circular PCR assembly requires overlap_extension to be set')
-        return super().get_circular_assemblies()
+        raise NotImplementedError('get_circular_assemblies not implemented for PCR assemblies')
 
     def get_insertion_assemblies(self, only_adjacent_edges: bool = False):
         raise NotImplementedError('get_insertion_assemblies not implemented for PCR assemblies')
