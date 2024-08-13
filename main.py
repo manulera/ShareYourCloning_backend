@@ -65,6 +65,7 @@ import os
 from record_stub_route import RecordStubRoute
 from starlette.responses import RedirectResponse
 from primer_design import homologous_recombination_primers
+import asyncio
 
 # ENV variables ========================================
 RECORD_STUBS = os.environ['RECORD_STUBS'] == '1' if 'RECORD_STUBS' in os.environ else False
@@ -351,48 +352,59 @@ async def genome_coordinates(
     ncbi_requests.validate_coordinates_pre_request(source.start, source.end, source.strand)
 
     # Source includes a locus tag in annotated assembly
-    if source.locus_tag is not None:
 
-        if source.assembly_accession is None:
-            raise HTTPException(422, 'assembly_accession is required if locus_tag is set')
+    async def validate_locus_task():
+        if source.locus_tag is not None:
 
-        annotation = ncbi_requests.get_annotation_from_locus_tag(source.locus_tag, source.assembly_accession)
-        gene_range = annotation['genomic_regions'][0]['gene_range']['range'][0]
-        gene_strand = 1 if gene_range['orientation'] == 'plus' else -1
+            if source.assembly_accession is None:
+                raise HTTPException(422, 'assembly_accession is required if locus_tag is set')
 
-        # This field will not be present in all cases, but should be there in reference genomes
-        if source.gene_id is not None:
-            if 'gene_id' not in annotation:
-                raise HTTPException(400, 'gene_id is set, but not found in the annotation')
-            if source.gene_id != int(annotation['gene_id']):
-                raise HTTPException(400, 'gene_id does not match the locus_tag')
-        elif 'gene_id' in annotation:
-            source.gene_id = int(annotation['gene_id'])
+            annotation = await ncbi_requests.get_annotation_from_locus_tag(source.locus_tag, source.assembly_accession)
+            gene_range = annotation['genomic_regions'][0]['gene_range']['range'][0]
+            gene_strand = 1 if gene_range['orientation'] == 'plus' else -1
 
-        # The gene should fall within the range (range might be bigger if bases were requested upstream or downstream)
-        if (
-            int(gene_range['begin']) < source.start
-            or int(gene_range['end']) > source.end
-            or gene_strand != source.strand
-        ):
-            raise HTTPException(
-                400,
-                f'wrong coordinates, expected to fall within {source.start}, {source.end} on strand: {source.strand}',
+            # This field will not be present in all cases, but should be there in reference genomes
+            if source.gene_id is not None:
+                if 'gene_id' not in annotation:
+                    raise HTTPException(400, 'gene_id is set, but not found in the annotation')
+                if source.gene_id != int(annotation['gene_id']):
+                    raise HTTPException(400, 'gene_id does not match the locus_tag')
+            elif 'gene_id' in annotation:
+                source.gene_id = int(annotation['gene_id'])
+
+            # The gene should fall within the range (range might be bigger if bases were requested upstream or downstream)
+            if (
+                int(gene_range['begin']) < source.start
+                or int(gene_range['end']) > source.end
+                or gene_strand != source.strand
+            ):
+                raise HTTPException(
+                    400,
+                    f'wrong coordinates, expected to fall within {source.start}, {source.end} on strand: {source.strand}',
+                )
+        elif source.gene_id is not None:
+            raise HTTPException(422, 'gene_id is set, but not locus_tag')
+
+    async def validate_assembly_task():
+        if source.assembly_accession is not None:
+            # We get the assembly accession (if it exists), and if the user provided one we validate it
+            sequence_accessions = await ncbi_requests.get_sequence_accessions_from_assembly_accession(
+                source.assembly_accession
             )
+            if source.sequence_accession not in sequence_accessions:
+                raise HTTPException(
+                    400,
+                    f'Sequence accession {source.sequence_accession} not contained in assembly accession {source.assembly_accession}, which contains accessions: {", ".join(sequence_accessions)}',
+                )
 
-    elif source.gene_id is not None:
-        raise HTTPException(422, 'gene_id is set, but not locus_tag')
+    async def get_sequence_task():
+        return await ncbi_requests.get_genbank_sequence_subset(
+            source.sequence_accession, source.start, source.end, source.strand
+        )
 
-    if source.assembly_accession is not None:
-        # We get the assembly accession (if it exists), and if the user provided one we validate it
-        sequence_accessions = ncbi_requests.get_sequence_accessions_from_assembly_accession(source.assembly_accession)
-        if source.sequence_accession not in sequence_accessions:
-            raise HTTPException(
-                400,
-                f'Sequence accession {source.sequence_accession} not contained in assembly accession {source.assembly_accession}, which contains accessions: {", ".join(sequence_accessions)}',
-            )
+    tasks = [validate_locus_task(), validate_assembly_task(), get_sequence_task()]
 
-    seq = ncbi_requests.get_genbank_sequence_subset(source.sequence_accession, source.start, source.end, source.strand)
+    _, _, seq = await asyncio.gather(*tasks)
 
     # NCBI does not complain for coordinates that fall out of the sequence, so we have to check here
     if len(seq) != source.end - source.start + 1:
