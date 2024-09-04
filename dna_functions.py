@@ -88,7 +88,7 @@ def get_invalid_enzyme_names(enzyme_names_list: list[str | None]) -> list[str]:
     return invalid_names
 
 
-def get_sequences_from_gb_file_url(url: str) -> Dseqrecord:
+def get_sequences_from_gb_file_url(url: str) -> list[Dseqrecord]:
     # TODO once pydna parse is fixed it should handle urls that point to non-gb files
     resp = requests.get(url)
     if resp.status_code != 200:
@@ -96,16 +96,22 @@ def get_sequences_from_gb_file_url(url: str) -> Dseqrecord:
     return pydna_parse(resp.text)
 
 
-def request_from_addgene(source: AddGeneIdSource) -> tuple[list[Dseqrecord], list[AddGeneIdSource]]:
-    # TODO here maybe it would be good to check that the addgeneID still returns the url requested.
-    if source.sequence_file_url:
-        return [get_sequences_from_gb_file_url(source.sequence_file_url)[0]], [source]
+def request_from_addgene(source: AddGeneIdSource) -> tuple[Dseqrecord, AddGeneIdSource]:
 
     url = f'https://www.addgene.org/{source.repository_id}/sequences/'
     resp = requests.get(url)
     if resp.status_code == 404:
         raise HTTPError(url, 404, 'wrong addgene id', 'wrong addgene id', None)
     soup = BeautifulSoup(resp.content, 'html.parser')
+
+    # Get a span.material-name from the soup, see https://github.com/manulera/ShareYourCloning_backend/issues/182
+    plasmid_name = soup.find('span', class_='material-name').text
+
+    if source.sequence_file_url:
+        dseqr = get_sequences_from_gb_file_url(source.sequence_file_url)[0]
+        dseqr.name = plasmid_name
+        return dseqr, source
+
     sequence_file_url_dict = dict()
     for _type in ['depositor-full', 'depositor-partial', 'addgene-full', 'addgene-partial']:
         sequence_file_url_dict[_type] = []
@@ -127,8 +133,21 @@ def request_from_addgene(source: AddGeneIdSource) -> tuple[list[Dseqrecord], lis
                 sources.append(new_source)
                 # There should be only one sequence
                 products.append(get_sequences_from_gb_file_url(seq_url)[0])
-            break
-    return products, sources
+
+    if len(products) == 0:
+        # They may have only partial sequences
+        raise HTTPError(
+            url,
+            404,
+            f'The requested plasmid does not have full sequences, see https://www.addgene.org/{source.repository_id}/sequences/',
+            f'The requested plasmid does not have full sequences, see https://www.addgene.org/{source.repository_id}/sequences/',
+            None,
+        )
+
+    # Rename the plasmid
+    for p in products:
+        p.name = plasmid_name
+    return products[0], sources[0]
 
 
 def correct_name(dseq: Dseqrecord):

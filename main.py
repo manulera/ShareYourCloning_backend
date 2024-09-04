@@ -304,19 +304,13 @@ def get_from_repository_id_genbank(source: RepositoryIdSource):
 )
 def get_from_repository_id_addgene(source: AddGeneIdSource):
     try:
-        dseqs, sources = request_from_addgene(source)
+        dseq, out_source = request_from_addgene(source)
     except HTTPError as exception:
         repository_id_http_error_handler(exception, source)
     except URLError as exception:
         repository_id_url_error_handler(exception, source)
 
-    # Special addgene exception, they may have only partial sequences
-    if len(dseqs) == 0:
-        raise HTTPException(
-            404,
-            f'The requested plasmid does not have full sequences, see https://www.addgene.org/{source.repository_id}/sequences/',
-        )
-    return {'sequences': [format_sequence_genbank(s, source.output_name) for s in dseqs], 'sources': sources}
+    return {'sequences': [format_sequence_genbank(dseq, source.output_name)], 'sources': [out_source]}
 
 
 @router.post(

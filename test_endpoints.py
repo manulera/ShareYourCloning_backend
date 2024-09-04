@@ -248,13 +248,15 @@ class AddGeneTest(unittest.TestCase):
         examples = [
             {
                 'id': '39282',
-                'url': 'https://media.addgene.org/snapgene-media/v1.7.9-0-g88a3305/sequences/240599/4936a6ae-6b4d-4d24-b7ac-2339fad5755d/addgene-plasmid-39282-sequence-240599.gbk',
+                'url': 'https://media.addgene.org/snapgene-media/v2.0.0/sequences/240599/4936a6ae-6b4d-4d24-b7ac-2339fad5755d/addgene-plasmid-39282-sequence-240599.gbk',
                 'type': 'addgene-full',
+                'name': 'pFA6a-kanMX6-P81nmt1',
             },
             {
                 'id': '39289',
-                'url': 'https://media.addgene.org/snapgene-media/v1.7.9-0-g88a3305/sequences/49640/4fa9f18b-d5ca-4ac6-a50c-76a6cd15cbab/addgene-plasmid-39289-sequence-49640.gbk',
+                'url': 'https://media.addgene.org/snapgene-media/v2.0.0/sequences/49640/4fa9f18b-d5ca-4ac6-a50c-76a6cd15cbab/addgene-plasmid-39289-sequence-49640.gbk',
                 'type': 'depositor-full',
+                'name': 'pFA6a-kanMX6-P3nmt1-GFP',
             },
         ]
         for example in examples:
@@ -276,10 +278,37 @@ class AddGeneTest(unittest.TestCase):
             self.assertEqual(len(sources), 1)
             self.assertEqual(sources[0].addgene_sequence_type, example['type'])
             self.assertEqual(sources[0].sequence_file_url, example['url'])
+            self.assertEqual(resulting_sequences[0].name, example['name'])
 
             # We get the same response when making the response with the url
             response2 = client.post('/repository_id/addgene', json=payload['sources'][0])
             self.assertEqual(response.json(), response2.json())
+
+    def test_old_url(self):
+        """Works for an AddGene url that has now been replaced by a newer one"""
+        source = AddGeneIdSource(
+            id=1,
+            repository_name='addgene',
+            repository_id='65109',
+            addgene_sequence_type='addgene-full',
+            sequence_file_url='https://media.addgene.org/snapgene-media/v1.7.9-0-g88a3305/sequences/110162/c1c98803-c8ba-44a6-95b8-d6a94097e36f/addgene-plasmid-65109-sequence-110162.gbk',
+        )
+        response = client.post('/repository_id/addgene', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        resulting_sequences = [
+            read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']
+        ]
+        sources = [AddGeneIdSource.model_validate(s) for s in payload['sources']]
+
+        self.assertEqual(len(resulting_sequences), 1)
+        self.assertEqual(len(sources), 1)
+        self.assertEqual(sources[0].addgene_sequence_type, 'addgene-full')
+        self.assertEqual(
+            sources[0].sequence_file_url,
+            'https://media.addgene.org/snapgene-media/v1.7.9-0-g88a3305/sequences/110162/c1c98803-c8ba-44a6-95b8-d6a94097e36f/addgene-plasmid-65109-sequence-110162.gbk',
+        )
+        self.assertEqual(resulting_sequences[0].name, 'pYTK002')
 
     def test_missing_sequences(self):
         # Non-existing id
