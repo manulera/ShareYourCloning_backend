@@ -376,8 +376,6 @@ async def genome_coordinates(
                     400,
                     f'wrong coordinates, expected to fall within {source.start}, {source.end} on strand: {source.strand}',
                 )
-        elif source.gene_id is not None:
-            raise HTTPException(422, 'gene_id is set, but not locus_tag')
 
     async def validate_assembly_task():
         if source.assembly_accession is not None:

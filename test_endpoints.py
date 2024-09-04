@@ -1450,11 +1450,12 @@ class GenomeRegionTest(unittest.TestCase):
         response = client.post('/genome_coordinates', json=s.model_dump())
         self.assertStatusCode(response.status_code, 422)
 
-        # Ommit locus_tag keeping gene id
+        # Ommit locus_tag keeping gene id is now supported
+        # Before it was not, but see https://github.com/ncbi/datasets/issues/397
         s = correct_source.model_copy()
         s.locus_tag = None
         response = client.post('/genome_coordinates', json=s.model_dump())
-        self.assertStatusCode(response.status_code, 422)
+        self.assertStatusCode(response.status_code, 200)
 
         # Wrong gene_id (not matching that of the locus_tag)
         s = correct_source.model_copy()
