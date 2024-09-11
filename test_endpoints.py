@@ -284,6 +284,7 @@ class AddGeneTest(unittest.TestCase):
             response2 = client.post('/repository_id/addgene', json=payload['sources'][0])
             self.assertEqual(response.json(), response2.json())
 
+    @pytest.mark.xfail(reason='This file was removed from AddGene, not sure what the ideal behavior should be')
     def test_old_url(self):
         """Works for an AddGene url that has now been replaced by a newer one"""
         source = AddGeneIdSource(
