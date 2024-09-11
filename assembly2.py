@@ -930,9 +930,9 @@ class Assembly:
             fragment = self.fragments[abs(v1) - 1]
             # Find the pair of edges that should be last and first  ((3, 1, [8:10], [9:11)]), (1, 2, [4:6], [0:2]) in
             # the example above. Only one of the pairs of edges should satisfy this condition for the topology to make sense.
-            end_of_insertion = _location_boundaries(start_location)[1]
-            start_of_insertion = _location_boundaries(end_location)[0]
-            if not fragment.circular and (end_of_insertion > start_of_insertion or start_location == end_location):
+            right_of_insertion = _location_boundaries(start_location)[0]
+            left_of_insertion = _location_boundaries(end_location)[0]
+            if not fragment.circular and (right_of_insertion > left_of_insertion or start_location == end_location):
                 edge_pair_index.append(i)
 
         if len(edge_pair_index) != 1:
