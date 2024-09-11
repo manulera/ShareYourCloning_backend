@@ -92,7 +92,10 @@ You can see how this is done in this [docker image](https://github.com/manulera/
 
 ## Contributing :hammer_and_wrench:
 
-Check [contribution guidelines in the main repository](https://github.com/manulera/ShareYourCloning/blob/master/CONTRIBUTING.md).
+Check [contribution guidelines in the main repository](https://github.com/manulera/ShareYourCloning/blob/master/CONTRIBUTING.md) for general guidelines.
+
+For more specific tasks:
+* Creating a new type of source: follow the [new source issue template](.github/ISSUE_TEMPLATE/new-source.md). You can create an issue like that [here](
 
 ## Running the tests locally
 

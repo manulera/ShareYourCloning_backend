@@ -1,11 +1,17 @@
 ---
 name: New source
 about: Adding a new type of source and corresponding functionality
-title: 'New source: Gateway cloning'
+title: 'New source: <name-of-source>'
 labels: new-source
 assignees: ''
 
 ---
+
+## Description
+
+<!-- Add your description here -->
+
+## Checklist
 
 You can do some of these tasks in parallel, specially if you need to wait for approval, but it's good to keep in mind the intended order:
 
