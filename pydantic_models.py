@@ -6,6 +6,7 @@ from Bio.Restriction.Restriction import RestrictionType, RestrictionBatch
 from Bio.SeqRecord import SeqRecord as _SeqRecord
 from pydna.primer import Primer as _PydnaPrimer
 from shareyourcloning_linkml.datamodel import (
+    Source as _Source,
     OligoHybridizationSource as _OligoHybridizationSource,
     PolymeraseExtensionSource as _PolymeraseExtensionSource,
     GenomeCoordinatesSource as _GenomeCoordinatesSource,
@@ -63,7 +64,15 @@ class SeqFeatureModel(BaseModel):
 # Sources =========================================
 
 
-class ManuallyTypedSource(_ManuallyTypedSource):
+class SourceCommonClass(_Source):
+    input: Optional[List[int]] = Field(
+        default_factory=list,
+        description="""The sequences that are an input to this source. If the source represents external import of a sequence, it's empty.""",
+        json_schema_extra={'linkml_meta': {'alias': 'input', 'domain_of': ['Source']}},
+    )
+
+
+class ManuallyTypedSource(SourceCommonClass, _ManuallyTypedSource):
     """Describes a sequence that is typed manually by the user"""
 
     @model_validator(mode='after')
@@ -75,25 +84,25 @@ class ManuallyTypedSource(_ManuallyTypedSource):
         return self
 
 
-class UploadedFileSource(_UploadedFileSource):
+class UploadedFileSource(SourceCommonClass, _UploadedFileSource):
     pass
 
 
-class RepositoryIdSource(_RepositoryIdSource):
+class RepositoryIdSource(SourceCommonClass, _RepositoryIdSource):
     pass
 
 
-class AddGeneIdSource(_AddGeneIdSource):
+class AddGeneIdSource(SourceCommonClass, _AddGeneIdSource):
     # TODO: add this to LinkML
     # repository_name: RepositoryName = RepositoryName('addgene')
     pass
 
 
-class BenchlingUrlSource(_BenchlingUrlSource):
+class BenchlingUrlSource(SourceCommonClass, _BenchlingUrlSource):
     pass
 
 
-class GenomeCoordinatesSource(_GenomeCoordinatesSource):
+class GenomeCoordinatesSource(SourceCommonClass, _GenomeCoordinatesSource):
     pass
 
 
@@ -115,7 +124,7 @@ class RestrictionSequenceCut(_RestrictionSequenceCut):
         return ((self.cut_watson, self.overhang), restriction_enzyme)
 
 
-class RestrictionEnzymeDigestionSource(_RestrictionEnzymeDigestionSource):
+class RestrictionEnzymeDigestionSource(SourceCommonClass, _RestrictionEnzymeDigestionSource):
     """Documents a restriction enzyme digestion, and the selection of one of the fragments."""
 
     # TODO: maybe a better way? They have to be redefined here because
@@ -186,8 +195,8 @@ class AssemblyFragment(_AssemblyFragment):
         )
 
 
-class AssemblySourceCommonClass:
-    # This is different in the LinkML model, because there it is required,
+class AssemblySourceCommonClass(SourceCommonClass):
+    # TODO: This is different in the LinkML model, because there it is required,
     # and here we make it default to list.
     assembly: List[AssemblyFragment] = Field(
         default_factory=list, description="""The joins between the fragments in the assembly"""
@@ -246,19 +255,19 @@ class AssemblySourceCommonClass:
         )
 
 
-class AssemblySource(_AssemblySource, AssemblySourceCommonClass):
+class AssemblySource(AssemblySourceCommonClass, _AssemblySource):
     pass
 
 
-class PCRSource(_PCRSource, AssemblySourceCommonClass):
+class PCRSource(AssemblySourceCommonClass, _PCRSource):
     pass
 
 
-class LigationSource(_LigationSource, AssemblySourceCommonClass):
+class LigationSource(AssemblySourceCommonClass, _LigationSource):
     pass
 
 
-class HomologousRecombinationSource(_HomologousRecombinationSource, AssemblySourceCommonClass):
+class HomologousRecombinationSource(AssemblySourceCommonClass, _HomologousRecombinationSource):
 
     # TODO: add this to LinkML
     # This can only take two inputs, the first one is the template, the second one is the insert
@@ -266,18 +275,18 @@ class HomologousRecombinationSource(_HomologousRecombinationSource, AssemblySour
     pass
 
 
-class GibsonAssemblySource(_GibsonAssemblySource, AssemblySourceCommonClass):
+class GibsonAssemblySource(AssemblySourceCommonClass, _GibsonAssemblySource):
 
     # TODO: add this to LinkML
     # input: conlist(int, min_length=1)
     pass
 
 
-class OverlapExtensionPCRLigationSource(_OverlapExtensionPCRLigationSource, AssemblySourceCommonClass):
+class OverlapExtensionPCRLigationSource(AssemblySourceCommonClass, _OverlapExtensionPCRLigationSource):
     pass
 
 
-class CRISPRSource(_CRISPRSource, AssemblySourceCommonClass):
+class CRISPRSource(AssemblySourceCommonClass, _CRISPRSource):
 
     # TODO
     # input: conlist(int, min_length=2, max_length=2)
@@ -294,7 +303,7 @@ class CRISPRSource(_CRISPRSource, AssemblySourceCommonClass):
         return super().from_assembly(assembly, id, False, fragments, guides=guides)
 
 
-class RestrictionAndLigationSource(_RestrictionAndLigationSource, AssemblySourceCommonClass):
+class RestrictionAndLigationSource(AssemblySourceCommonClass, _RestrictionAndLigationSource):
     # TODO: add this to LinkML
     # input: conlist(int, min_length=1)
 
@@ -310,17 +319,22 @@ class RestrictionAndLigationSource(_RestrictionAndLigationSource, AssemblySource
         return super().from_assembly(assembly, id, circular, fragments, restriction_enzymes=restriction_enzymes)
 
 
-class OligoHybridizationSource(_OligoHybridizationSource):
+class OligoHybridizationSource(SourceCommonClass, _OligoHybridizationSource):
     pass
 
 
-class PolymeraseExtensionSource(_PolymeraseExtensionSource):
+class PolymeraseExtensionSource(SourceCommonClass, _PolymeraseExtensionSource):
     pass
 
 
 class BaseCloningStrategy(_CloningStrategy):
     # For now, we don't add anything, but the classes will not have the new methods if this is used
     # It will be used for validation for now
+    primers: Optional[List[PrimerModel]] = Field(
+        default_factory=list,
+        description="""The primers that are used in the cloning strategy""",
+        json_schema_extra={'linkml_meta': {'alias': 'primers', 'domain_of': ['CloningStrategy']}},
+    )
     pass
 
 
