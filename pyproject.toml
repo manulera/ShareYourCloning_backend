@@ -17,7 +17,7 @@ pydna = {git = "https://github.com/BjornFJohansson/pydna", rev = "bfddf0cb23dd5c
 requests = "^2.31.0"
 regex = "^2023.10.3"
 pydantic = "^2.7.1"
-shareyourcloning-linkml = {git = "https://github.com/genestorian/ShareYourCloning_LinkML"}
+shareyourcloning-linkml = {git = "https://github.com/genestorian/ShareYourCloning_LinkML", rev = "222b3b81738ee995147372ee98b06f72ce9a92ca"}
 
 [tool.poetry.group.dev.dependencies]
 autopep8 = "^2.0.4"

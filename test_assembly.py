@@ -942,6 +942,57 @@ def test_fragments_only_once():
         assert len(nodes_used) == len(set(nodes_used))
 
 
+def test_both_representations():
+    # Linear examples
+    assembly_linear = (
+        (1, 2, 'loc_1_r', 'loc_2_l'),
+        (2, 3, 'loc_2_r', 'loc_3_l'),
+    )
+
+    subf = assembly.edge_representation2subfragment_representation(assembly_linear, False)
+    assert subf == (
+        (1, None, 'loc_1_r'),
+        (2, 'loc_2_l', 'loc_2_r'),
+        (3, 'loc_3_l', None),
+    )
+
+    back_to_edge = assembly.subfragment_representation2edge_representation(subf, False)
+    assert back_to_edge == assembly_linear
+
+    assembly_linear = (
+        (1, -2, 'loc_1_r', 'loc_2_l'),
+        (-2, -3, 'loc_2_r', 'loc_3_l'),
+    )
+
+    subf = assembly.edge_representation2subfragment_representation(assembly_linear, False)
+    assert subf == (
+        (1, None, 'loc_1_r'),
+        (-2, 'loc_2_l', 'loc_2_r'),
+        (-3, 'loc_3_l', None),
+    )
+
+    back_to_edge = assembly.subfragment_representation2edge_representation(subf, False)
+    assert back_to_edge == assembly_linear
+
+    # Circular example
+
+    assembly_circular = (
+        (1, 2, 'loc_1_r', 'loc_2_l'),
+        (2, 3, 'loc_2_r', 'loc_3_l'),
+        (3, 1, 'loc_3_r', 'loc_1_l'),
+    )
+
+    subf = assembly.edge_representation2subfragment_representation(assembly_circular, True)
+    assert subf == (
+        (1, 'loc_1_l', 'loc_1_r'),
+        (2, 'loc_2_l', 'loc_2_r'),
+        (3, 'loc_3_l', 'loc_3_r'),
+    )
+
+    back_to_edge = assembly.subfragment_representation2edge_representation(subf, True)
+    assert back_to_edge == assembly_circular
+
+
 def test_ends_from_cutsite():
 
     seqs = (

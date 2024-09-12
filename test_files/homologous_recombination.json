@@ -66,44 +66,38 @@
       "type": "PCRSource",
       "assembly": [
         {
-          "left": {
-            "sequence": 10,
-            "location": {
-              "start": 79,
-              "end": 100,
-              "strand": null
-            },
-            "reverse_complemented": false
+          "sequence": 10,
+          "left_location": null,
+          "right_location": {
+            "start": 79,
+            "end": 100,
+            "strand": null
           },
-          "right": {
-            "sequence": 20,
-            "location": {
-              "start": 40,
-              "end": 61,
-              "strand": null
-            },
-            "reverse_complemented": false
-          }
+          "reverse_complemented": false
         },
         {
-          "left": {
-            "sequence": 2,
-            "location": {
-              "start": 2094,
-              "end": 2114,
-              "strand": null
-            },
-            "reverse_complemented": false
+          "sequence": 2,
+          "left_location": {
+            "start": 40,
+            "end": 61,
+            "strand": null
           },
-          "right": {
-            "sequence": 3,
-            "location": {
-              "start": 0,
-              "end": 20,
-              "strand": null
-            },
-            "reverse_complemented": true
-          }
+          "right_location": {
+            "start": 2094,
+            "end": 2114,
+            "strand": null
+          },
+          "reverse_complemented": false
+        },
+        {
+          "sequence": 20,
+          "left_location": {
+            "start": 40,
+            "end": 61,
+            "strand": null
+          },
+          "right_location": null,
+          "reverse_complemented": false
         }
       ],
       "circular": false
@@ -118,44 +112,38 @@
       "type": "HomologousRecombinationSource",
       "assembly": [
         {
-          "left": {
-            "sequence": 1,
-            "location": {
-              "start": 1093,
-              "end": 1173,
-              "strand": null
-            },
-            "reverse_complemented": false
+          "sequence": 6,
+          "left_location": null,
+          "right_location": {
+            "start": 1093,
+            "end": 1173,
+            "strand": null
           },
-          "right": {
-            "sequence": 2,
-            "location": {
-              "start": 0,
-              "end": 80,
-              "strand": null
-            },
-            "reverse_complemented": false
-          }
+          "reverse_complemented": false
         },
         {
-          "left": {
-            "sequence": 2,
-            "location": {
-              "start": 2153,
-              "end": 2233,
-              "strand": null
-            },
-            "reverse_complemented": false
+          "sequence": 8,
+          "left_location": {
+            "start": 0,
+            "end": 80,
+            "strand": null
           },
-          "right": {
-            "sequence": 1,
-            "location": {
-              "start": 3416,
-              "end": 3496,
-              "strand": null
-            },
-            "reverse_complemented": false
-          }
+          "right_location": {
+            "start": 2153,
+            "end": 2233,
+            "strand": null
+          },
+          "reverse_complemented": false
+        },
+        {
+          "sequence": 6,
+          "left_location": {
+            "start": 3416,
+            "end": 3496,
+            "strand": null
+          },
+          "right_location": null,
+          "reverse_complemented": false
         }
       ],
       "circular": false

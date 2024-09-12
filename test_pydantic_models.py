@@ -1,6 +1,6 @@
 from unittest import TestCase
-from pydantic_models import AssemblyJoin, SimpleSequenceLocation, AssemblyJoinComponent, AssemblySource
-from assembly2 import assembly2str
+from pydantic_models import AssemblySource, SimpleSequenceLocation
+from assembly2 import edge_representation2subfragment_representation
 from Bio.SeqFeature import SimpleLocation
 
 
@@ -9,91 +9,69 @@ class DummyFragment:
         self.id = id
 
 
-class AssemblyJoinTest(TestCase):
-    def test_str(self):
-        join = AssemblyJoin(
-            left=AssemblyJoinComponent(
-                sequence=1,
-                reverse_complemented=False,
-                location=SimpleSequenceLocation(start=1, end=10),
-            ),
-            right=AssemblyJoinComponent(
-                sequence=2,
-                reverse_complemented=False,
-                location=SimpleSequenceLocation(start=20, end=30),
-            ),
-        )
-        self.assertEqual(str(join), '1[1:10]:2[20:30]')
-        self.assertEqual(join.__repr__(), '1[1:10]:2[20:30]')
-
-        join.left.reverse_complemented = True
-
-        self.assertEqual(str(join), '-1[1:10]:2[20:30]')
-        self.assertEqual(join.__repr__(), '-1[1:10]:2[20:30]')
-
-    def test_join_tuple(self):
-        join_tuple_1 = (1, 2, SimpleLocation(0, 10), SimpleLocation(10, 20))
-        join1 = AssemblyJoin.from_join_tuple(join_tuple_1)
-
-        self.assertEqual(join1.left.sequence, 1)
-        self.assertEqual(join1.left.reverse_complemented, False)
-        self.assertEqual(join1.left.location.start, 0)
-        self.assertEqual(join1.left.location.end, 10)
-
-        self.assertEqual(join1.right.sequence, 2)
-        self.assertEqual(join1.right.reverse_complemented, False)
-        self.assertEqual(join1.right.location.start, 10)
-        self.assertEqual(join1.right.location.end, 20)
-
-        self.assertEqual(join1.to_join_tuple([DummyFragment(1), DummyFragment(2)]), join_tuple_1)
-
-        join_tuple_2 = (-1, -2, SimpleLocation(0, 10), SimpleLocation(10, 20))
-        join2 = AssemblyJoin.from_join_tuple(join_tuple_2)
-
-        self.assertEqual(join2.left.sequence, 1)
-        self.assertEqual(join2.left.reverse_complemented, True)
-        self.assertEqual(join2.left.location.start, 0)
-        self.assertEqual(join2.left.location.end, 10)
-
-        self.assertEqual(join2.right.sequence, 2)
-        self.assertEqual(join2.right.reverse_complemented, True)
-        self.assertEqual(join2.right.location.start, 10)
-        self.assertEqual(join2.right.location.end, 20)
-
-        self.assertEqual(join2.to_join_tuple([DummyFragment(1), DummyFragment(2)]), join_tuple_2)
-
-
 class AssemblySourceTest(TestCase):
-    def test_get_assembly_plan(self):
-
-        join = AssemblyJoin(
-            left=AssemblyJoinComponent(
-                sequence=4,
-                reverse_complemented=False,
-                location=SimpleSequenceLocation(start=1, end=10),
-            ),
-            right=AssemblyJoinComponent(
-                sequence=5,
-                reverse_complemented=False,
-                location=SimpleSequenceLocation(start=20, end=30),
-            ),
-        )
-
-        asm = AssemblySource(
-            id=1,
-            assembly=[join],
-        )
-
-        assert assembly2str(asm.get_assembly_plan([DummyFragment(4), DummyFragment(5)])) == "('1[1:10]:2[20:30]',)"
-        assert assembly2str(asm.get_assembly_plan([DummyFragment(5), DummyFragment(4)])) == "('2[1:10]:1[20:30]',)"
 
     def test_from_assembly(self):
-        assembly = [
-            (1, 2, SimpleLocation(0, 10), SimpleLocation(10, 20)),
-            (2, 3, SimpleLocation(0, 10), SimpleLocation(10, 20)),
+        assemblies = [
+            [
+                (1, 2, SimpleLocation(0, 10), SimpleLocation(10, 20)),
+                (2, 3, SimpleLocation(0, 10), SimpleLocation(10, 20)),
+            ],
+            [
+                (1, -2, SimpleLocation(0, 10), SimpleLocation(10, 20)),
+                (-2, 3, SimpleLocation(0, 10), SimpleLocation(10, 20)),
+            ],
         ]
 
-        fragments = [DummyFragment(4), DummyFragment(5), DummyFragment(6)]
-        assembly_source = AssemblySource.from_assembly(assembly=assembly, fragments=fragments, id=0, circular=False)
+        for i, assembly in enumerate(assemblies):
 
-        assert [str(join) for join in assembly_source.assembly] == ['4[0:10]:5[10:20]', '5[0:10]:6[10:20]']
+            fragments = [DummyFragment(4), DummyFragment(5), DummyFragment(6)]
+            assembly_source = AssemblySource.from_assembly(
+                assembly=assembly, fragments=fragments, id=0, circular=False
+            )
+            fragment_assembly = edge_representation2subfragment_representation(assembly, False)
+
+            if i == 0:
+                # Check first fragment
+                self.assertEqual(assembly_source.assembly[0].sequence, 4)
+                self.assertEqual(assembly_source.assembly[0].reverse_complemented, False)
+                self.assertEqual(assembly_source.assembly[0].left_location, None)
+                self.assertEqual(assembly_source.assembly[0].right_location, SimpleSequenceLocation(start=0, end=10))
+
+                # Check second fragment
+                self.assertEqual(assembly_source.assembly[1].sequence, 5)
+                self.assertEqual(assembly_source.assembly[1].reverse_complemented, False)
+                self.assertEqual(assembly_source.assembly[1].left_location, SimpleSequenceLocation(start=10, end=20))
+                self.assertEqual(assembly_source.assembly[1].right_location, SimpleSequenceLocation(start=0, end=10))
+
+                # Check other fields
+                self.assertEqual(assembly_source.input, [4, 5, 6])
+
+            for obj, tup in zip(assembly_source.assembly, fragment_assembly):
+                self.assertEqual(obj.to_fragment_tuple(fragments), tup)
+
+    def test_get_assembly_plan(self):
+        # Linear assembly
+        assembly = (
+            (1, 2, SimpleLocation(0, 10), SimpleLocation(10, 20)),
+            (2, 3, SimpleLocation(0, 10), SimpleLocation(10, 20)),
+        )
+
+        fragments = [DummyFragment(4), DummyFragment(5), DummyFragment(6)]
+
+        assembly_source = AssemblySource.from_assembly(assembly=assembly, fragments=fragments, id=0, circular=False)
+        assembly_plan = assembly_source.get_assembly_plan(fragments)
+        self.assertEqual(assembly_plan, assembly)
+
+        # Circular assembly
+        assembly = (
+            (1, 2, SimpleLocation(0, 10), SimpleLocation(10, 20)),
+            (2, 3, SimpleLocation(0, 10), SimpleLocation(10, 20)),
+            (3, 1, SimpleLocation(0, 10), SimpleLocation(10, 20)),
+        )
+
+        fragments = [DummyFragment(4), DummyFragment(5), DummyFragment(6)]
+
+        assembly_source = AssemblySource.from_assembly(assembly=assembly, fragments=fragments, id=0, circular=True)
+        assembly_plan = assembly_source.get_assembly_plan(fragments)
+        self.assertEqual(assembly_plan, assembly)

@@ -24,8 +24,7 @@ from shareyourcloning_linkml.datamodel import (
     LigationSource as _LigationSource,
     CRISPRSource as _CRISPRSource,
     Primer as _Primer,
-    AssemblyJoin as _AssemblyJoin,
-    AssemblyJoinComponent as _AssemblyJoinComponent,
+    AssemblyFragment as _AssemblyFragment,
     SimpleSequenceLocation as _SimpleSequenceLocation,
     AddGeneIdSource as _AddGeneIdSource,
     BenchlingUrlSource as _BenchlingUrlSource,
@@ -33,6 +32,8 @@ from shareyourcloning_linkml.datamodel import (
     OverlapExtensionPCRLigationSource as _OverlapExtensionPCRLigationSource,
 )
 from pydna.utils import shift_location as _shift_location
+from assembly2 import edge_representation2subfragment_representation, subfragment_representation2edge_representation
+
 
 SequenceFileFormat = _SequenceFileFormat
 
@@ -167,35 +168,11 @@ class SimpleSequenceLocation(_SimpleSequenceLocation):
         return BioSimpleLocation(self.start, self.end, self.strand)
 
 
-class AssemblyJoinComponent(_AssemblyJoinComponent):
-    location: SimpleSequenceLocation = Field(
-        ...,
-        description="""Location of the overlap in the fragment. Might be an empty location (start == end) to indicate blunt join.""",
-    )
-    pass
+class AssemblyFragment(_AssemblyFragment):
+    left_location: Optional[SimpleSequenceLocation] = None
+    right_location: Optional[SimpleSequenceLocation] = None
 
-
-class AssemblyJoin(_AssemblyJoin):
-
-    left: AssemblyJoinComponent = Field(...)
-    right: AssemblyJoinComponent = Field(...)
-
-    @classmethod
-    def from_join_tuple(cls, join_tuple: tuple[int, int, BioSimpleLocation, BioSimpleLocation]):
-        return cls(
-            left=AssemblyJoinComponent(
-                sequence=abs(join_tuple[0]),
-                reverse_complemented=join_tuple[0] < 0,
-                location=SimpleSequenceLocation.from_simple_location(join_tuple[2]),
-            ),
-            right=AssemblyJoinComponent(
-                sequence=abs(join_tuple[1]),
-                reverse_complemented=join_tuple[1] < 0,
-                location=SimpleSequenceLocation.from_simple_location(join_tuple[3]),
-            ),
-        )
-
-    def to_join_tuple(self, fragments) -> tuple[int, int, BioSimpleLocation, BioSimpleLocation]:
+    def to_fragment_tuple(self, fragments) -> tuple[int, BioSimpleLocation, BioSimpleLocation]:
         fragment_ids = [int(f.id) for f in fragments]
 
         def id2pos(id):
@@ -203,30 +180,16 @@ class AssemblyJoin(_AssemblyJoin):
             return fragment_ids.index(abs(id)) + 1
 
         return (
-            id2pos(self.left.sequence) * (-1 if self.left.reverse_complemented else 1),
-            id2pos(self.right.sequence) * (-1 if self.right.reverse_complemented else 1),
-            self.left.location.to_biopython_location(),
-            self.right.location.to_biopython_location(),
+            id2pos(self.sequence) * (-1 if self.reverse_complemented else 1),
+            None if self.left_location is None else self.left_location.to_biopython_location(),
+            None if self.right_location is None else self.right_location.to_biopython_location(),
         )
-
-    def to_join_tuple_with_ids(self) -> tuple[int, int, BioSimpleLocation, BioSimpleLocation]:
-        return (
-            self.left.sequence * (-1 if self.left.reverse_complemented else 1),
-            self.right.sequence * (-1 if self.right.reverse_complemented else 1),
-            self.left.location.to_biopython_location(),
-            self.right.location.to_biopython_location(),
-        )
-
-    def __str__(self) -> str:
-        u, v, lu, lv = self.to_join_tuple_with_ids()
-        return f'{u}{lu}:{v}{lv}'
-
-    def __repr__(self) -> str:
-        return self.__str__()
 
 
 class AssemblySourceCommonClass:
-    assembly: List[AssemblyJoin] = Field(
+    # This is different in the LinkML model, because there it is required,
+    # and here we make it default to list.
+    assembly: List[AssemblyFragment] = Field(
         default_factory=list, description="""The joins between the fragments in the assembly"""
     )
 
@@ -234,16 +197,16 @@ class AssemblySourceCommonClass:
         """Returns the minimal overlap between the fragments in the assembly"""
         all_overlaps = list()
         for f in self.assembly:
-            # TODO: these conditions are probably not needed
-            # if f.left.location is not None:
-            all_overlaps.append(f.left.location.end - f.left.location.start)
-            # if f.right.location is not None:
-            all_overlaps.append(f.right.location.end - f.right.location.start)
+            if f.left_location is not None:
+                all_overlaps.append(f.left_location.end - f.left_location.start)
+            if f.right_location is not None:
+                all_overlaps.append(f.right_location.end - f.right_location.start)
         return min(all_overlaps)
 
     def get_assembly_plan(self, fragments: list[_SeqRecord]) -> tuple:
         """Returns the assembly plan"""
-        return tuple(j.to_join_tuple(fragments) for j in self.assembly)
+        subf = [f.to_fragment_tuple(fragments) for f in self.assembly]
+        return subfragment_representation2edge_representation(subf, self.circular)
 
     @classmethod
     def from_assembly(
@@ -254,6 +217,8 @@ class AssemblySourceCommonClass:
         fragments: list[_SeqRecord],
         **kwargs,
     ):
+
+        # Replace the positions with the actual ids
         fragment_ids = [int(f.id) for f in fragments]
         input_ids = [int(f.id) for f in fragments if not isinstance(f, _PydnaPrimer)]
 
@@ -261,11 +226,21 @@ class AssemblySourceCommonClass:
             sign = -1 if pos < 0 else 1
             return fragment_ids[abs(pos) - 1] * sign
 
-        ids_assembly = [(pos2id(u), pos2id(v), lu, lv) for u, v, lu, lv in assembly]
+        # Here the ids are still the positions in the fragments list
+        fragment_assembly_positions = edge_representation2subfragment_representation(assembly, circular)
+        assembly_fragments = [
+            AssemblyFragment(
+                sequence=pos2id(pos),
+                left_location=None if left_loc is None else SimpleSequenceLocation.from_simple_location(left_loc),
+                right_location=None if right_loc is None else SimpleSequenceLocation.from_simple_location(right_loc),
+                reverse_complemented=pos < 0,
+            )
+            for pos, left_loc, right_loc in fragment_assembly_positions
+        ]
         return cls(
             id=id,
             input=input_ids,
-            assembly=[AssemblyJoin.from_join_tuple(join) for join in ids_assembly],
+            assembly=assembly_fragments,
             circular=circular,
             **kwargs,
         )

@@ -15,7 +15,7 @@ from pydna.seqrecord import SeqRecord as _SeqRecord
 import networkx as _nx
 import itertools as _itertools
 from Bio.SeqFeature import SimpleLocation, Location
-from dna_functions import sum_is_sticky
+from dna_utils import sum_is_sticky
 from Bio.Seq import reverse_complement
 from Bio.Restriction.Restriction import RestrictionBatch, AbstractCut
 import regex
@@ -538,7 +538,33 @@ def edge_representation2subfragment_representation(assembly, is_circular):
     for (_u1, v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
         subfragment_representation.append((v1, start_location, end_location))
 
-    return subfragment_representation
+    return tuple(subfragment_representation)
+
+
+def subfragment_representation2edge_representation(assembly, is_circular):
+    """
+    Turn this kind of subfragment representation fragment 1, left edge on 1, right edge on 1
+    a = [(1, 'loc1c', 'loc1a'), (2, 'loc2a', 'loc2b'), (3, 'loc3b', 'loc3c')]
+    Into this: fragment 1, fragment 2, right edge on 1, left edge on 2
+    b = [(1, 2, 'loc1a', 'loc2a'), (2, 3, 'loc2b' 'loc3b'), (3, 1, 'loc3c', 'loc1c')]
+    """
+
+    edge_representation = []
+
+    # Iterate through the assembly pairwise to create the edge representation
+    for i in range(len(assembly) - 1):
+        frag1, left1, right1 = assembly[i]
+        frag2, left2, right2 = assembly[i + 1]
+        # Create the edge between the current and next fragment
+        edge_representation.append((frag1, frag2, right1, left2))
+
+    if is_circular:
+        # Add the edge from the last fragment back to the first
+        frag_last, left_last, right_last = assembly[-1]
+        frag_first, left_first, right_first = assembly[0]
+        edge_representation.append((frag_last, frag_first, right_last, left_first))
+
+    return tuple(edge_representation)
 
 
 def get_assembly_subfragments(fragments: list[_Dseqrecord], subfragment_representation):
