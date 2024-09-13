@@ -6,7 +6,6 @@ from Bio.Restriction.Restriction import RestrictionType, RestrictionBatch
 from Bio.SeqRecord import SeqRecord as _SeqRecord
 from pydna.primer import Primer as _PydnaPrimer
 from shareyourcloning_linkml.datamodel import (
-    Source as _Source,
     OligoHybridizationSource as _OligoHybridizationSource,
     PolymeraseExtensionSource as _PolymeraseExtensionSource,
     GenomeCoordinatesSource as _GenomeCoordinatesSource,
@@ -64,7 +63,7 @@ class SeqFeatureModel(BaseModel):
 # Sources =========================================
 
 
-class SourceCommonClass(_Source):
+class SourceCommonClass:
     input: Optional[List[int]] = Field(
         default_factory=list,
         description="""The sequences that are an input to this source. If the source represents external import of a sequence, it's empty.""",
@@ -184,12 +183,8 @@ class AssemblyFragment(_AssemblyFragment):
     def to_fragment_tuple(self, fragments) -> tuple[int, BioSimpleLocation, BioSimpleLocation]:
         fragment_ids = [int(f.id) for f in fragments]
 
-        def id2pos(id):
-            # Find the position of id in the fragments list
-            return fragment_ids.index(abs(id)) + 1
-
         return (
-            id2pos(self.sequence) * (-1 if self.reverse_complemented else 1),
+            (fragment_ids.index(self.sequence) + 1) * (-1 if self.reverse_complemented else 1),
             None if self.left_location is None else self.left_location.to_biopython_location(),
             None if self.right_location is None else self.right_location.to_biopython_location(),
         )
@@ -231,15 +226,11 @@ class AssemblySourceCommonClass(SourceCommonClass):
         fragment_ids = [int(f.id) for f in fragments]
         input_ids = [int(f.id) for f in fragments if not isinstance(f, _PydnaPrimer)]
 
-        def pos2id(pos):
-            sign = -1 if pos < 0 else 1
-            return fragment_ids[abs(pos) - 1] * sign
-
         # Here the ids are still the positions in the fragments list
         fragment_assembly_positions = edge_representation2subfragment_representation(assembly, circular)
         assembly_fragments = [
             AssemblyFragment(
-                sequence=pos2id(pos),
+                sequence=fragment_ids[abs(pos) - 1],
                 left_location=None if left_loc is None else SimpleSequenceLocation.from_simple_location(left_loc),
                 right_location=None if right_loc is None else SimpleSequenceLocation.from_simple_location(right_loc),
                 reverse_complemented=pos < 0,
