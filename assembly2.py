@@ -20,16 +20,16 @@ from Bio.Seq import reverse_complement
 from Bio.Restriction.Restriction import RestrictionBatch, AbstractCut
 import regex
 
-
-def primers_clash(assembly, fragments):
-    edge_pairs = zip(assembly, assembly[1:])
-    for (_u1, _v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
-        # Only for primer joins
-        if not isinstance(fragments[abs(_v1) - 1], _Dseqrecord):
-            continue
-        if _locations_overlap(start_location, end_location, len(fragments[abs(_v1) - 1])):
-            return True
-    return False
+# Currently unused, commented out because it's not tested
+# def primers_clash(assembly, fragments):
+#     edge_pairs = zip(assembly, assembly[1:])
+#     for (_u1, _v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
+#         # Only for primer joins
+#         if not isinstance(fragments[abs(_v1) - 1], _Dseqrecord):
+#             continue
+#         if _locations_overlap(start_location, end_location, len(fragments[abs(_v1) - 1])):
+#             return True
+#     return False
 
 
 def gather_overlapping_locations(locs: list[Location], fragment_length: int):
@@ -610,11 +610,19 @@ def extract_subfragment(seq: _Dseqrecord, start_location: Location, end_location
     end = None if end_location is None else _location_boundaries(end_location)[1]
 
     # Special case, some of it could be handled by better Dseqrecord slicing in the future
-    if seq.circular and start_location == end_location:
+    if (
+        seq.circular
+        and start_location is not None
+        and end_location is not None
+        and _locations_overlap(start_location, end_location, len(seq))
+    ):
         # The overhang is different for origin-spanning features, for instance
         # for a feature join{[12:13], [0:3]} in a sequence of length 13, the overhang
         # is -4, not 9
         ovhg = start - end if end > start else start - end - len(seq)
+        # edge case
+        if abs(ovhg) == len(seq):
+            ovhg = 0
         dummy_cut = ((start, ovhg), None)
         open_seq = seq.apply_cut(dummy_cut, dummy_cut)
         return _Dseqrecord(fill_dseq(open_seq.seq), features=open_seq.features)
@@ -1155,20 +1163,7 @@ class PCRAssembly(Assembly):
 
         return
 
-    @classmethod
-    def assembly_is_valid(
-        cls, fragments: list[_Dseqrecord | _Primer], assembly, is_circular, use_all_fragments, is_insertion=False
-    ):
-        is_valid = super().assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, is_insertion)
-        if not is_valid:
-            return False
-        # Error if clashing primers
-        if primers_clash(assembly, fragments):
-            raise ValueError('Clashing primers in assembly ' + assembly2str(assembly))
-        return True
-
     def get_linear_assemblies(self, only_adjacent_edges: bool = False):
-        """Adds extra constrains to prevent clashing primers."""
         if only_adjacent_edges:
             raise NotImplementedError('only_adjacent_edges not implemented for PCR assemblies')
 

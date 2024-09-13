@@ -1014,28 +1014,6 @@ class PCRTest(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(payload['detail'], 'The provided assembly is not valid.')
 
-        # Test clashing primers
-        template = Dseqrecord(Dseq('ACGTACGTGCGCGCGC'))
-
-        json_seq = format_sequence_genbank(template)
-        json_seq.id = 1
-
-        submitted_source = PCRSource(id=0)
-
-        primer_fwd = PrimerModel(sequence='ACGTACGTG', id=2, name='forward')
-
-        primer_rvs = PrimerModel(sequence='GCGCGCGCA', id=3, name='reverse')
-
-        data = {
-            'source': submitted_source.model_dump(),
-            'sequences': [json_seq.model_dump()],
-            'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
-        }
-        response = client.post('/pcr', json=data, params={'minimal_annealing': 8})
-        payload = response.json()
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('Clashing primers', payload['detail'])
-
     def test_wrong_stoichiometry(self):
         # If not 2 primers per sequence, bad request
         template = Dseqrecord(Dseq('ACGTACGTGCGCGCGC'))

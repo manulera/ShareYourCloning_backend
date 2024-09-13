@@ -866,6 +866,45 @@ def test_pcr_assembly_uracil():
     assert asm.assemble_linear()[0].seq == 'ATAUUAggccggTTAAAT'
 
 
+def test_pcrs_with_overlapping_primers_circular_templates():
+
+    seq = Dseqrecord(Dseq('ACGTTCGTGCGTTTTGC', circular=True))
+
+    # Overlapping 5', edge case for circular extract_subfragment
+    primer1 = Primer('ACGTTCGTGC')
+    primer2 = Primer(reverse_complement('GTGCGTTTTGC'))
+
+    for shift in range(len(seq)):
+        seq_shifted = seq.shifted(shift)
+        asm = assembly.PCRAssembly([primer1, seq_shifted, primer2], limit=8)
+        assert str(asm.assemble_linear()[0].seq) == 'ACGTTCGTGCGTTTTGC'
+
+    # Overlapping 5' and 3'
+    primer1 = Primer('GCACGTTCGTG')
+    for shift in range(len(seq)):
+        seq_shifted = seq.shifted(shift)
+        asm = assembly.PCRAssembly([primer1, seq_shifted, primer2], limit=8)
+        assert str(asm.assemble_linear()[0].seq) == 'GCACGTTCGTGCGTTTTGC'
+
+
+def test_pcrs_with_overlapping_primers_linear_templates():
+    seq = Dseqrecord(Dseq('ACGTTCGTGCGTTTTGC', circular=False))
+
+    # Overlapping 5', do as normal
+    primer1 = Primer('ACGTTCGTGC')
+    primer2 = Primer(reverse_complement('GTGCGTTTTGC'))
+
+    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8)
+    assert str(asm.assemble_linear()[0].seq) == 'ACGTTCGTGCGTTTTGC'
+
+    # Overlapping 3', should not work
+    primer1 = Primer('GTGCGTTTTGC')
+    primer2 = Primer(reverse_complement('ACGTTCGTGCG'))
+
+    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8)
+    assert len(asm.assemble_linear()) == 0
+
+
 def test_pcr_assembly_invalid():
 
     primer1 = Primer('ACGTACGT')
@@ -880,9 +919,9 @@ def test_pcr_assembly_invalid():
     assert len(prods) == 0
 
     # Clashing primers
-    seq = Dseqrecord(Dseq('ACGTACGTGCGCGCGC'))
-    primer1 = Primer('ACGTACGTG')
-    primer2 = Primer(reverse_complement('TGCGCGCGC'))
+    seq = Dseqrecord(Dseq('ACGTTCGTGCGTTTTGC'))
+    primer1 = Primer('ACGTTCGTGC')
+    primer2 = Primer(reverse_complement('GTGCGTTTTGC'))
 
     asm = assembly.PCRAssembly([primer1, seq, primer2], limit=8)
 
@@ -892,12 +931,12 @@ def test_pcr_assembly_invalid():
     except ValueError:
         pass
 
+    # PCR on circular assemblies should not give an error if primers clash
     seq = seq.looped()
     for shift in range(len(seq)):
         seq_shifted = seq.shifted(shift)
         asm = assembly.PCRAssembly([primer1, seq_shifted, primer2], limit=8)
-        with pytest.raises(ValueError):
-            asm.assemble_linear()
+        asm.assemble_linear()
 
     # PCR assembly, raises error in case of circular assembly and insertion
     with pytest.raises(NotImplementedError):
