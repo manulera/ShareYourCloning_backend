@@ -1122,6 +1122,26 @@ class HomologousRecombinationTest(unittest.TestCase):
         self.assertEqual(len(sequences), 1)
         self.assertEqual(str(sequences[0].seq), 'TTTTacgatCCCtgctccCCCC'.upper())
 
+    def test_multiple_insertions(self):
+        homology = 'ATGCAAACAGTAATGATGGATGACATTCAAAGCACTGATT'
+        template = Dseqrecord(f'aaaaaa{homology}aattggaa{homology}tttttttt', circular=False)
+        insert = Dseqrecord(f'{homology}cccc{homology}', circular=False)
+
+        json_template = format_sequence_genbank(template)
+        json_template.id = 1
+        json_insert = format_sequence_genbank(insert)
+        json_insert.id = 2
+
+        source = HomologousRecombinationSource(id=0)
+        data = {'source': source.model_dump(), 'sequences': [json_template.model_dump(), json_insert.model_dump()]}
+
+        response = client.post('/homologous_recombination', json=data)
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        sequences = [read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']]
+        self.assertEqual(len(sequences), 3)
+
 
 class GibsonAssemblyTest(unittest.TestCase):
     def test_gibson_assembly(self):

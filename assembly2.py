@@ -462,6 +462,9 @@ def assemble_mismatch_PCR(subfragments, subfragment_representation):
 
 
 def assembly_is_circular(assembly, fragments):
+    """
+    Note: This does not work for insertion assemblies, that's why assemble takes the optional argument is_insertion.
+    """
     if assembly[0][0] != assembly[-1][1]:
         return False
     elif isinstance(fragments[abs(assembly[0][0]) - 1], _Dseqrecord) and fragments[abs(assembly[0][0]) - 1].circular:
@@ -470,10 +473,13 @@ def assembly_is_circular(assembly, fragments):
         return _location_boundaries(assembly[0][2])[0] > _location_boundaries(assembly[-1][3])[0]
 
 
-def assemble(fragments, assembly):
+def assemble(fragments, assembly, is_insertion=False):
     """Execute an assembly, from the representation returned by get_linear_assemblies or get_circular_assemblies."""
 
-    is_circular = assembly_is_circular(assembly, fragments)
+    if is_insertion:
+        is_circular = False
+    else:
+        is_circular = assembly_is_circular(assembly, fragments)
 
     subfragment_representation = edge_representation2subfragment_representation(assembly, is_circular)
     # We transform into Dseqrecords (for primers)
@@ -1009,7 +1015,7 @@ class Assembly:
     def assemble_insertion(self, only_adjacent_edges: bool = False):
         """Assemble insertion constructs, from assemblies returned by self.get_insertion_assemblies."""
         assemblies = self.get_insertion_assemblies(only_adjacent_edges)
-        return [assemble(self.fragments, a) for a in assemblies]
+        return [assemble(self.fragments, a, is_insertion=True) for a in assemblies]
 
     def get_locations_on_fragments(self) -> dict[int, dict[str, list[Location]]]:
         """Get a dictionary where the keys are the nodes in the graph, and the values are dictionaries with keys
