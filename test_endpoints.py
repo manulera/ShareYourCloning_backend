@@ -1125,7 +1125,7 @@ class HomologousRecombinationTest(unittest.TestCase):
     def test_multiple_insertions(self):
         homology = 'ATGCAAACAGTAATGATGGATGACATTCAAAGCACTGATT'
         template = Dseqrecord(f'aaaaaa{homology}aattggaa{homology}tttttttt', circular=False)
-        insert = Dseqrecord(f'{homology}cccc{homology}', circular=False)
+        insert = Dseqrecord(f'{homology}acaa{homology}', circular=False)
 
         json_template = format_sequence_genbank(template)
         json_template.id = 1

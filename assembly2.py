@@ -972,7 +972,10 @@ class Assembly:
             # the example above. Only one of the pairs of edges should satisfy this condition for the topology to make sense.
             right_of_insertion = _location_boundaries(start_location)[0]
             left_of_insertion = _location_boundaries(end_location)[0]
-            if not fragment.circular and (right_of_insertion > left_of_insertion or start_location == end_location):
+            if not fragment.circular and (
+                right_of_insertion > left_of_insertion
+                or _locations_overlap(start_location, end_location, len(fragment))
+            ):
                 edge_pair_index.append(i)
 
         if len(edge_pair_index) != 1:
