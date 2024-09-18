@@ -1014,28 +1014,6 @@ class PCRTest(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(payload['detail'], 'The provided assembly is not valid.')
 
-        # Test clashing primers
-        template = Dseqrecord(Dseq('ACGTACGTGCGCGCGC'))
-
-        json_seq = format_sequence_genbank(template)
-        json_seq.id = 1
-
-        submitted_source = PCRSource(id=0)
-
-        primer_fwd = PrimerModel(sequence='ACGTACGTG', id=2, name='forward')
-
-        primer_rvs = PrimerModel(sequence='GCGCGCGCA', id=3, name='reverse')
-
-        data = {
-            'source': submitted_source.model_dump(),
-            'sequences': [json_seq.model_dump()],
-            'primers': [primer_fwd.model_dump(), primer_rvs.model_dump()],
-        }
-        response = client.post('/pcr', json=data, params={'minimal_annealing': 8})
-        payload = response.json()
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('Clashing primers', payload['detail'])
-
     def test_wrong_stoichiometry(self):
         # If not 2 primers per sequence, bad request
         template = Dseqrecord(Dseq('ACGTACGTGCGCGCGC'))
@@ -1143,6 +1121,26 @@ class HomologousRecombinationTest(unittest.TestCase):
         sequences = [read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']]
         self.assertEqual(len(sequences), 1)
         self.assertEqual(str(sequences[0].seq), 'TTTTacgatCCCtgctccCCCC'.upper())
+
+    def test_multiple_insertions(self):
+        homology = 'ATGCAAACAGTAATGATGGATGACATTCAAAGCACTGATT'
+        template = Dseqrecord(f'aaaaaa{homology}aattggaa{homology}tttttttt', circular=False)
+        insert = Dseqrecord(f'{homology}acaa{homology}', circular=False)
+
+        json_template = format_sequence_genbank(template)
+        json_template.id = 1
+        json_insert = format_sequence_genbank(insert)
+        json_insert.id = 2
+
+        source = HomologousRecombinationSource(id=0)
+        data = {'source': source.model_dump(), 'sequences': [json_template.model_dump(), json_insert.model_dump()]}
+
+        response = client.post('/homologous_recombination', json=data)
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        sequences = [read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']]
+        self.assertEqual(len(sequences), 3)
 
 
 class GibsonAssemblyTest(unittest.TestCase):

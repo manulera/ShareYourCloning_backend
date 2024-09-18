@@ -1,4 +1,5 @@
-from dna_functions import sum_is_sticky, find_sequence_regex
+from dna_functions import find_sequence_regex
+from dna_utils import sum_is_sticky
 import unittest
 from pydna.dseq import Dseq
 

@@ -24,8 +24,7 @@ from shareyourcloning_linkml.datamodel import (
     LigationSource as _LigationSource,
     CRISPRSource as _CRISPRSource,
     Primer as _Primer,
-    AssemblyJoin as _AssemblyJoin,
-    AssemblyJoinComponent as _AssemblyJoinComponent,
+    AssemblyFragment as _AssemblyFragment,
     SimpleSequenceLocation as _SimpleSequenceLocation,
     AddGeneIdSource as _AddGeneIdSource,
     BenchlingUrlSource as _BenchlingUrlSource,
@@ -33,6 +32,8 @@ from shareyourcloning_linkml.datamodel import (
     OverlapExtensionPCRLigationSource as _OverlapExtensionPCRLigationSource,
 )
 from pydna.utils import shift_location as _shift_location
+from assembly2 import edge_representation2subfragment_representation, subfragment_representation2edge_representation
+
 
 SequenceFileFormat = _SequenceFileFormat
 
@@ -62,7 +63,15 @@ class SeqFeatureModel(BaseModel):
 # Sources =========================================
 
 
-class ManuallyTypedSource(_ManuallyTypedSource):
+class SourceCommonClass:
+    input: Optional[List[int]] = Field(
+        default_factory=list,
+        description="""The sequences that are an input to this source. If the source represents external import of a sequence, it's empty.""",
+        json_schema_extra={'linkml_meta': {'alias': 'input', 'domain_of': ['Source']}},
+    )
+
+
+class ManuallyTypedSource(SourceCommonClass, _ManuallyTypedSource):
     """Describes a sequence that is typed manually by the user"""
 
     @model_validator(mode='after')
@@ -74,25 +83,25 @@ class ManuallyTypedSource(_ManuallyTypedSource):
         return self
 
 
-class UploadedFileSource(_UploadedFileSource):
+class UploadedFileSource(SourceCommonClass, _UploadedFileSource):
     pass
 
 
-class RepositoryIdSource(_RepositoryIdSource):
+class RepositoryIdSource(SourceCommonClass, _RepositoryIdSource):
     pass
 
 
-class AddGeneIdSource(_AddGeneIdSource):
+class AddGeneIdSource(SourceCommonClass, _AddGeneIdSource):
     # TODO: add this to LinkML
     # repository_name: RepositoryName = RepositoryName('addgene')
     pass
 
 
-class BenchlingUrlSource(_BenchlingUrlSource):
+class BenchlingUrlSource(SourceCommonClass, _BenchlingUrlSource):
     pass
 
 
-class GenomeCoordinatesSource(_GenomeCoordinatesSource):
+class GenomeCoordinatesSource(SourceCommonClass, _GenomeCoordinatesSource):
     pass
 
 
@@ -114,7 +123,7 @@ class RestrictionSequenceCut(_RestrictionSequenceCut):
         return ((self.cut_watson, self.overhang), restriction_enzyme)
 
 
-class RestrictionEnzymeDigestionSource(_RestrictionEnzymeDigestionSource):
+class RestrictionEnzymeDigestionSource(SourceCommonClass, _RestrictionEnzymeDigestionSource):
     """Documents a restriction enzyme digestion, and the selection of one of the fragments."""
 
     # TODO: maybe a better way? They have to be redefined here because
@@ -167,66 +176,24 @@ class SimpleSequenceLocation(_SimpleSequenceLocation):
         return BioSimpleLocation(self.start, self.end, self.strand)
 
 
-class AssemblyJoinComponent(_AssemblyJoinComponent):
-    location: SimpleSequenceLocation = Field(
-        ...,
-        description="""Location of the overlap in the fragment. Might be an empty location (start == end) to indicate blunt join.""",
-    )
-    pass
+class AssemblyFragment(_AssemblyFragment):
+    left_location: Optional[SimpleSequenceLocation] = None
+    right_location: Optional[SimpleSequenceLocation] = None
 
-
-class AssemblyJoin(_AssemblyJoin):
-
-    left: AssemblyJoinComponent = Field(...)
-    right: AssemblyJoinComponent = Field(...)
-
-    @classmethod
-    def from_join_tuple(cls, join_tuple: tuple[int, int, BioSimpleLocation, BioSimpleLocation]):
-        return cls(
-            left=AssemblyJoinComponent(
-                sequence=abs(join_tuple[0]),
-                reverse_complemented=join_tuple[0] < 0,
-                location=SimpleSequenceLocation.from_simple_location(join_tuple[2]),
-            ),
-            right=AssemblyJoinComponent(
-                sequence=abs(join_tuple[1]),
-                reverse_complemented=join_tuple[1] < 0,
-                location=SimpleSequenceLocation.from_simple_location(join_tuple[3]),
-            ),
-        )
-
-    def to_join_tuple(self, fragments) -> tuple[int, int, BioSimpleLocation, BioSimpleLocation]:
+    def to_fragment_tuple(self, fragments) -> tuple[int, BioSimpleLocation, BioSimpleLocation]:
         fragment_ids = [int(f.id) for f in fragments]
 
-        def id2pos(id):
-            # Find the position of id in the fragments list
-            return fragment_ids.index(abs(id)) + 1
-
         return (
-            id2pos(self.left.sequence) * (-1 if self.left.reverse_complemented else 1),
-            id2pos(self.right.sequence) * (-1 if self.right.reverse_complemented else 1),
-            self.left.location.to_biopython_location(),
-            self.right.location.to_biopython_location(),
+            (fragment_ids.index(self.sequence) + 1) * (-1 if self.reverse_complemented else 1),
+            None if self.left_location is None else self.left_location.to_biopython_location(),
+            None if self.right_location is None else self.right_location.to_biopython_location(),
         )
 
-    def to_join_tuple_with_ids(self) -> tuple[int, int, BioSimpleLocation, BioSimpleLocation]:
-        return (
-            self.left.sequence * (-1 if self.left.reverse_complemented else 1),
-            self.right.sequence * (-1 if self.right.reverse_complemented else 1),
-            self.left.location.to_biopython_location(),
-            self.right.location.to_biopython_location(),
-        )
 
-    def __str__(self) -> str:
-        u, v, lu, lv = self.to_join_tuple_with_ids()
-        return f'{u}{lu}:{v}{lv}'
-
-    def __repr__(self) -> str:
-        return self.__str__()
-
-
-class AssemblySourceCommonClass:
-    assembly: List[AssemblyJoin] = Field(
+class AssemblySourceCommonClass(SourceCommonClass):
+    # TODO: This is different in the LinkML model, because there it is required,
+    # and here we make it default to list.
+    assembly: List[AssemblyFragment] = Field(
         default_factory=list, description="""The joins between the fragments in the assembly"""
     )
 
@@ -234,16 +201,16 @@ class AssemblySourceCommonClass:
         """Returns the minimal overlap between the fragments in the assembly"""
         all_overlaps = list()
         for f in self.assembly:
-            # TODO: these conditions are probably not needed
-            # if f.left.location is not None:
-            all_overlaps.append(f.left.location.end - f.left.location.start)
-            # if f.right.location is not None:
-            all_overlaps.append(f.right.location.end - f.right.location.start)
+            if f.left_location is not None:
+                all_overlaps.append(f.left_location.end - f.left_location.start)
+            if f.right_location is not None:
+                all_overlaps.append(f.right_location.end - f.right_location.start)
         return min(all_overlaps)
 
     def get_assembly_plan(self, fragments: list[_SeqRecord]) -> tuple:
         """Returns the assembly plan"""
-        return tuple(j.to_join_tuple(fragments) for j in self.assembly)
+        subf = [f.to_fragment_tuple(fragments) for f in self.assembly]
+        return subfragment_representation2edge_representation(subf, self.circular)
 
     @classmethod
     def from_assembly(
@@ -254,36 +221,44 @@ class AssemblySourceCommonClass:
         fragments: list[_SeqRecord],
         **kwargs,
     ):
+
+        # Replace the positions with the actual ids
         fragment_ids = [int(f.id) for f in fragments]
         input_ids = [int(f.id) for f in fragments if not isinstance(f, _PydnaPrimer)]
 
-        def pos2id(pos):
-            sign = -1 if pos < 0 else 1
-            return fragment_ids[abs(pos) - 1] * sign
-
-        ids_assembly = [(pos2id(u), pos2id(v), lu, lv) for u, v, lu, lv in assembly]
+        # Here the ids are still the positions in the fragments list
+        fragment_assembly_positions = edge_representation2subfragment_representation(assembly, circular)
+        assembly_fragments = [
+            AssemblyFragment(
+                sequence=fragment_ids[abs(pos) - 1],
+                left_location=None if left_loc is None else SimpleSequenceLocation.from_simple_location(left_loc),
+                right_location=None if right_loc is None else SimpleSequenceLocation.from_simple_location(right_loc),
+                reverse_complemented=pos < 0,
+            )
+            for pos, left_loc, right_loc in fragment_assembly_positions
+        ]
         return cls(
             id=id,
             input=input_ids,
-            assembly=[AssemblyJoin.from_join_tuple(join) for join in ids_assembly],
+            assembly=assembly_fragments,
             circular=circular,
             **kwargs,
         )
 
 
-class AssemblySource(_AssemblySource, AssemblySourceCommonClass):
+class AssemblySource(AssemblySourceCommonClass, _AssemblySource):
     pass
 
 
-class PCRSource(_PCRSource, AssemblySourceCommonClass):
+class PCRSource(AssemblySourceCommonClass, _PCRSource):
     pass
 
 
-class LigationSource(_LigationSource, AssemblySourceCommonClass):
+class LigationSource(AssemblySourceCommonClass, _LigationSource):
     pass
 
 
-class HomologousRecombinationSource(_HomologousRecombinationSource, AssemblySourceCommonClass):
+class HomologousRecombinationSource(AssemblySourceCommonClass, _HomologousRecombinationSource):
 
     # TODO: add this to LinkML
     # This can only take two inputs, the first one is the template, the second one is the insert
@@ -291,18 +266,18 @@ class HomologousRecombinationSource(_HomologousRecombinationSource, AssemblySour
     pass
 
 
-class GibsonAssemblySource(_GibsonAssemblySource, AssemblySourceCommonClass):
+class GibsonAssemblySource(AssemblySourceCommonClass, _GibsonAssemblySource):
 
     # TODO: add this to LinkML
     # input: conlist(int, min_length=1)
     pass
 
 
-class OverlapExtensionPCRLigationSource(_OverlapExtensionPCRLigationSource, AssemblySourceCommonClass):
+class OverlapExtensionPCRLigationSource(AssemblySourceCommonClass, _OverlapExtensionPCRLigationSource):
     pass
 
 
-class CRISPRSource(_CRISPRSource, AssemblySourceCommonClass):
+class CRISPRSource(AssemblySourceCommonClass, _CRISPRSource):
 
     # TODO
     # input: conlist(int, min_length=2, max_length=2)
@@ -319,7 +294,7 @@ class CRISPRSource(_CRISPRSource, AssemblySourceCommonClass):
         return super().from_assembly(assembly, id, False, fragments, guides=guides)
 
 
-class RestrictionAndLigationSource(_RestrictionAndLigationSource, AssemblySourceCommonClass):
+class RestrictionAndLigationSource(AssemblySourceCommonClass, _RestrictionAndLigationSource):
     # TODO: add this to LinkML
     # input: conlist(int, min_length=1)
 
@@ -335,17 +310,22 @@ class RestrictionAndLigationSource(_RestrictionAndLigationSource, AssemblySource
         return super().from_assembly(assembly, id, circular, fragments, restriction_enzymes=restriction_enzymes)
 
 
-class OligoHybridizationSource(_OligoHybridizationSource):
+class OligoHybridizationSource(SourceCommonClass, _OligoHybridizationSource):
     pass
 
 
-class PolymeraseExtensionSource(_PolymeraseExtensionSource):
+class PolymeraseExtensionSource(SourceCommonClass, _PolymeraseExtensionSource):
     pass
 
 
 class BaseCloningStrategy(_CloningStrategy):
     # For now, we don't add anything, but the classes will not have the new methods if this is used
     # It will be used for validation for now
+    primers: Optional[List[PrimerModel]] = Field(
+        default_factory=list,
+        description="""The primers that are used in the cloning strategy""",
+        json_schema_extra={'linkml_meta': {'alias': 'primers', 'domain_of': ['CloningStrategy']}},
+    )
     pass
 
 

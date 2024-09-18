@@ -15,21 +15,21 @@ from pydna.seqrecord import SeqRecord as _SeqRecord
 import networkx as _nx
 import itertools as _itertools
 from Bio.SeqFeature import SimpleLocation, Location
-from dna_functions import sum_is_sticky
+from dna_utils import sum_is_sticky
 from Bio.Seq import reverse_complement
 from Bio.Restriction.Restriction import RestrictionBatch, AbstractCut
 import regex
 
-
-def primers_clash(assembly, fragments):
-    edge_pairs = zip(assembly, assembly[1:])
-    for (_u1, _v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
-        # Only for primer joins
-        if not isinstance(fragments[abs(_v1) - 1], _Dseqrecord):
-            continue
-        if _locations_overlap(start_location, end_location, len(fragments[abs(_v1) - 1])):
-            return True
-    return False
+# Currently unused, commented out because it's not tested
+# def primers_clash(assembly, fragments):
+#     edge_pairs = zip(assembly, assembly[1:])
+#     for (_u1, _v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
+#         # Only for primer joins
+#         if not isinstance(fragments[abs(_v1) - 1], _Dseqrecord):
+#             continue
+#         if _locations_overlap(start_location, end_location, len(fragments[abs(_v1) - 1])):
+#             return True
+#     return False
 
 
 def gather_overlapping_locations(locs: list[Location], fragment_length: int):
@@ -462,6 +462,9 @@ def assemble_mismatch_PCR(subfragments, subfragment_representation):
 
 
 def assembly_is_circular(assembly, fragments):
+    """
+    Note: This does not work for insertion assemblies, that's why assemble takes the optional argument is_insertion.
+    """
     if assembly[0][0] != assembly[-1][1]:
         return False
     elif isinstance(fragments[abs(assembly[0][0]) - 1], _Dseqrecord) and fragments[abs(assembly[0][0]) - 1].circular:
@@ -470,10 +473,13 @@ def assembly_is_circular(assembly, fragments):
         return _location_boundaries(assembly[0][2])[0] > _location_boundaries(assembly[-1][3])[0]
 
 
-def assemble(fragments, assembly):
+def assemble(fragments, assembly, is_insertion=False):
     """Execute an assembly, from the representation returned by get_linear_assemblies or get_circular_assemblies."""
 
-    is_circular = assembly_is_circular(assembly, fragments)
+    if is_insertion:
+        is_circular = False
+    else:
+        is_circular = assembly_is_circular(assembly, fragments)
 
     subfragment_representation = edge_representation2subfragment_representation(assembly, is_circular)
     # We transform into Dseqrecords (for primers)
@@ -538,7 +544,33 @@ def edge_representation2subfragment_representation(assembly, is_circular):
     for (_u1, v1, _, start_location), (_u2, _v2, end_location, _) in edge_pairs:
         subfragment_representation.append((v1, start_location, end_location))
 
-    return subfragment_representation
+    return tuple(subfragment_representation)
+
+
+def subfragment_representation2edge_representation(assembly, is_circular):
+    """
+    Turn this kind of subfragment representation fragment 1, left edge on 1, right edge on 1
+    a = [(1, 'loc1c', 'loc1a'), (2, 'loc2a', 'loc2b'), (3, 'loc3b', 'loc3c')]
+    Into this: fragment 1, fragment 2, right edge on 1, left edge on 2
+    b = [(1, 2, 'loc1a', 'loc2a'), (2, 3, 'loc2b' 'loc3b'), (3, 1, 'loc3c', 'loc1c')]
+    """
+
+    edge_representation = []
+
+    # Iterate through the assembly pairwise to create the edge representation
+    for i in range(len(assembly) - 1):
+        frag1, left1, right1 = assembly[i]
+        frag2, left2, right2 = assembly[i + 1]
+        # Create the edge between the current and next fragment
+        edge_representation.append((frag1, frag2, right1, left2))
+
+    if is_circular:
+        # Add the edge from the last fragment back to the first
+        frag_last, left_last, right_last = assembly[-1]
+        frag_first, left_first, right_first = assembly[0]
+        edge_representation.append((frag_last, frag_first, right_last, left_first))
+
+    return tuple(edge_representation)
 
 
 def get_assembly_subfragments(fragments: list[_Dseqrecord], subfragment_representation):
@@ -584,11 +616,19 @@ def extract_subfragment(seq: _Dseqrecord, start_location: Location, end_location
     end = None if end_location is None else _location_boundaries(end_location)[1]
 
     # Special case, some of it could be handled by better Dseqrecord slicing in the future
-    if seq.circular and start_location == end_location:
+    if (
+        seq.circular
+        and start_location is not None
+        and end_location is not None
+        and _locations_overlap(start_location, end_location, len(seq))
+    ):
         # The overhang is different for origin-spanning features, for instance
         # for a feature join{[12:13], [0:3]} in a sequence of length 13, the overhang
         # is -4, not 9
         ovhg = start - end if end > start else start - end - len(seq)
+        # edge case
+        if abs(ovhg) == len(seq):
+            ovhg = 0
         dummy_cut = ((start, ovhg), None)
         open_seq = seq.apply_cut(dummy_cut, dummy_cut)
         return _Dseqrecord(fill_dseq(open_seq.seq), features=open_seq.features)
@@ -932,7 +972,10 @@ class Assembly:
             # the example above. Only one of the pairs of edges should satisfy this condition for the topology to make sense.
             right_of_insertion = _location_boundaries(start_location)[0]
             left_of_insertion = _location_boundaries(end_location)[0]
-            if not fragment.circular and (right_of_insertion > left_of_insertion or start_location == end_location):
+            if not fragment.circular and (
+                right_of_insertion > left_of_insertion
+                or _locations_overlap(start_location, end_location, len(fragment))
+            ):
                 edge_pair_index.append(i)
 
         if len(edge_pair_index) != 1:
@@ -975,7 +1018,7 @@ class Assembly:
     def assemble_insertion(self, only_adjacent_edges: bool = False):
         """Assemble insertion constructs, from assemblies returned by self.get_insertion_assemblies."""
         assemblies = self.get_insertion_assemblies(only_adjacent_edges)
-        return [assemble(self.fragments, a) for a in assemblies]
+        return [assemble(self.fragments, a, is_insertion=True) for a in assemblies]
 
     def get_locations_on_fragments(self) -> dict[int, dict[str, list[Location]]]:
         """Get a dictionary where the keys are the nodes in the graph, and the values are dictionaries with keys
@@ -1129,20 +1172,7 @@ class PCRAssembly(Assembly):
 
         return
 
-    @classmethod
-    def assembly_is_valid(
-        cls, fragments: list[_Dseqrecord | _Primer], assembly, is_circular, use_all_fragments, is_insertion=False
-    ):
-        is_valid = super().assembly_is_valid(fragments, assembly, is_circular, use_all_fragments, is_insertion)
-        if not is_valid:
-            return False
-        # Error if clashing primers
-        if primers_clash(assembly, fragments):
-            raise ValueError('Clashing primers in assembly ' + assembly2str(assembly))
-        return True
-
     def get_linear_assemblies(self, only_adjacent_edges: bool = False):
-        """Adds extra constrains to prevent clashing primers."""
         if only_adjacent_edges:
             raise NotImplementedError('only_adjacent_edges not implemented for PCR assemblies')
 
