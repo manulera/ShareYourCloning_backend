@@ -1,7 +1,9 @@
 from pydna.dseqrecord import Dseqrecord
-from pydna.design import primer_design
+from pydna.design import primer_design, assembly_fragments
 from Bio.SeqFeature import SimpleLocation
 from pydna.utils import locations_overlap, shift_location, location_boundaries
+from pydna.amplicon import Amplicon
+from pydantic_models import PrimerModel
 
 
 def homologous_recombination_primers(
@@ -47,3 +49,34 @@ def homologous_recombination_primers(
     rvs_homology = rvs_arm.extract(hr_seq).reverse_complement()
 
     return str(fwd_homology.seq).lower() + str(fwd_primer.seq), str(rvs_homology.seq).lower() + str(rvs_primer.seq)
+
+
+def gibson_assembly_primers(
+    templates: list[Dseqrecord],
+    homology_length: int,
+    minimal_hybridization_length: int,
+    target_tm: float,
+    circular: bool,
+) -> list[PrimerModel]:
+
+    initial_amplicons = [
+        primer_design(template, limit=minimal_hybridization_length, target_tm=target_tm) for template in templates
+    ]
+    if circular:
+        initial_amplicons.append(initial_amplicons[0])
+
+    assembly_amplicons: list[Amplicon] = assembly_fragments(initial_amplicons, overlap=homology_length)
+
+    all_primers = sum((list(amplicon.primers()) for amplicon in assembly_amplicons), [])
+    if circular:
+        all_primers[0] = all_primers[-2]
+        all_primers = all_primers[:-2]
+
+    for i in range(0, len(all_primers), 2):
+        fwd, rvs = all_primers[i : i + 2]
+        template = templates[i // 2]
+        template_name = template.name if template.name != 'name' else f'seq_{template.id}'
+        fwd.name = f'{template_name}_fwd'
+        rvs.name = f'{template_name}_rvs'
+
+    return [PrimerModel(id=0, name=primer.name, sequence=str(primer.seq)) for primer in all_primers]

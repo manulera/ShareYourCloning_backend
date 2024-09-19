@@ -64,7 +64,7 @@ import ncbi_requests
 import os
 from record_stub_route import RecordStubRoute
 from starlette.responses import RedirectResponse
-from primer_design import homologous_recombination_primers
+from primer_design import homologous_recombination_primers, gibson_assembly_primers
 import asyncio
 
 # ENV variables ========================================
@@ -992,7 +992,6 @@ async def primer_design_homologous_recombination(
     minimal_hybridization_length: int = Query(
         ..., description='The minimal length of the hybridization region in bps.'
     ),
-    insert_forward: bool = Query(..., description='Whether the insert is in the forward direction.'),
     target_tm: float = Query(
         ..., description='The desired melting temperature for the hybridization part of the primer.'
     ),
@@ -1005,6 +1004,8 @@ async def primer_design_homologous_recombination(
     hr_seq = read_dsrecord_from_json(homologous_recombination_target.sequence)
     hr_loc = homologous_recombination_target.location.to_biopython_location(hr_seq.circular, len(hr_seq))
 
+    insert_forward = pcr_template.forward_orientation
+
     try:
         forward_primer, reverse_primer = homologous_recombination_primers(
             pcr_seq, pcr_loc, hr_seq, hr_loc, homology_length, minimal_hybridization_length, insert_forward, target_tm
@@ -1016,6 +1017,49 @@ async def primer_design_homologous_recombination(
     reverse_primer = PrimerModel(id=0, sequence=reverse_primer, name='reverse')
 
     return {'forward_primer': forward_primer, 'reverse_primer': reverse_primer}
+
+
+# A primer design endpoint for Gibson assembly
+# This is how the request data will look like from javascript code:
+# const requestData = {
+#       queries: templateEntities.map((e, index) => ({
+#         sequence: e,
+#         location: selectedRegion2SequenceLocation(amplifyRegions[index]),
+#         orientation: fragmentOrientations[index],
+#       })),
+#     };
+
+
+@router.post(
+    '/primer_design/gibson_assembly',
+    response_model=create_model('GibsonAssemblyPrimerDesignResponse', primers=(list[PrimerModel], ...)),
+)
+async def primer_design_gibson_assembly(
+    queries: list[PrimerDesignQuery],
+    homology_length: int = Query(..., description='The length of the homology region in bps.'),
+    minimal_hybridization_length: int = Query(
+        ..., description='The minimal length of the hybridization region in bps.'
+    ),
+    target_tm: float = Query(
+        ..., description='The desired melting temperature for the hybridization part of the primer.'
+    ),
+    circular: bool = Query(False, description='Whether the assembly is circular.'),
+):
+    """Design primers for Gibson assembly"""
+    templates = list()
+    for query in queries:
+        dseqr = read_dsrecord_from_json(query.sequence)
+        location = query.location.to_biopython_location(dseqr.circular, len(dseqr))
+        template = location.extract(dseqr)
+        if not query.forward_orientation:
+            template = template.reverse_complement()
+        # For naming the primers
+        template.name = dseqr.name
+        templates.append(template)
+
+    primers = gibson_assembly_primers(templates, homology_length, minimal_hybridization_length, target_tm, circular)
+
+    return {'primers': primers}
 
 
 @router.post(

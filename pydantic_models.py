@@ -1,6 +1,11 @@
 from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List
-from Bio.SeqFeature import SeqFeature, Location, SimpleLocation as BioSimpleLocation
+from Bio.SeqFeature import (
+    SeqFeature,
+    Location,
+    SimpleLocation as BioSimpleLocation,
+    FeatureLocation as BioFeatureLocation,
+)
 from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
 from Bio.Restriction.Restriction import RestrictionType, RestrictionBatch
 from Bio.SeqRecord import SeqRecord as _SeqRecord
@@ -169,7 +174,7 @@ class SimpleSequenceLocation(_SimpleSequenceLocation):
             strand=location.strand,
         )
 
-    def to_biopython_location(self, circular: bool = False, seq_len: int = None) -> Location:
+    def to_biopython_location(self, circular: bool = False, seq_len: int = None) -> BioFeatureLocation:
         if circular and self.start > self.end and seq_len is not None:
             unwrapped_location = BioSimpleLocation(self.start, self.end + seq_len, self.strand)
             return _shift_location(unwrapped_location, 0, seq_len)
@@ -331,4 +336,5 @@ class BaseCloningStrategy(_CloningStrategy):
 
 class PrimerDesignQuery(BaseModel):
     sequence: TextFileSequence
-    location: Optional[SimpleSequenceLocation] = None
+    location: SimpleSequenceLocation
+    forward_orientation: bool = True
