@@ -1750,6 +1750,82 @@ class PrimerDesignTest(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload['detail'], 'Forward homology region is out of bounds.')
 
+    def test_gibson_assembly(self):
+        # Test case for gibson_assembly_primers endpoint
+        templates = [
+            Dseqrecord('AAACAGTAATACGTTCCTTTTTTATGATGATGGATGACATTCAAAGCACTGATTCTAT'),
+            Dseqrecord('GTTTACAACGGCAATGAACGTTCCTTTTTTATGATATGCCCAGCTTCATGAAATGGAA'),
+            Dseqrecord('AAGGACAACGTTCCTTTTTTATGATATATATGGCACAGTATGATCAAAAGTTAAGTAC'),
+        ]
+
+        queries = []
+        for i, template in enumerate(templates):
+            json_seq = format_sequence_genbank(template)
+            json_seq.id = i
+            queries.append(
+                {
+                    'sequence': json_seq.model_dump(),
+                    'location': PydanticSimpleLocation(start=0, end=len(template)).model_dump(),
+                    'forward_orientation': True,
+                }
+            )
+
+        data = queries
+        params = {'homology_length': 20, 'minimal_hybridization_length': 15, 'target_tm': 55, 'circular': True}
+
+        response = client.post('/primer_design/gibson_assembly', json=data, params=params)
+
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.json()
+        self.assertEqual(len(payload['primers']), 6)  # 2 primers per template
+        for i, p in enumerate(payload['primers']):
+            p = PrimerModel.model_validate(p)
+            # Check that the name is correct
+            if i % 2 == 0:
+                self.assertEqual(p.name, f'seq_{i//2}_fwd')
+            else:
+                self.assertEqual(p.name, f'seq_{i//2}_rvs')
+
+        # Primer naming also work for named sequences
+        for i, t in enumerate(templates):
+            t.name = f'template_{i}'
+
+        queries = []
+        for i, template in enumerate(templates):
+            json_seq = format_sequence_genbank(template)
+            json_seq.id = i
+            queries.append(
+                {
+                    'sequence': json_seq.model_dump(),
+                    'location': PydanticSimpleLocation(start=0, end=len(template)).model_dump(),
+                    'forward_orientation': True,
+                }
+            )
+
+        data = queries
+        params = {'homology_length': 20, 'minimal_hybridization_length': 15, 'target_tm': 55, 'circular': True}
+
+        response = client.post('/primer_design/gibson_assembly', json=data, params=params)
+
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.json()
+        self.assertEqual(len(payload['primers']), 6)  # 2 primers per template
+        for i, p in enumerate(payload['primers']):
+            p = PrimerModel.model_validate(p)
+            # Check that the name is correct
+            if i % 2 == 0:
+                self.assertEqual(p.name, f'template_{i//2}_fwd')
+            else:
+                self.assertEqual(p.name, f'template_{i//2}_rvs')
+
+        # Test error case with invalid parameters
+        params['minimal_hybridization_length'] = 100  # Too long
+        response = client.post('/primer_design/gibson_assembly', json=data, params=params)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Primers could not be designed', response.json()['detail'])
+
 
 class ValidateEndPointTest(unittest.TestCase):
 
