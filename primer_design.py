@@ -65,6 +65,19 @@ def gibson_assembly_primers(
     if circular:
         initial_amplicons.append(initial_amplicons[0])
 
+    templates_with_no_primers = []
+    for i, amplicon in enumerate(initial_amplicons):
+        if None in amplicon.primers():
+            # In circular cases
+            index = i + 1 if i < len(templates) else 1
+            templates_with_no_primers.append(index)
+    templates_with_no_primers = list(sorted(set(templates_with_no_primers)))
+
+    if templates_with_no_primers:
+        raise ValueError(
+            f'Primers could not be designed for template {", ".join(map(str, templates_with_no_primers))}, try changing settings.'
+        )
+
     assembly_amplicons: list[Amplicon] = assembly_fragments(initial_amplicons, overlap=homology_length)
 
     all_primers = sum((list(amplicon.primers()) for amplicon in assembly_amplicons), [])

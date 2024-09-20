@@ -1,7 +1,11 @@
-from primer_design import homologous_recombination_primers
+from primer_design import homologous_recombination_primers, gibson_assembly_primers
 from Bio.SeqFeature import SimpleLocation, SeqFeature
 from unittest import TestCase
 from pydna.dseqrecord import Dseqrecord
+from pydantic_models import PrimerModel
+from pydna.amplify import pcr
+from assembly2 import Assembly, gibson_overlap
+import pytest
 
 
 class TestHomologousRecombinationPrimers(TestCase):
@@ -168,3 +172,131 @@ class TestHomologousRecombinationPrimers(TestCase):
             self.fail('Expected ValueError.')
         except ValueError as e:
             self.assertEqual(str(e), 'Homology arms overlap.')
+
+
+class TestGibsonAssemblyPrimers(TestCase):
+
+    def test_normal_examples(self):
+        """
+        Test the gibson_assembly_primers function.
+        """
+
+        # Test case for gibson_assembly_primers function
+        templates = [
+            Dseqrecord('AAACAGTAATACGTTCCTTTTTTATGATGATGGATGACATTCAAAGCACTGATTCTAT'),
+            Dseqrecord('GTTTACAACGGCAATGAACGTTCCTTTTTTATGATATGCCCAGCTTCATGAAATGGAA'),
+            Dseqrecord('AAGGACAACGTTCCTTTTTTATGATATATATGGCACAGTATGATCAAAAGTTAAGTAC'),
+        ]
+        # Set the name to 'name' to check formatting of name
+        for i, template in enumerate(templates):
+            template.name = 'name'
+            template.id = f'{i}'
+
+        homology_length = 20
+        minimal_hybridization_length = 15
+        target_tm = 55
+        circular = True
+
+        primers = gibson_assembly_primers(
+            templates, homology_length, minimal_hybridization_length, target_tm, circular
+        )
+
+        # Check if the correct number of primers is returned
+        self.assertEqual(len(primers), 6)  # 2 primers per template
+
+        # Check if all primers are instances of PrimerModel
+        for primer in primers:
+            self.assertIsInstance(primer, PrimerModel)
+
+        # Check if primer names are correctly formatted
+        for i, primer in enumerate(primers):
+            template_index = i // 2
+            primer_type = 'fwd' if i % 2 == 0 else 'rvs'
+            expected_name = f'seq_{templates[template_index].id}_{primer_type}'
+            self.assertEqual(primer.name, expected_name)
+
+        # Test that it yields the right sequence
+        amplicons = list()
+        for i in range(len(templates)):
+            amplicons.append(pcr(primers[i * 2].to_pydna_primer(), primers[i * 2 + 1].to_pydna_primer(), templates[i]))
+
+        asm = Assembly(
+            amplicons,
+            algorithm=gibson_overlap,
+            use_fragment_order=False,
+            use_all_fragments=True,
+            limit=homology_length,
+        )
+
+        circular_assemblies = asm.assemble_circular()
+        self.assertEqual(len(circular_assemblies), 1)
+        self.assertEqual(circular_assemblies[0].seq.seguid(), sum(templates, Dseqrecord('')).seq.looped().seguid())
+
+        # Test with circular=False
+        circular = False
+        primers = gibson_assembly_primers(
+            templates, homology_length, minimal_hybridization_length, target_tm, circular
+        )
+
+        # Check if the correct number of primers is returned for linear assembly
+        self.assertEqual(len(primers), 6)  # 2 primers per template
+
+        # Test that it yields the right sequence
+        amplicons = list()
+        for i in range(len(templates)):
+            amplicons.append(pcr(primers[i * 2].to_pydna_primer(), primers[i * 2 + 1].to_pydna_primer(), templates[i]))
+
+        asm = Assembly(
+            amplicons,
+            algorithm=gibson_overlap,
+            use_fragment_order=False,
+            use_all_fragments=True,
+            limit=homology_length,
+        )
+
+        linear_assemblies = asm.assemble_linear()
+        self.assertEqual(len(linear_assemblies), 1)
+        self.assertEqual(linear_assemblies[0].seq, sum(templates, Dseqrecord('')).seq)
+
+    @pytest.mark.xfail(
+        reason='Waiting on https://github.com/BjornFJohansson/pydna/issues/265 and https://github.com/BjornFJohansson/pydna/issues/264'
+    )
+    def test_primer_errors(self):
+        """
+        Test the gibson_assembly_primers function.
+        """
+
+        templates = [
+            Dseqrecord('AAACAGTAATACGTTCCTTTTTTATGATGATGGATGACATTCAAAGCACTGATTCTAT'),
+            Dseqrecord('GTTTACTGGAA'),
+            Dseqrecord('AAGGACAACGTTCCTTTTTTATGATATATATGGCACAGTATGATCAAAAGTTAAGTAC'),
+        ]
+        homology_length = 20
+        minimal_hybridization_length = 15
+        target_tm = 55
+        circular = True
+
+        try:
+            gibson_assembly_primers(templates, homology_length, minimal_hybridization_length, target_tm, circular)
+            self.fail('Expected ValueError.')
+        except ValueError as e:
+            self.assertEqual(str(e), 'Primers could not be designed for template 2, try changing settings.')
+
+        templates = [templates[0], templates[2]]
+
+        # Now ask for too long minimal_hybridization_length
+        minimal_hybridization_length = 100
+        try:
+            gibson_assembly_primers(templates, homology_length, minimal_hybridization_length, target_tm, circular)
+            self.fail('Expected ValueError.')
+        except ValueError as e:
+            self.assertEqual(str(e), 'Primers could not be designed for template 1, 2, try changing settings.')
+
+        # Too long homology_length
+        homology_length = 200
+        minimal_hybridization_length = 15
+        try:
+            gibson_assembly_primers(templates, homology_length, minimal_hybridization_length, target_tm, circular)
+            self.fail('Expected ValueError.')
+        except ValueError as e:
+            self.assertEqual(str(e), 'Primers could not be designed for template 1, 2, try changing settings.')

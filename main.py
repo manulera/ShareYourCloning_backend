@@ -1055,9 +1055,14 @@ async def primer_design_gibson_assembly(
             template = template.reverse_complement()
         # For naming the primers
         template.name = dseqr.name
+        template.id = dseqr.id
         templates.append(template)
-
-    primers = gibson_assembly_primers(templates, homology_length, minimal_hybridization_length, target_tm, circular)
+    try:
+        primers = gibson_assembly_primers(
+            templates, homology_length, minimal_hybridization_length, target_tm, circular
+        )
+    except ValueError as e:
+        raise HTTPException(400, *e.args)
 
     return {'primers': primers}
 

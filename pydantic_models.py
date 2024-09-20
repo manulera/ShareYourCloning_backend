@@ -50,6 +50,15 @@ class TextFileSequence(_TextFileSequence):
 class PrimerModel(_Primer):
     """Called PrimerModel not to be confused with the class from pydna."""
 
+    def to_pydna_primer(self) -> _PydnaPrimer:
+        """
+        Convert the PrimerModel to a pydna Primer object.
+
+        Returns:
+            _PydnaPrimer: A pydna Primer object with the same sequence and name as the PrimerModel.
+        """
+        return _PydnaPrimer(self.sequence, name=self.name, id=str(self.id))
+
 
 class SeqFeatureModel(BaseModel):
     type: str
