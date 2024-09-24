@@ -1855,6 +1855,15 @@ class RenameSequenceTest(unittest.TestCase):
         dseq_resp = read_dsrecord_from_json(TextFileSequence.model_validate(payload))
         self.assertEqual(dseq_resp.name, 'hello')
 
+    def test_error(self):
+        """Does not allow spaces"""
+        dseqr = Dseqrecord('ACGT')
+        dseqr.name = 'original'
+        json_seq = format_sequence_genbank(dseqr)
+        json_seq.id = 0
+        response = client.post('/rename_sequence?name=hello world', json=json_seq.model_dump())
+        self.assertEqual(response.status_code, 422)
+
 
 class RestrictionEnzymeListTest(unittest.TestCase):
 

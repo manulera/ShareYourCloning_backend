@@ -1080,7 +1080,7 @@ async def cloning_strategy_is_valid(
 
 @router.post('/rename_sequence', response_model=TextFileSequence)
 async def rename_sequence(
-    sequence: TextFileSequence, name: str = Query(..., description='The new name of the sequence.')
+    sequence: TextFileSequence, name: str = Query(..., description='The new name of the sequence.', regex=r'^[^\s]+$')
 ):
     """Rename a sequence"""
     dseqr = read_dsrecord_from_json(sequence)
