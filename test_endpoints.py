@@ -1770,10 +1770,11 @@ class PrimerDesignTest(unittest.TestCase):
                 }
             )
 
-        data = queries
         params = {'homology_length': 20, 'minimal_hybridization_length': 15, 'target_tm': 55, 'circular': True}
 
-        response = client.post('/primer_design/gibson_assembly', json=data, params=params)
+        response = client.post(
+            '/primer_design/gibson_assembly', json={'pcr_templates': queries, 'spacers': None}, params=params
+        )
 
         self.assertEqual(response.status_code, 200)
 
@@ -1803,10 +1804,11 @@ class PrimerDesignTest(unittest.TestCase):
                 }
             )
 
-        data = queries
         params = {'homology_length': 20, 'minimal_hybridization_length': 15, 'target_tm': 55, 'circular': True}
 
-        response = client.post('/primer_design/gibson_assembly', json=data, params=params)
+        response = client.post(
+            '/primer_design/gibson_assembly', json={'pcr_templates': queries, 'spacers': None}, params=params
+        )
 
         self.assertEqual(response.status_code, 200)
 
@@ -1822,7 +1824,9 @@ class PrimerDesignTest(unittest.TestCase):
 
         # Test error case with invalid parameters
         params['minimal_hybridization_length'] = 100  # Too long
-        response = client.post('/primer_design/gibson_assembly', json=data, params=params)
+        response = client.post(
+            '/primer_design/gibson_assembly', json={'pcr_templates': queries, 'spacers': None}, params=params
+        )
         self.assertEqual(response.status_code, 400)
         self.assertIn('Primers could not be designed', response.json()['detail'])
 

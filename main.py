@@ -66,6 +66,7 @@ from record_stub_route import RecordStubRoute
 from starlette.responses import RedirectResponse
 from primer_design import homologous_recombination_primers, gibson_assembly_primers, restriction_enzyme_primers
 import asyncio
+import re
 
 # ENV variables ========================================
 RECORD_STUBS = os.environ['RECORD_STUBS'] == '1' if 'RECORD_STUBS' in os.environ else False
@@ -111,6 +112,22 @@ def format_known_assembly_response(
                 'sources': [s],
             }
     raise HTTPException(400, 'The provided assembly is not valid.')
+
+
+def validate_spacers(spacers: list[str], nb_templates: int, circular: bool):
+    if spacers is not None:
+        if circular and len(spacers) != nb_templates:
+            raise HTTPException(
+                422, 'The number of spacers must be the same as the number of templates when the assembly is circular.'
+            )
+        if not circular and len(spacers) != (nb_templates + 1):
+            raise HTTPException(
+                422, 'The number of spacers must be one more than the number of templates when the assembly is linear.'
+            )
+    for spacer in spacers:
+        # If it's not only ACGt
+        if not re.match(r'^[ACGT]+$', spacer.upper()):
+            raise HTTPException(400, 'Spacer can only contain ACGT bases.')
 
 
 # Workaround for internal server errors: https://github.com/tiangolo/fastapi/discussions/7847#discussioncomment-5144709
@@ -1034,8 +1051,8 @@ async def primer_design_homologous_recombination(
 )
 async def primer_design_gibson_assembly(
     pcr_templates: list[PrimerDesignQuery],
-    spacers: list[str] = Body(
-        ...,
+    spacers: list[str] | None = Body(
+        None,
         description='Spacers to add between the restriction site and the 5\' end of the primer footprint (the part that binds the DNA).',
     ),
     homology_length: int = Query(..., description='The length of the homology region in bps.'),
@@ -1048,15 +1065,8 @@ async def primer_design_gibson_assembly(
     circular: bool = Query(False, description='Whether the assembly is circular.'),
 ):
     """Design primers for Gibson assembly"""
-    if circular and len(spacers) != len(pcr_templates):
-        raise HTTPException(
-            422, 'The number of spacers must be the same as the number of templates when the assembly is circular.'
-        )
-    if not circular and len(spacers) != (len(pcr_templates) + 1):
-        raise HTTPException(
-            422, 'The number of spacers must be one more than the number of templates when the assembly is linear.'
-        )
-
+    # Validate the spacers
+    validate_spacers(spacers, len(pcr_templates), circular)
     templates = list()
     for query in pcr_templates:
         dseqr = read_dsrecord_from_json(query.sequence)
@@ -1084,8 +1094,8 @@ async def primer_design_gibson_assembly(
 )
 async def primer_design_restriction_ligation(
     pcr_template: PrimerDesignQuery,
-    spacers: list[str] = Body(
-        ...,
+    spacers: list[str] | None = Body(
+        None,
         description='Spacers to add between the restriction site and the 5\' end of the primer footprint (the part that binds the DNA).',
     ),
     minimal_hybridization_length: int = Query(
@@ -1101,11 +1111,16 @@ async def primer_design_restriction_ligation(
         description='These bases are added to the 5\' end of the primer to ensure proper restriction enzyme digestion.',
     ),
 ):
-    """Design primers for restriction ligation"""
+    """
+    Design primers for restriction ligation. If the restriction site contains ambiguous bases, the primer bases will
+    be chosen by order of appearance in the dictionary `ambiguous_dna_values` from `Bio.Data.IUPACData`.
+    """
 
     invalid_enzymes = get_invalid_enzyme_names([left_enzyme, right_enzyme])
     if len(invalid_enzymes):
         raise HTTPException(404, 'These enzymes do not exist: ' + ', '.join(invalid_enzymes))
+
+    validate_spacers(spacers, 1, False)
 
     dseqr = read_dsrecord_from_json(pcr_template.sequence)
     location = pcr_template.location.to_biopython_location(dseqr.circular, len(dseqr))
@@ -1141,7 +1156,8 @@ async def cloning_strategy_is_valid(
 
 @router.post('/rename_sequence', response_model=TextFileSequence)
 async def rename_sequence(
-    sequence: TextFileSequence, name: str = Query(..., description='The new name of the sequence.', regex=r'^[^\s]+$')
+    sequence: TextFileSequence,
+    name: str = Query(..., description='The new name of the sequence.', pattern=r'^[^\s]+$'),
 ):
     """Rename a sequence"""
     dseqr = read_dsrecord_from_json(sequence)

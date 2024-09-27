@@ -65,7 +65,7 @@ def gibson_assembly_primers(
     minimal_hybridization_length: int,
     target_tm: float,
     circular: bool,
-    spacers: list[str],
+    spacers: list[str] | None = None,
 ) -> list[PrimerModel]:
 
     initial_amplicons = [
@@ -111,8 +111,12 @@ def restriction_enzyme_primers(
     left_enzyme: RestrictionType,
     right_enzyme: RestrictionType,
     filler_bases: str,
-    spacers: list[str],
+    spacers: list[str] | None = None,
 ) -> tuple[PrimerModel, PrimerModel]:
+
+    if spacers is None:
+        spacers = ['', '']
+
     amplicon = primer_design(template, limit=minimal_hybridization_length, target_tm=target_tm)
     fwd_primer, rvs_primer = amplicon.primers()
 
