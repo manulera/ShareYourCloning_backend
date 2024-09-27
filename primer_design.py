@@ -57,6 +57,7 @@ def gibson_assembly_primers(
     minimal_hybridization_length: int,
     target_tm: float,
     circular: bool,
+    spacers: list[str],
 ) -> list[PrimerModel]:
 
     initial_amplicons = [

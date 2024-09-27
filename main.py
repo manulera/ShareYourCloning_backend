@@ -1035,7 +1035,8 @@ async def primer_design_homologous_recombination(
     response_model=create_model('GibsonAssemblyPrimerDesignResponse', primers=(list[PrimerModel], ...)),
 )
 async def primer_design_gibson_assembly(
-    queries: list[PrimerDesignQuery],
+    pcr_templates: list[PrimerDesignQuery],
+    spacers: list[str],
     homology_length: int = Query(..., description='The length of the homology region in bps.'),
     minimal_hybridization_length: int = Query(
         ..., description='The minimal length of the hybridization region in bps.'
@@ -1046,8 +1047,17 @@ async def primer_design_gibson_assembly(
     circular: bool = Query(False, description='Whether the assembly is circular.'),
 ):
     """Design primers for Gibson assembly"""
+    if circular and len(spacers) != len(pcr_templates):
+        raise HTTPException(
+            422, 'The number of spacers must be the same as the number of templates when the assembly is circular.'
+        )
+    if not circular and len(spacers) != (len(pcr_templates) + 1):
+        raise HTTPException(
+            422, 'The number of spacers must be one more than the number of templates when the assembly is linear.'
+        )
+
     templates = list()
-    for query in queries:
+    for query in pcr_templates:
         dseqr = read_dsrecord_from_json(query.sequence)
         location = query.location.to_biopython_location(dseqr.circular, len(dseqr))
         template = location.extract(dseqr)
@@ -1059,7 +1069,7 @@ async def primer_design_gibson_assembly(
         templates.append(template)
     try:
         primers = gibson_assembly_primers(
-            templates, homology_length, minimal_hybridization_length, target_tm, circular
+            templates, homology_length, minimal_hybridization_length, target_tm, circular, spacers
         )
     except ValueError as e:
         raise HTTPException(400, *e.args)
