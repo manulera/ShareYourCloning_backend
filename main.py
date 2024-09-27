@@ -981,9 +981,7 @@ async def restriction_and_ligation(
 
 @router.post(
     '/primer_design/homologous_recombination',
-    response_model=create_model(
-        'PrimerDesignResponse', forward_primer=(PrimerModel, ...), reverse_primer=(PrimerModel, ...)
-    ),
+    response_model=create_model('HomologousRecombinationPrimerDesignResponse', primers=(list[PrimerModel], ...)),
 )
 async def primer_design_homologous_recombination(
     pcr_template: PrimerDesignQuery,
@@ -1036,7 +1034,10 @@ async def primer_design_homologous_recombination(
 )
 async def primer_design_gibson_assembly(
     pcr_templates: list[PrimerDesignQuery],
-    spacers: list[str],
+    spacers: list[str] = Body(
+        ...,
+        description='Spacers to add between the restriction site and the 5\' end of the primer footprint (the part that binds the DNA).',
+    ),
     homology_length: int = Query(..., description='The length of the homology region in bps.'),
     minimal_hybridization_length: int = Query(
         ..., description='The minimal length of the hybridization region in bps.'

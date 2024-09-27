@@ -6,6 +6,12 @@ from pydna.amplicon import Amplicon
 from pydantic_models import PrimerModel
 from Bio.Seq import reverse_complement
 from Bio.Restriction.Restriction import RestrictionType
+from Bio.Data.IUPACData import ambiguous_dna_values as _ambiguous_dna_values
+
+ambiguous_dna_values = _ambiguous_dna_values.copy()
+# Remove acgt
+for base in 'ACGT':
+    del ambiguous_dna_values[base]
 
 
 def homologous_recombination_primers(
@@ -112,8 +118,11 @@ def restriction_enzyme_primers(
 
     template_name = template.name if template.name != 'name' else f'seq_{template.id}'
 
-    fwd_primer_seq = filler_bases + left_enzyme.site + spacers[0] + fwd_primer.seq
-    rvs_primer_seq = filler_bases + right_enzyme.site + reverse_complement(spacers[1]) + rvs_primer.seq
+    left_site = ''.join(b if b not in ambiguous_dna_values else ambiguous_dna_values[b][0] for b in left_enzyme.site)
+    right_site = ''.join(b if b not in ambiguous_dna_values else ambiguous_dna_values[b][0] for b in right_enzyme.site)
+
+    fwd_primer_seq = filler_bases + left_site + spacers[0] + fwd_primer.seq
+    rvs_primer_seq = filler_bases + right_site + reverse_complement(spacers[1]) + rvs_primer.seq
 
     fwd_primer_name = f'{template_name}_{left_enzyme}_fwd'
     rvs_primer_name = f'{template_name}_{right_enzyme}_rvs'
