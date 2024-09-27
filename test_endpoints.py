@@ -1740,8 +1740,8 @@ class PrimerDesignTest(unittest.TestCase):
         payload = response.json()
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(payload['forward_primer']['sequence'], 'aaaAAATGGAACAG')
-        self.assertEqual(payload['reverse_primer']['sequence'], 'aaaAATTTCTGGC')
+        self.assertEqual(payload['primers'][0]['sequence'], 'aaaAAATGGAACAG')
+        self.assertEqual(payload['primers'][1]['sequence'], 'aaaAATTTCTGGC')
 
         # Raise valuerror
         params['homology_length'] = 10

@@ -64,7 +64,7 @@ import ncbi_requests
 import os
 from record_stub_route import RecordStubRoute
 from starlette.responses import RedirectResponse
-from primer_design import homologous_recombination_primers, gibson_assembly_primers
+from primer_design import homologous_recombination_primers, gibson_assembly_primers, restriction_enzyme_primers
 import asyncio
 
 # ENV variables ========================================
@@ -1016,7 +1016,7 @@ async def primer_design_homologous_recombination(
     forward_primer = PrimerModel(id=0, sequence=forward_primer, name='forward')
     reverse_primer = PrimerModel(id=0, sequence=reverse_primer, name='reverse')
 
-    return {'forward_primer': forward_primer, 'reverse_primer': reverse_primer}
+    return {'primers': [forward_primer, reverse_primer]}
 
 
 # A primer design endpoint for Gibson assembly
@@ -1075,6 +1075,56 @@ async def primer_design_gibson_assembly(
         raise HTTPException(400, *e.args)
 
     return {'primers': primers}
+
+
+@router.post(
+    '/primer_design/restriction_ligation',
+    response_model=create_model('RestrictionLigationPrimerDesignResponse', primers=(list[PrimerModel], ...)),
+)
+async def primer_design_restriction_ligation(
+    pcr_template: PrimerDesignQuery,
+    spacers: list[str] = Body(
+        ...,
+        description='Spacers to add between the restriction site and the 5\' end of the primer footprint (the part that binds the DNA).',
+    ),
+    minimal_hybridization_length: int = Query(
+        ..., description='The minimal length of the hybridization region in bps.'
+    ),
+    target_tm: float = Query(
+        ..., description='The desired melting temperature for the hybridization part of the primer.'
+    ),
+    left_enzyme: str | None = Query(None, description='The restriction enzyme for the left side of the sequence.'),
+    right_enzyme: str | None = Query(None, description='The restriction enzyme for the right side of the sequence.'),
+    filler_bases: str = Query(
+        ...,
+        description='These bases are added to the 5\' end of the primer to ensure proper restriction enzyme digestion.',
+    ),
+):
+    """Design primers for restriction ligation"""
+
+    invalid_enzymes = get_invalid_enzyme_names([left_enzyme, right_enzyme])
+    if len(invalid_enzymes):
+        raise HTTPException(404, 'These enzymes do not exist: ' + ', '.join(invalid_enzymes))
+
+    dseqr = read_dsrecord_from_json(pcr_template.sequence)
+    location = pcr_template.location.to_biopython_location(dseqr.circular, len(dseqr))
+    template = location.extract(dseqr)
+    if not pcr_template.forward_orientation:
+        template = template.reverse_complement()
+    template.name = dseqr.name
+    # This is to my knowledge the only way to get the enzymes
+    rb = RestrictionBatch()
+    fwd, rvs = restriction_enzyme_primers(
+        template,
+        minimal_hybridization_length,
+        target_tm,
+        rb.format(left_enzyme) if left_enzyme is not None else None,
+        rb.format(right_enzyme) if right_enzyme is not None else None,
+        filler_bases,
+        spacers,
+    )
+
+    return {'primers': [fwd, rvs]}
 
 
 @router.post(

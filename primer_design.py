@@ -4,6 +4,8 @@ from Bio.SeqFeature import SimpleLocation
 from pydna.utils import locations_overlap, shift_location, location_boundaries
 from pydna.amplicon import Amplicon
 from pydantic_models import PrimerModel
+from Bio.Seq import reverse_complement
+from Bio.Restriction.Restriction import RestrictionType
 
 
 def homologous_recombination_primers(
@@ -94,3 +96,29 @@ def gibson_assembly_primers(
         rvs.name = f'{template_name}_rvs'
 
     return [PrimerModel(id=0, name=primer.name, sequence=str(primer.seq)) for primer in all_primers]
+
+
+def restriction_enzyme_primers(
+    template: Dseqrecord,
+    minimal_hybridization_length: int,
+    target_tm: float,
+    left_enzyme: RestrictionType,
+    right_enzyme: RestrictionType,
+    filler_bases: str,
+    spacers: list[str],
+) -> tuple[PrimerModel, PrimerModel]:
+    amplicon = primer_design(template, limit=minimal_hybridization_length, target_tm=target_tm)
+    fwd_primer, rvs_primer = amplicon.primers()
+
+    template_name = template.name if template.name != 'name' else f'seq_{template.id}'
+
+    fwd_primer_seq = filler_bases + left_enzyme.site + spacers[0] + fwd_primer.seq
+    rvs_primer_seq = filler_bases + right_enzyme.site + reverse_complement(spacers[1]) + rvs_primer.seq
+
+    fwd_primer_name = f'{template_name}_{left_enzyme}_fwd'
+    rvs_primer_name = f'{template_name}_{right_enzyme}_rvs'
+
+    return (
+        PrimerModel(id=0, name=fwd_primer_name, sequence=str(fwd_primer_seq)),
+        PrimerModel(id=0, name=rvs_primer_name, sequence=str(rvs_primer_seq)),
+    )
