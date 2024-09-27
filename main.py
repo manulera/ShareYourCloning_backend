@@ -1107,7 +1107,7 @@ async def primer_design_restriction_ligation(
     left_enzyme: str | None = Query(None, description='The restriction enzyme for the left side of the sequence.'),
     right_enzyme: str | None = Query(None, description='The restriction enzyme for the right side of the sequence.'),
     filler_bases: str = Query(
-        ...,
+        'TTT',
         description='These bases are added to the 5\' end of the primer to ensure proper restriction enzyme digestion.',
     ),
 ):
@@ -1115,6 +1115,9 @@ async def primer_design_restriction_ligation(
     Design primers for restriction ligation. If the restriction site contains ambiguous bases, the primer bases will
     be chosen by order of appearance in the dictionary `ambiguous_dna_values` from `Bio.Data.IUPACData`.
     """
+
+    if not re.match(r'^[ACGT]+$', filler_bases.upper()):
+        raise HTTPException(400, 'Filler bases can only contain ACGT bases.')
 
     invalid_enzymes = get_invalid_enzyme_names([left_enzyme, right_enzyme])
     if len(invalid_enzymes):

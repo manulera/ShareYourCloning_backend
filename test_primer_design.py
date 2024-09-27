@@ -1,4 +1,4 @@
-from primer_design import homologous_recombination_primers, gibson_assembly_primers
+from primer_design import homologous_recombination_primers, gibson_assembly_primers, restriction_enzyme_primers
 from Bio.SeqFeature import SimpleLocation, SeqFeature
 from unittest import TestCase
 from pydna.dseqrecord import Dseqrecord
@@ -6,6 +6,7 @@ from pydantic_models import PrimerModel
 from pydna.amplify import pcr
 from assembly2 import Assembly, gibson_overlap
 import pytest
+from Bio.Data.IUPACData import ambiguous_dna_values
 
 
 class TestHomologousRecombinationPrimers(TestCase):
@@ -300,3 +301,61 @@ class TestGibsonAssemblyPrimers(TestCase):
             self.fail('Expected ValueError.')
         except ValueError as e:
             self.assertEqual(str(e), 'Primers could not be designed for template 1, 2, try changing settings.')
+
+
+class TestRestrictionEnzymePrimers(TestCase):
+    def test_restriction_enzyme_primers(self):
+        """
+        Test the restriction_enzyme_primers function.
+        """
+        from Bio.Restriction import EcoRI, BamHI, AflIII
+
+        template = Dseqrecord('ATGCATGCATGCATGCATGCATGC')
+        minimal_hybridization_length = 10
+        target_tm = 55
+        left_enzyme = EcoRI
+        right_enzyme = BamHI
+        filler_bases = 'GC'
+
+        fwd, rvs = restriction_enzyme_primers(
+            template, minimal_hybridization_length, target_tm, left_enzyme, right_enzyme, filler_bases
+        )
+
+        # Check that primers contain the correct restriction sites
+        self.assertTrue(fwd.sequence.startswith('GC' + str(EcoRI.site)))
+        self.assertTrue(rvs.sequence.startswith('GC' + str(BamHI.site)))
+
+        # Test with only left enzyme
+        fwd, rvs = restriction_enzyme_primers(
+            template, minimal_hybridization_length, target_tm, left_enzyme, None, filler_bases
+        )
+
+        self.assertTrue(fwd.sequence.startswith('GC' + str(EcoRI.site)))
+        self.assertFalse(rvs.sequence.startswith('GC' + str(BamHI.site)))
+
+        # Test with only right enzyme
+        fwd, rvs = restriction_enzyme_primers(
+            template, minimal_hybridization_length, target_tm, None, right_enzyme, filler_bases
+        )
+
+        self.assertFalse(fwd.sequence.startswith('GC' + str(EcoRI.site)))
+        self.assertTrue(rvs.sequence.startswith('GC' + str(BamHI.site)))
+
+        # Test with no enzymes
+        fwd, rvs = restriction_enzyme_primers(
+            template, minimal_hybridization_length, target_tm, None, None, filler_bases
+        )
+
+        self.assertFalse(fwd.sequence.startswith('GC' + str(EcoRI.site)))
+        self.assertFalse(rvs.sequence.startswith('GC' + str(BamHI.site)))
+
+        # Test with enzyme that has ambiguous bases
+        fwd, rvs = restriction_enzyme_primers(
+            template, minimal_hybridization_length, target_tm, AflIII, AflIII, filler_bases
+        )
+        actual_site = (
+            str(AflIII.site).replace('R', ambiguous_dna_values['R'][0]).replace('Y', ambiguous_dna_values['Y'][0])
+        )
+
+        self.assertTrue(fwd.sequence.startswith('GC' + actual_site))
+        self.assertTrue(rvs.sequence.startswith('GC' + actual_site))

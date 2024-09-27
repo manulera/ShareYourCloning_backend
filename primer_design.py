@@ -117,13 +117,27 @@ def restriction_enzyme_primers(
     if spacers is None:
         spacers = ['', '']
 
+    if len(spacers) != 2:
+        raise ValueError("The 'spacers' list must contain exactly two elements.")
+
     amplicon = primer_design(template, limit=minimal_hybridization_length, target_tm=target_tm)
     fwd_primer, rvs_primer = amplicon.primers()
 
+    if fwd_primer is None or rvs_primer is None:
+        raise ValueError('Primers could not be designed, try changing settings.')
+
     template_name = template.name if template.name != 'name' else f'seq_{template.id}'
 
-    left_site = ''.join(b if b not in ambiguous_dna_values else ambiguous_dna_values[b][0] for b in left_enzyme.site)
-    right_site = ''.join(b if b not in ambiguous_dna_values else ambiguous_dna_values[b][0] for b in right_enzyme.site)
+    left_site = (
+        ''
+        if left_enzyme is None
+        else ''.join(b if b not in ambiguous_dna_values else ambiguous_dna_values[b][0] for b in left_enzyme.site)
+    )
+    right_site = (
+        ''
+        if right_enzyme is None
+        else ''.join(b if b not in ambiguous_dna_values else ambiguous_dna_values[b][0] for b in right_enzyme.site)
+    )
 
     fwd_primer_seq = filler_bases + left_site + spacers[0] + fwd_primer.seq
     rvs_primer_seq = filler_bases + right_site + reverse_complement(spacers[1]) + rvs_primer.seq
