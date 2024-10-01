@@ -114,12 +114,14 @@ def format_known_assembly_response(
     raise HTTPException(400, 'The provided assembly is not valid.')
 
 
-def validate_spacers(spacers: list[str], nb_templates: int, circular: bool):
-    if spacers is not None:
-        if circular and len(spacers) != nb_templates:
-            raise HTTPException(
-                422, 'The number of spacers must be the same as the number of templates when the assembly is circular.'
-            )
+def validate_spacers(spacers: list[str] | None, nb_templates: int, circular: bool):
+    if spacers is None:
+        return
+
+    if circular and len(spacers) != nb_templates:
+        raise HTTPException(
+            422, 'The number of spacers must be the same as the number of templates when the assembly is circular.'
+        )
         if not circular and len(spacers) != (nb_templates + 1):
             raise HTTPException(
                 422, 'The number of spacers must be one more than the number of templates when the assembly is linear.'
