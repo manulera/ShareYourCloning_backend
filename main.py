@@ -1149,15 +1149,18 @@ async def primer_design_restriction_ligation(
     template.name = dseqr.name
     # This is to my knowledge the only way to get the enzymes
     rb = RestrictionBatch()
-    fwd, rvs = restriction_enzyme_primers(
-        template,
-        minimal_hybridization_length,
-        target_tm,
-        rb.format(left_enzyme) if left_enzyme is not None else None,
-        rb.format(right_enzyme) if right_enzyme is not None else None,
-        filler_bases,
-        spacers,
-    )
+    try:
+        fwd, rvs = restriction_enzyme_primers(
+            template,
+            minimal_hybridization_length,
+            target_tm,
+            rb.format(left_enzyme) if left_enzyme is not None else None,
+            rb.format(right_enzyme) if right_enzyme is not None else None,
+            filler_bases,
+            spacers,
+        )
+    except ValueError as e:
+        raise HTTPException(400, *e.args)
 
     return {'primers': [fwd, rvs]}
 

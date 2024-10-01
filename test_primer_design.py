@@ -208,6 +208,51 @@ class TestHomologousRecombinationPrimers(TestCase):
         except ValueError as e:
             self.assertEqual(str(e), 'Homology arms overlap.')
 
+    def test_errors(self):
+        pcr_seq = Dseqrecord('GAAATGGAACAGTGCCAGAAATTTTT')
+        pcr_loc = SimpleLocation(1, 23)
+        hr_seq = Dseqrecord('AAACGTTT')
+        homology_length = 3
+        minimal_hybridization_length = 10
+        insert_forward = True
+        target_tm = 30
+        hr_loc_insert = SimpleLocation(5, 5)
+
+        # Wrong number of spacers
+        try:
+            homologous_recombination_primers(
+                pcr_seq,
+                pcr_loc,
+                hr_seq,
+                hr_loc_insert,
+                homology_length,
+                minimal_hybridization_length,
+                insert_forward,
+                target_tm,
+                spacers=['ATTT'],
+            )
+            self.fail('Expected ValueError.')
+
+        except ValueError as e:
+            self.assertIn("The 'spacers' list", str(e))
+
+        # Primers can't be designed
+
+        try:
+            homologous_recombination_primers(
+                pcr_seq,
+                pcr_loc,
+                hr_seq,
+                hr_loc_insert,
+                homology_length,
+                100,
+                insert_forward,
+                target_tm,
+            )
+            self.fail('Expected ValueError.')
+        except ValueError as e:
+            self.assertIn('Primers could not be designed', str(e))
+
 
 class TestGibsonAssemblyPrimers(TestCase):
 

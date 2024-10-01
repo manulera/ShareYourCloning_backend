@@ -1750,6 +1750,23 @@ class PrimerDesignTest(unittest.TestCase):
         payload = response.json()
         self.assertEqual(payload['detail'], 'Forward homology region is out of bounds.')
 
+        # Test an insertion with spacers and reversed insert
+        params['homology_length'] = 3
+        data['homologous_recombination_target']['forward_orientation'] = False
+        data['homologous_recombination_target']['location'] = PydanticSimpleLocation(start=3, end=3).model_dump()
+        data['spacers'] = ['attt', 'cggg']
+        response = client.post('/primer_design/homologous_recombination', json=data, params=params)
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['primers'][0]['sequence'], 'aaaatttAAATGGAACAG')
+        self.assertEqual(payload['primers'][1]['sequence'], 'acgcccgAATTTCTGGC')
+
+        # Raise error if the number of spacers is incorrect
+        data['spacers'] = ['attt', 'cggg', 'tttt']
+        response = client.post('/primer_design/homologous_recombination', json=data, params=params)
+        self.assertEqual(response.status_code, 422)
+        self.assertIn('The number of spacers must be', response.json()['detail'])
+
     def test_gibson_assembly(self):
         # Test case for gibson_assembly_primers endpoint
         templates = [
@@ -1829,6 +1846,92 @@ class PrimerDesignTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn('Primers could not be designed', response.json()['detail'])
+
+    def test_restriction_ligation(self):
+        from Bio.Restriction import EcoRI, BamHI
+
+        # Create a test sequence
+        dseqr = Dseqrecord('aaaATGCATGCATGCATGCATGCATGCccc')
+        dseqr.name = 'test_sequence'
+        json_seq = format_sequence_genbank(dseqr)
+        json_seq.id = 0
+
+        query = {
+            'sequence': json_seq.model_dump(),
+            'location': PydanticSimpleLocation(start=3, end=27).model_dump(),
+            'forward_orientation': True,
+        }
+
+        params = {
+            'minimal_hybridization_length': 10,
+            'target_tm': 55,
+            'left_enzyme': 'EcoRI',
+            'right_enzyme': 'BamHI',
+            'filler_bases': 'GC',
+        }
+
+        response = client.post('/primer_design/restriction_ligation', json={'pcr_template': query}, params=params)
+
+        self.assertEqual(response.status_code, 200)
+
+        payload = response.json()
+        self.assertEqual(len(payload['primers']), 2)  # 2 primers (forward and reverse)
+
+        fwd_primer = PrimerModel.model_validate(payload['primers'][0])
+        rvs_primer = PrimerModel.model_validate(payload['primers'][1])
+
+        self.assertEqual(fwd_primer.name, 'test_sequence_EcoRI_fwd')
+        self.assertEqual(rvs_primer.name, 'test_sequence_BamHI_rvs')
+
+        self.assertTrue(fwd_primer.sequence.startswith('GC' + str(EcoRI.site)))
+        self.assertTrue(rvs_primer.sequence.startswith('GC' + str(BamHI.site)))
+
+        # Test with spacers
+        response = client.post(
+            '/primer_design/restriction_ligation',
+            json={'pcr_template': query, 'spacers': ['ATTT', 'CCAG']},
+            params=params,
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['primers']), 2)
+
+        fwd_primer = PrimerModel.model_validate(payload['primers'][0])
+        rvs_primer = PrimerModel.model_validate(payload['primers'][1])
+
+        self.assertEqual(fwd_primer.name, 'test_sequence_EcoRI_fwd')
+        self.assertEqual(rvs_primer.name, 'test_sequence_BamHI_rvs')
+
+        self.assertTrue(fwd_primer.sequence.startswith('GC' + str(EcoRI.site) + 'ATTT'))
+        self.assertTrue(rvs_primer.sequence.startswith('GC' + str(BamHI.site) + 'CTGG'))
+
+        # Test error case with invalid parameters
+        params['minimal_hybridization_length'] = 100  # Too long
+        response = client.post('/primer_design/restriction_ligation', json={'pcr_template': query}, params=params)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Primers could not be designed', response.json()['detail'])
+
+        # Test error case with invalid enzyme
+        params['minimal_hybridization_length'] = 10  # Reset to valid value
+        params['left_enzyme'] = 'InvalidEnzyme'
+        response = client.post('/primer_design/restriction_ligation', json={'pcr_template': query}, params=params)
+        self.assertEqual(response.status_code, 404)
+        self.assertIn('These enzymes do not exist', response.json()['detail'])
+
+        # Test error case with wrong filler bases
+        params['left_enzyme'] = 'EcoRI'
+        params['filler_bases'] = 'zAA'
+        response = client.post('/primer_design/restriction_ligation', json={'pcr_template': query}, params=params)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Filler bases can only contain ACGT bases.', response.json()['detail'])
+
+        # Test error case with wrong spacer number
+        params['filler_bases'] = 'GC'
+        response = client.post(
+            '/primer_design/restriction_ligation', json={'pcr_template': query, 'spacers': ['ATGC']}, params=params
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertIn('The number of spacers must be', response.json()['detail'])
 
 
 class ValidateEndPointTest(unittest.TestCase):
