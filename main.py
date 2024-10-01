@@ -122,13 +122,13 @@ def validate_spacers(spacers: list[str] | None, nb_templates: int, circular: boo
         raise HTTPException(
             422, 'The number of spacers must be the same as the number of templates when the assembly is circular.'
         )
-        if not circular and len(spacers) != (nb_templates + 1):
-            raise HTTPException(
-                422, 'The number of spacers must be one more than the number of templates when the assembly is linear.'
-            )
+    if not circular and len(spacers) != (nb_templates + 1):
+        raise HTTPException(
+            422, 'The number of spacers must be one more than the number of templates when the assembly is linear.'
+        )
     for spacer in spacers:
         # If it's not only ACGt
-        if not re.match(r'^[ACGT]+$', spacer.upper()):
+        if not re.match(r'^[ACGT]*$', spacer.upper()):
             raise HTTPException(400, 'Spacer can only contain ACGT bases.')
 
 
