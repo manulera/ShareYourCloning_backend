@@ -4,6 +4,14 @@ from Bio.SeqFeature import SimpleLocation
 from pydna.utils import locations_overlap, shift_location, location_boundaries
 from pydna.amplicon import Amplicon
 from pydantic_models import PrimerModel
+from Bio.Seq import reverse_complement
+from Bio.Restriction.Restriction import RestrictionType
+from Bio.Data.IUPACData import ambiguous_dna_values as _ambiguous_dna_values
+
+ambiguous_dna_values = _ambiguous_dna_values.copy()
+# Remove acgt
+for base in 'ACGT':
+    del ambiguous_dna_values[base]
 
 
 def homologous_recombination_primers(
@@ -15,6 +23,7 @@ def homologous_recombination_primers(
     minimal_hybridization_length: int,
     insert_forward: bool,
     target_tm: float,
+    spacers: list[str] | None = None,
 ) -> tuple[str, str]:
 
     fragment2amplify = pcr_loc.extract(pcr_seq)
@@ -32,6 +41,12 @@ def homologous_recombination_primers(
     fwd_homology_start = hr_loc_start - homology_length
     rvs_homology_end = hr_loc_end + homology_length
 
+    if spacers is None:
+        spacers = ['', '']
+
+    if len(spacers) != 2:
+        raise ValueError("The 'spacers' list must contain exactly two elements.")
+
     if not hr_seq.circular:
         if fwd_homology_start < 0:
             raise ValueError('Forward homology region is out of bounds.')
@@ -48,7 +63,10 @@ def homologous_recombination_primers(
     fwd_homology = fwd_arm.extract(hr_seq)
     rvs_homology = rvs_arm.extract(hr_seq).reverse_complement()
 
-    return str(fwd_homology.seq).lower() + str(fwd_primer.seq), str(rvs_homology.seq).lower() + str(rvs_primer.seq)
+    fwd_primer_seq = (str(fwd_homology.seq) + spacers[0]).lower() + str(fwd_primer.seq).upper()
+    rvs_primer_seq = (str(rvs_homology.seq) + reverse_complement(spacers[1])).lower() + str(rvs_primer.seq).upper()
+
+    return fwd_primer_seq, rvs_primer_seq
 
 
 def gibson_assembly_primers(
@@ -57,6 +75,7 @@ def gibson_assembly_primers(
     minimal_hybridization_length: int,
     target_tm: float,
     circular: bool,
+    spacers: list[str] | None = None,
 ) -> list[PrimerModel]:
 
     initial_amplicons = [
@@ -93,3 +112,50 @@ def gibson_assembly_primers(
         rvs.name = f'{template_name}_rvs'
 
     return [PrimerModel(id=0, name=primer.name, sequence=str(primer.seq)) for primer in all_primers]
+
+
+def restriction_enzyme_primers(
+    template: Dseqrecord,
+    minimal_hybridization_length: int,
+    target_tm: float,
+    left_enzyme: RestrictionType,
+    right_enzyme: RestrictionType,
+    filler_bases: str,
+    spacers: list[str] | None = None,
+) -> tuple[PrimerModel, PrimerModel]:
+
+    if spacers is None:
+        spacers = ['', '']
+
+    if len(spacers) != 2:
+        raise ValueError("The 'spacers' list must contain exactly two elements.")
+
+    amplicon = primer_design(template, limit=minimal_hybridization_length, target_tm=target_tm)
+    fwd_primer, rvs_primer = amplicon.primers()
+
+    if fwd_primer is None or rvs_primer is None:
+        raise ValueError('Primers could not be designed, try changing settings.')
+
+    template_name = template.name if template.name != 'name' else f'seq_{template.id}'
+
+    left_site = (
+        ''
+        if left_enzyme is None
+        else ''.join(b if b not in ambiguous_dna_values else ambiguous_dna_values[b][0] for b in left_enzyme.site)
+    )
+    right_site = (
+        ''
+        if right_enzyme is None
+        else ''.join(b if b not in ambiguous_dna_values else ambiguous_dna_values[b][0] for b in right_enzyme.site)
+    )
+
+    fwd_primer_seq = filler_bases + left_site + spacers[0] + fwd_primer.seq
+    rvs_primer_seq = filler_bases + right_site + reverse_complement(spacers[1]) + rvs_primer.seq
+
+    fwd_primer_name = f'{template_name}_{left_enzyme}_fwd'
+    rvs_primer_name = f'{template_name}_{right_enzyme}_rvs'
+
+    return (
+        PrimerModel(id=0, name=fwd_primer_name, sequence=str(fwd_primer_seq)),
+        PrimerModel(id=0, name=rvs_primer_name, sequence=str(rvs_primer_seq)),
+    )
