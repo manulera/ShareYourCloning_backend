@@ -98,6 +98,40 @@ class TestHomologousRecombinationPrimers(TestCase):
                             target_tm,
                         )
                         self.assertEqual(primers, solution)
+        # With spacers
+        spacers = ['attt', 'cggg']
+        primers = homologous_recombination_primers(
+            pcr_shifted,
+            pcr_loc,
+            hr_shifted,
+            hr_loc,
+            homology_length,
+            minimal_hybridization_length,
+            True,  # insert_forward
+            target_tm,
+            spacers,
+        )
+
+        solution = ('aaaatttAAATGGAACAG', 'acgcccgAATTTCTGGC')
+        self.assertEqual(primers, solution)
+
+        # The spacer is defined with respect to the locus, not the insert
+        # so if we insert inverse, it should look like this:
+
+        primers = homologous_recombination_primers(
+            pcr_shifted,
+            pcr_loc,
+            hr_shifted,
+            hr_loc,
+            homology_length,
+            minimal_hybridization_length,
+            False,  # insert_forward
+            target_tm,
+            spacers,
+        )
+
+        solution = ('aaaatttAATTTCTGGC', 'acgcccgAAATGGAACAG')
+        self.assertEqual(primers, solution)
 
     def test_clashing_homology(self):
 
@@ -359,3 +393,21 @@ class TestRestrictionEnzymePrimers(TestCase):
 
         self.assertTrue(fwd.sequence.startswith('GC' + actual_site))
         self.assertTrue(rvs.sequence.startswith('GC' + actual_site))
+
+        # Test spacers on one side only
+        spacers = ['ACGT' * 10, '']
+        fwd, rvs = restriction_enzyme_primers(
+            template, minimal_hybridization_length, target_tm, left_enzyme, right_enzyme, filler_bases, spacers=spacers
+        )
+
+        self.assertTrue('GC' + str(left_enzyme.site) + 'ACGT' * 10 in fwd.sequence)
+        self.assertTrue('GC' + str(right_enzyme.site) in rvs.sequence)
+
+        # Both spacers
+        spacers = ['ACGT' * 10, 'ACGT' * 10]
+        fwd, rvs = restriction_enzyme_primers(
+            template, minimal_hybridization_length, target_tm, left_enzyme, right_enzyme, filler_bases, spacers=spacers
+        )
+
+        self.assertTrue('GC' + str(left_enzyme.site) + 'ACGT' * 10 in fwd.sequence)
+        self.assertTrue('GC' + str(right_enzyme.site) + 'ACGT' * 10 in rvs.sequence)

@@ -1005,6 +1005,10 @@ async def restriction_and_ligation(
 async def primer_design_homologous_recombination(
     pcr_template: PrimerDesignQuery,
     homologous_recombination_target: PrimerDesignQuery,
+    spacers: list[str] | None = Body(
+        None,
+        description='Spacers to add at the left and right side of the insertion.',
+    ),
     homology_length: int = Query(..., description='The length of the homology region in bps.'),
     minimal_hybridization_length: int = Query(
         ..., description='The minimal length of the hybridization region in bps.'
@@ -1014,6 +1018,8 @@ async def primer_design_homologous_recombination(
     ),
 ):
     """Design primers for homologous recombination"""
+
+    validate_spacers(spacers, 1, False)
 
     pcr_seq = read_dsrecord_from_json(pcr_template.sequence)
     pcr_loc = pcr_template.location.to_biopython_location(pcr_seq.circular, len(pcr_seq))
@@ -1025,7 +1031,15 @@ async def primer_design_homologous_recombination(
 
     try:
         forward_primer, reverse_primer = homologous_recombination_primers(
-            pcr_seq, pcr_loc, hr_seq, hr_loc, homology_length, minimal_hybridization_length, insert_forward, target_tm
+            pcr_seq,
+            pcr_loc,
+            hr_seq,
+            hr_loc,
+            homology_length,
+            minimal_hybridization_length,
+            insert_forward,
+            target_tm,
+            spacers,
         )
     except ValueError as e:
         raise HTTPException(400, *e.args)

@@ -23,6 +23,7 @@ def homologous_recombination_primers(
     minimal_hybridization_length: int,
     insert_forward: bool,
     target_tm: float,
+    spacers: list[str] | None = None,
 ) -> tuple[str, str]:
 
     fragment2amplify = pcr_loc.extract(pcr_seq)
@@ -40,6 +41,12 @@ def homologous_recombination_primers(
     fwd_homology_start = hr_loc_start - homology_length
     rvs_homology_end = hr_loc_end + homology_length
 
+    if spacers is None:
+        spacers = ['', '']
+
+    if len(spacers) != 2:
+        raise ValueError("The 'spacers' list must contain exactly two elements.")
+
     if not hr_seq.circular:
         if fwd_homology_start < 0:
             raise ValueError('Forward homology region is out of bounds.')
@@ -56,7 +63,10 @@ def homologous_recombination_primers(
     fwd_homology = fwd_arm.extract(hr_seq)
     rvs_homology = rvs_arm.extract(hr_seq).reverse_complement()
 
-    return str(fwd_homology.seq).lower() + str(fwd_primer.seq), str(rvs_homology.seq).lower() + str(rvs_primer.seq)
+    fwd_primer_seq = (str(fwd_homology.seq) + spacers[0]).lower() + str(fwd_primer.seq).upper()
+    rvs_primer_seq = (str(rvs_homology.seq) + reverse_complement(spacers[1])).lower() + str(rvs_primer.seq).upper()
+
+    return fwd_primer_seq, rvs_primer_seq
 
 
 def gibson_assembly_primers(
