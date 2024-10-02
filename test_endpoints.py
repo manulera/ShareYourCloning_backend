@@ -1888,9 +1888,15 @@ class PrimerDesignTest(unittest.TestCase):
 
         # Test primer name when sequence name is unset
         query2 = copy.deepcopy(query)
-        query2['sequence']['name'] = 'name'
+        dseqr2 = copy.deepcopy(dseqr)
+        dseqr2.name = 'name'
+        json_seq2 = format_sequence_genbank(dseqr2)
+        json_seq2.id = 0
+        query2['sequence'] = json_seq2.model_dump()
         response = client.post('/primer_design/restriction_ligation', json={'pcr_template': query2}, params=params)
         payload = response.json()
+        fwd_primer = PrimerModel.model_validate(payload['primers'][0])
+        rvs_primer = PrimerModel.model_validate(payload['primers'][1])
 
         self.assertEqual(fwd_primer.name, 'seq_0_EcoRI_fwd')
         self.assertEqual(rvs_primer.name, 'seq_0_BamHI_rvs')
