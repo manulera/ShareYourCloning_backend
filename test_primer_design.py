@@ -395,6 +395,8 @@ class TestRestrictionEnzymePrimers(TestCase):
         left_enzyme = EcoRI
         right_enzyme = BamHI
         filler_bases = 'GC'
+        template.name = 'dummy'
+        template.id = '0'
 
         fwd, rvs = restriction_enzyme_primers(
             template, minimal_hybridization_length, target_tm, left_enzyme, right_enzyme, filler_bases
@@ -403,6 +405,19 @@ class TestRestrictionEnzymePrimers(TestCase):
         # Check that primers contain the correct restriction sites
         self.assertTrue(fwd.sequence.startswith('GC' + str(EcoRI.site)))
         self.assertTrue(rvs.sequence.startswith('GC' + str(BamHI.site)))
+
+        # Check that the name is correct
+        self.assertEqual(fwd.name, 'dummy_EcoRI_fwd')
+        self.assertEqual(rvs.name, 'dummy_BamHI_rvs')
+
+        # Check that the name is correct when the name is 'name'
+        template.name = 'name'
+        fwd, rvs = restriction_enzyme_primers(
+            template, minimal_hybridization_length, target_tm, left_enzyme, right_enzyme, filler_bases
+        )
+
+        self.assertEqual(fwd.name, 'seq_0_EcoRI_fwd')
+        self.assertEqual(rvs.name, 'seq_0_BamHI_rvs')
 
         # Test with only left enzyme
         fwd, rvs = restriction_enzyme_primers(
