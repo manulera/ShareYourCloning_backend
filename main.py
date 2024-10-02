@@ -1147,6 +1147,7 @@ async def primer_design_restriction_ligation(
     if not pcr_template.forward_orientation:
         template = template.reverse_complement()
     template.name = dseqr.name
+    template.id = dseqr.id
     # This is to my knowledge the only way to get the enzymes
     rb = RestrictionBatch()
     try:

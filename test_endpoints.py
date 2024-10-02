@@ -1886,6 +1886,15 @@ class PrimerDesignTest(unittest.TestCase):
         self.assertTrue(fwd_primer.sequence.startswith('GC' + str(EcoRI.site)))
         self.assertTrue(rvs_primer.sequence.startswith('GC' + str(BamHI.site)))
 
+        # Test primer name when sequence name is unset
+        query2 = copy.deepcopy(query)
+        query2['sequence']['name'] = 'name'
+        response = client.post('/primer_design/restriction_ligation', json={'pcr_template': query2}, params=params)
+        payload = response.json()
+
+        self.assertEqual(fwd_primer.name, 'seq_0_EcoRI_fwd')
+        self.assertEqual(rvs_primer.name, 'seq_0_BamHI_rvs')
+
         # Test with spacers
         response = client.post(
             '/primer_design/restriction_ligation',
