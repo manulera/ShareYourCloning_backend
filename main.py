@@ -129,7 +129,7 @@ def validate_spacers(spacers: list[str] | None, nb_templates: int, circular: boo
     for spacer in spacers:
         # If it's not only ACGt
         if not re.match(r'^[ACGT]*$', spacer.upper()):
-            raise HTTPException(400, 'Spacer can only contain ACGT bases.')
+            raise HTTPException(422, 'Spacer can only contain ACGT bases.')
 
 
 # Workaround for internal server errors: https://github.com/tiangolo/fastapi/discussions/7847#discussioncomment-5144709

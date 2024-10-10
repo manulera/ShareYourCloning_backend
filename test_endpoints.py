@@ -34,6 +34,7 @@ import copy
 import json
 import tempfile
 import pytest
+from Bio.Seq import reverse_complement
 
 client = TestClient(app)
 
@@ -1767,6 +1768,12 @@ class PrimerDesignTest(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertIn('The number of spacers must be', response.json()['detail'])
 
+        # Raise error if the spacer is not DNA
+        data['spacers'] = ['zzz', 'cggg']
+        response = client.post('/primer_design/homologous_recombination', json=data, params=params)
+        self.assertEqual(response.status_code, 422)
+        self.assertIn('Spacer can only contain ACGT bases', response.json()['detail'])
+
     def test_gibson_assembly(self):
         # Test case for gibson_assembly_primers endpoint
         templates = [
@@ -1846,6 +1853,41 @@ class PrimerDesignTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn('Primers could not be designed', response.json()['detail'])
+
+        # Test case with spacers
+        params['homology_length'] = 20
+        params['circular'] = True
+        params['minimal_hybridization_length'] = 15
+        spacers = ['aaaa', 'tttt', 'cccc']
+        response = client.post(
+            '/primer_design/gibson_assembly', json={'pcr_templates': queries, 'spacers': spacers}, params=params
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['primers']), 6)  # 2 primers per template
+        primers = [PrimerModel.model_validate(p) for p in payload['primers']]
+        self.assertTrue(primers[0].sequence.startswith('TTAAGTACccccAAACAGTA'))
+        self.assertTrue(reverse_complement(primers[-1].sequence).endswith('TTAAGTACccccAAACAGTA'))
+        self.assertTrue(reverse_complement(primers[1].sequence).endswith('GATTCTATaaaaGTTTACAA'))
+        self.assertTrue(primers[2].sequence.startswith('GATTCTATaaaaGTTTACAA'))
+        self.assertTrue(reverse_complement(primers[3].sequence).endswith('AAATGGAAttttAAGGACAA'))
+        self.assertTrue(primers[4].sequence.startswith('AAATGGAAttttAAGGACAA'))
+
+        # Test that wrong number of spacers fails
+        response = client.post(
+            '/primer_design/gibson_assembly',
+            json={'pcr_templates': queries, 'spacers': ['aaaa', 'tttt']},
+            params=params,
+        )
+        self.assertEqual(response.status_code, 422)
+
+        # Test that non-DNA spacers fails
+        response = client.post(
+            '/primer_design/gibson_assembly',
+            json={'pcr_templates': queries, 'spacers': ['hello', 'TTTT']},
+            params=params,
+        )
+        self.assertEqual(response.status_code, 422)
 
     def test_restriction_ligation(self):
         from Bio.Restriction import EcoRI, BamHI
