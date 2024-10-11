@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from Bio.Restriction import AatII, AjiI, AgeI, EcoRV, ZraI, SalI, EcoRI, RgaI, BsaI, BsrI, DrdI, HindIII, FauI
+from Bio.Restriction import AatII, AjiI, AgeI, EcoRV, ZraI, SalI, EcoRI, RgaI, BsaI, BsrI, DrdI, HindIII, FauI, NotI
 from pydna.amplify import pcr
 from pydna.dseq import Dseq
 from pydna.readers import read
@@ -1889,3 +1889,18 @@ def test_alignment_sub_strings():
 
     with pytest.raises(ValueError):
         assembly.alignment_sub_strings(template, template, 8, 1)
+
+
+def test_too_many_assemblies():
+    fragments = [
+        Dseqrecord('aaGCGGCCGCaaGCGGCCGC', circular=True),
+        Dseqrecord('aaGCGGCCGCaaGCGGCCGC', circular=True),
+        Dseqrecord('aaGCGGCCGCaaGCGGCCGCaaGCGGCCGCaaGCGGCCGC', circular=True),
+    ]
+
+    def algo(x, y, _l):
+        return assembly.restriction_ligation_overlap(x, y, [NotI])  # noqa: B023
+
+    asm = assembly.Assembly(fragments, algorithm=algo)
+    with pytest.raises(ValueError):
+        asm.assemble_circular()
