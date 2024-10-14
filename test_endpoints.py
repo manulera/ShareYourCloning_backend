@@ -566,6 +566,19 @@ class LigationTest(unittest.TestCase):
         self.assertEqual(len(resulting_sequences), 1)
         self.assertEqual(resulting_sequences[0].seguid(), (seqs[1] + seqs[0]).looped().seguid())
 
+    def test_too_many_assemblies(self):
+        # Too many paths
+        seqs = [Dseqrecord('ATCC', circular=False)] * 20
+        json_seqs = [format_sequence_genbank(seq) for seq in seqs]
+        json_seqs = [seq.model_dump() for seq in json_seqs]
+        for i in range(len(json_seqs)):
+            json_seqs[i]['id'] = i
+        source = LigationSource(id=0)
+        data = {'source': source.model_dump(), 'sequences': json_seqs}
+        response = client.post('/ligation', json=data, params={'blunt': True})
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue('Too many possible paths' in response.json()['detail'])
+
 
 class RestrictionTest(unittest.TestCase):
     def test_enzyme_doesnt_exist(self):
@@ -1032,6 +1045,27 @@ class PCRTest(unittest.TestCase):
         response = client.post('/pcr', json=data, params={'minimal_annealing': 8})
         self.assertEqual(response.status_code, 400)
 
+    def test_too_many_assemblies(self):
+        # Too many assemblies
+        template = Dseqrecord(Dseq('A' * 200))
+        json_template = format_sequence_genbank(template)
+        json_template.id = 1
+
+        source = PCRSource(id=0)
+        primers = [
+            PrimerModel(sequence='A' * 20, id=1, name=f'primer{1}'),
+            PrimerModel(sequence='T' * 20, id=2, name=f'primer{2}'),
+        ]
+
+        data = {
+            'source': source.model_dump(),
+            'sequences': [json_template.model_dump()],
+            'primers': [primer.model_dump() for primer in primers],
+        }
+        response = client.post('/pcr', json=data, params={'minimal_annealing': 8})
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue('Too many assemblies' in response.json()['detail'])
+
 
 class OligoHybridizationTest(unittest.TestCase):
 
@@ -1143,6 +1177,21 @@ class HomologousRecombinationTest(unittest.TestCase):
         sequences = [read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']]
         self.assertEqual(len(sequences), 3)
 
+    def test_too_many_assemblies(self):
+        template = Dseqrecord(Dseq('A' * 200))
+        insert = Dseqrecord(Dseq('A' * 40))
+        json_template = format_sequence_genbank(template)
+        json_template.id = 1
+        json_insert = format_sequence_genbank(insert)
+        json_insert.id = 2
+
+        source = HomologousRecombinationSource(id=0)
+        data = {'source': source.model_dump(), 'sequences': [json_template.model_dump(), json_insert.model_dump()]}
+
+        response = client.post('/homologous_recombination', json=data)
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue('Too many assemblies' in response.json()['detail'])
+
 
 class GibsonAssemblyTest(unittest.TestCase):
     def test_gibson_assembly(self):
@@ -1199,6 +1248,19 @@ class GibsonAssemblyTest(unittest.TestCase):
         response = client.post('/gibson_assembly', json=data, params={'minimal_homology': 4, 'circular_only': True})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()['detail'], 'No circular assembly with at least 4 bps of homology was found.')
+
+    def test_too_many_assemblies(self):
+        homology = 'ATGCAAACAGTAATGATGGATGACATTCAAAGCACTGATT'
+        fragments = [Dseqrecord(f'{homology}acgt{homology}') for _ in range(10)]
+        json_fragments = [format_sequence_genbank(f) for f in fragments]
+        for i, f in enumerate(json_fragments):
+            f.id = i + 1
+
+        source = GibsonAssemblySource(id=0)
+        data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
+        response = client.post('/gibson_assembly', json=data)
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue('Too many possible paths' in response.json()['detail'])
 
 
 class RestrictionAndLigationTest(unittest.TestCase):
@@ -1330,6 +1392,27 @@ class RestrictionAndLigationTest(unittest.TestCase):
 
         data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
         response = client.post('/restriction_and_ligation', json=data)
+
+    def test_too_many_assemblies(self):
+        fragments = [
+            Dseqrecord('aaGCGGCCGCaaGCGGCCGC', circular=True),
+            Dseqrecord('aaGCGGCCGCaaGCGGCCGC', circular=True),
+            Dseqrecord('aaGCGGCCGCaaGCGGCCGCaaGCGGCCGCaaGCGGCCGC', circular=True),
+        ]
+
+        source = RestrictionAndLigationSource(
+            id=0,
+            restriction_enzymes=['NotI'],
+        )
+
+        json_fragments = [format_sequence_genbank(f) for f in fragments]
+        for i, f in enumerate(json_fragments):
+            f.id = i + 1
+
+        data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
+        response = client.post('/restriction_and_ligation', json=data)
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue('Too many assemblies' in response.json()['detail'])
 
 
 class ManuallyTypedTest(unittest.TestCase):
@@ -1695,6 +1778,32 @@ class CrisprTest(unittest.TestCase):
             payload['detail'],
             'A Cas9 cutsite was found, and a homologous recombination region, but they do not overlap.',
         )
+
+    def test_too_many_assemblies(self):
+        template = Dseqrecord(30 * 'A' + 'aattcaatgcaaacagtaatgatggatgaca' + 30 * 'A')
+        json_template = format_sequence_genbank(template)
+        json_template.id = 1
+
+        insert = Dseqrecord(30 * 'A' + 'AAAAAAAAA' + 30 * 'A')
+        json_insert = format_sequence_genbank(insert)
+        json_insert.id = 2
+
+        guide = PrimerModel(sequence='ttcaatgcaaacagtaatga', id=3, name='guide_1')
+        source = CRISPRSource(
+            id=0,
+            guides=[3],
+        )
+        data = {
+            'source': source.model_dump(),
+            'sequences': [json_template.model_dump(), json_insert.model_dump()],
+            'guides': [guide.model_dump()],
+        }
+        params = {'minimal_homology': 8}
+
+        response = client.post('/crispr', json=data, params=params)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Too many assemblies', response.json()['detail'])
 
 
 class ValidatorTest(unittest.TestCase):

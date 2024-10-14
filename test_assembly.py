@@ -1902,5 +1902,12 @@ def test_too_many_assemblies():
         return assembly.restriction_ligation_overlap(x, y, [NotI])  # noqa: B023
 
     asm = assembly.Assembly(fragments, algorithm=algo)
+
     with pytest.raises(ValueError):
         asm.assemble_circular()
+
+    with pytest.raises(ValueError):
+        asm.assemble_linear()
+
+    with pytest.raises(ValueError):
+        asm.get_insertion_assemblies()
