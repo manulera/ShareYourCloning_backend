@@ -129,7 +129,7 @@ def validate_spacers(spacers: list[str] | None, nb_templates: int, circular: boo
     for spacer in spacers:
         # If it's not only ACGt
         if not re.match(r'^[ACGT]*$', spacer.upper()):
-            raise HTTPException(400, 'Spacer can only contain ACGT bases.')
+            raise HTTPException(422, 'Spacer can only contain ACGT bases.')
 
 
 # Workaround for internal server errors: https://github.com/tiangolo/fastapi/discussions/7847#discussioncomment-5144709
@@ -461,7 +461,10 @@ async def crispr(
     # Check if homologous recombination is possible
     fragments = [template, insert]
     asm = Assembly(fragments, minimal_homology, use_all_fragments=True)
-    possible_assemblies = [a for a in asm.get_insertion_assemblies() if a[0][0] == 1]
+    try:
+        possible_assemblies = [a for a in asm.get_insertion_assemblies() if a[0][0] == 1]
+    except ValueError as e:
+        raise HTTPException(400, *e.args)
 
     if not possible_assemblies:
         raise HTTPException(400, 'Repair fragment cannot be inserted in the target sequence through homology')
@@ -615,22 +618,29 @@ async def ligation(
         blunt = len(asm[0][2]) == 0
 
     algo = combine_algorithms(blunt_overlap, sticky_end_sub_strings) if blunt else sticky_end_sub_strings
-    out_sources = []
-    if len(fragments) > 1:
-        asm = Assembly(
-            fragments, algorithm=algo, limit=allow_partial_overlap, use_all_fragments=True, use_fragment_order=False
-        )
-        circular_assemblies = asm.get_circular_assemblies()
-        out_sources += [create_source(a, True) for a in circular_assemblies]
-        if not circular_only:
-            out_sources += [
-                create_source(a, False)
-                for a in filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
-            ]
-    else:
-        asm = SingleFragmentAssembly(fragments, algorithm=algo, limit=allow_partial_overlap)
-        out_sources += [create_source(a, True) for a in asm.get_circular_assemblies()]
-        # Not possible to have insertion assemblies in this case
+    try:
+        out_sources = []
+        if len(fragments) > 1:
+            asm = Assembly(
+                fragments,
+                algorithm=algo,
+                limit=allow_partial_overlap,
+                use_all_fragments=True,
+                use_fragment_order=False,
+            )
+            circular_assemblies = asm.get_circular_assemblies()
+            out_sources += [create_source(a, True) for a in circular_assemblies]
+            if not circular_only:
+                out_sources += [
+                    create_source(a, False)
+                    for a in filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
+                ]
+        else:
+            asm = SingleFragmentAssembly(fragments, algorithm=algo, limit=allow_partial_overlap)
+            out_sources += [create_source(a, True) for a in asm.get_circular_assemblies()]
+            # Not possible to have insertion assemblies in this case
+    except ValueError as e:
+        raise HTTPException(400, *e.args)
 
     # If a specific assembly is requested
     if len(source.assembly):
@@ -844,7 +854,10 @@ async def homologous_recombination(
     asm = Assembly((template, insert), limit=minimal_homology, use_all_fragments=True)
 
     # The condition is that the first and last fragments are the template
-    possible_assemblies = [a for a in asm.get_insertion_assemblies() if a[0][0] == 1]
+    try:
+        possible_assemblies = [a for a in asm.get_insertion_assemblies() if a[0][0] == 1]
+    except ValueError as e:
+        raise HTTPException(400, *e.args)
 
     if len(possible_assemblies) == 0:
         raise HTTPException(400, 'No homologous recombination was found.')
@@ -890,26 +903,29 @@ async def gibson_assembly(
     def create_source(a, is_circular):
         return source.__class__.from_assembly(assembly=a, circular=is_circular, id=source.id, fragments=fragments)
 
-    out_sources = []
-    if len(fragments) > 1:
-        asm = Assembly(
-            fragments,
-            algorithm=gibson_overlap,
-            use_fragment_order=False,
-            use_all_fragments=True,
-            limit=minimal_homology,
-        )
-        circular_assemblies = asm.get_circular_assemblies()
-        out_sources += [create_source(a, True) for a in circular_assemblies]
-        if not circular_only:
-            out_sources += [
-                create_source(a, False)
-                for a in filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
-            ]
-    else:
-        asm = SingleFragmentAssembly(fragments, algorithm=gibson_overlap, limit=minimal_homology)
-        out_sources += [create_source(a, True) for a in asm.get_circular_assemblies()]
-        # Not possible to have insertion assemblies with gibson
+    try:
+        out_sources = []
+        if len(fragments) > 1:
+            asm = Assembly(
+                fragments,
+                algorithm=gibson_overlap,
+                use_fragment_order=False,
+                use_all_fragments=True,
+                limit=minimal_homology,
+            )
+            circular_assemblies = asm.get_circular_assemblies()
+            out_sources += [create_source(a, True) for a in circular_assemblies]
+            if not circular_only:
+                out_sources += [
+                    create_source(a, False)
+                    for a in filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
+                ]
+        else:
+            asm = SingleFragmentAssembly(fragments, algorithm=gibson_overlap, limit=minimal_homology)
+            out_sources += [create_source(a, True) for a in asm.get_circular_assemblies()]
+            # Not possible to have insertion assemblies with gibson
+    except ValueError as e:
+        raise HTTPException(400, *e.args)
 
     # If a specific assembly is requested
     if len(source.assembly):
@@ -966,22 +982,25 @@ async def restriction_and_ligation(
         # By default, we allow blunt ends
         return restriction_ligation_overlap(x, y, enzymes, allow_partial_overlap, True)
 
-    out_sources = []
-    if len(fragments) > 1:
-        asm = Assembly(fragments, algorithm=algo, use_fragment_order=False, use_all_fragments=True)
-        circular_assemblies = asm.get_circular_assemblies()
-        out_sources += [create_source(a, True) for a in circular_assemblies]
-        if not circular_only:
-            out_sources += [
-                create_source(a, False)
-                for a in filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
-            ]
-    else:
-        asm = SingleFragmentAssembly(fragments, algorithm=algo)
-        circular_assemblies = asm.get_circular_assemblies()
-        out_sources += [create_source(a, True) for a in circular_assemblies]
-        if not circular_only:
-            out_sources += [create_source(a, False) for a in asm.get_insertion_assemblies()]
+    try:
+        out_sources = []
+        if len(fragments) > 1:
+            asm = Assembly(fragments, algorithm=algo, use_fragment_order=False, use_all_fragments=True)
+            circular_assemblies = asm.get_circular_assemblies()
+            out_sources += [create_source(a, True) for a in circular_assemblies]
+            if not circular_only:
+                out_sources += [
+                    create_source(a, False)
+                    for a in filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
+                ]
+        else:
+            asm = SingleFragmentAssembly(fragments, algorithm=algo)
+            circular_assemblies = asm.get_circular_assemblies()
+            out_sources += [create_source(a, True) for a in circular_assemblies]
+            if not circular_only:
+                out_sources += [create_source(a, False) for a in asm.get_insertion_assemblies()]
+    except ValueError as e:
+        raise HTTPException(400, *e.args)
 
     # If a specific assembly is requested
     if len(source.assembly):

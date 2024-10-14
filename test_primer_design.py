@@ -7,6 +7,7 @@ from pydna.amplify import pcr
 from assembly2 import Assembly, gibson_overlap
 import pytest
 from Bio.Data.IUPACData import ambiguous_dna_values
+from Bio.Seq import reverse_complement
 
 
 class TestHomologousRecombinationPrimers(TestCase):
@@ -338,9 +339,35 @@ class TestGibsonAssemblyPrimers(TestCase):
         self.assertEqual(len(linear_assemblies), 1)
         self.assertEqual(linear_assemblies[0].seq, sum(templates, Dseqrecord('')).seq)
 
-    @pytest.mark.xfail(
-        reason='Waiting on https://github.com/BjornFJohansson/pydna/issues/265 and https://github.com/BjornFJohansson/pydna/issues/264'
-    )
+    def test_primer_with_spacers(self):
+        """
+        Test the gibson_assembly_primers function with spacers.
+        """
+        templates = [
+            Dseqrecord('AAACAGTAATACGTTCCTTTTTTATGATGATGGATGACATTCAAAGCACTGATTCTAT'),
+            Dseqrecord('GTTTACAACGGCAATGAACGTTCCTTTTTTATGATATGCCCAGCTTCATGAAATGGAA'),
+            Dseqrecord('AAGGACAACGTTCCTTTTTTATGATATATATGGCACAGTATGATCAAAAGTTAAGTAC'),
+        ]
+        spacers = ['aaaa', 'tttt', 'cccc']
+        homology_length = 20
+        minimal_hybridization_length = 15
+        target_tm = 55
+        circular = True
+
+        primers = gibson_assembly_primers(
+            templates, homology_length, minimal_hybridization_length, target_tm, circular, spacers=spacers
+        )
+
+        self.assertTrue(primers[0].sequence.startswith('TTAAGTACccccAAACAGTA'))
+        self.assertTrue(reverse_complement(primers[-1].sequence).endswith('TTAAGTACccccAAACAGTA'))
+
+        self.assertTrue(reverse_complement(primers[1].sequence).endswith('GATTCTATaaaaGTTTACAA'))
+        self.assertTrue(primers[2].sequence.startswith('GATTCTATaaaaGTTTACAA'))
+
+        self.assertTrue(reverse_complement(primers[3].sequence).endswith('AAATGGAAttttAAGGACAA'))
+        self.assertTrue(primers[4].sequence.startswith('AAATGGAAttttAAGGACAA'))
+
+    @pytest.mark.xfail(reason='Waiting on https://github.com/BjornFJohansson/pydna/issues/265')
     def test_primer_errors(self):
         """
         Test the gibson_assembly_primers function.

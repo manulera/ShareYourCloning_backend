@@ -81,28 +81,30 @@ def gibson_assembly_primers(
     initial_amplicons = [
         primer_design(template, limit=minimal_hybridization_length, target_tm=target_tm) for template in templates
     ]
-    if circular:
-        initial_amplicons.append(initial_amplicons[0])
 
-    templates_with_no_primers = []
     for i, amplicon in enumerate(initial_amplicons):
         if None in amplicon.primers():
-            # In circular cases
-            index = i + 1 if i < len(templates) else 1
-            templates_with_no_primers.append(index)
-    templates_with_no_primers = list(sorted(set(templates_with_no_primers)))
+            raise ValueError(f'Primers could not be designed for template {templates[i].name}, try changing settings.')
 
-    if templates_with_no_primers:
-        raise ValueError(
-            f'Primers could not be designed for template {", ".join(map(str, templates_with_no_primers))}, try changing settings.'
-        )
+    maxlink = 40
+    if spacers is not None:
+        maxlink = max(len(spacer) for spacer in spacers)
+        spacers = [Dseqrecord(spacer) for spacer in spacers]
+        initial_amplicons_with_spacers = []
+        # For linear assemblies, the first spacer is the first thing
+        if not circular:
+            initial_amplicons_with_spacers.append(spacers.pop(0))
+        for amplicon in initial_amplicons:
+            initial_amplicons_with_spacers.append(amplicon)
+            initial_amplicons_with_spacers.append(spacers.pop(0))
+        initial_amplicons = initial_amplicons_with_spacers
+        # Maxlink is used to define what is a spacer or what is a template (see docs)
 
-    assembly_amplicons: list[Amplicon] = assembly_fragments(initial_amplicons, overlap=homology_length)
+    assembly_amplicons: list[Amplicon] = assembly_fragments(
+        initial_amplicons, overlap=homology_length, circular=circular, maxlink=maxlink
+    )
 
     all_primers = sum((list(amplicon.primers()) for amplicon in assembly_amplicons), [])
-    if circular:
-        all_primers[0] = all_primers[-2]
-        all_primers = all_primers[:-2]
 
     for i in range(0, len(all_primers), 2):
         fwd, rvs = all_primers[i : i + 2]

@@ -32,6 +32,13 @@ import regex
 #     return False
 
 
+def limit_iterator(iterator, limit):
+    for i, x in enumerate(iterator):
+        if i >= limit:
+            raise ValueError(f'Too many possible paths (more than {limit})')
+        yield x
+
+
 def gather_overlapping_locations(locs: list[Location], fragment_length: int):
     """
     Turn a list of locations into a list of tuples of those locations, where each tuple contains
@@ -68,19 +75,6 @@ def assembly_checksum(G: _nx.MultiDiGraph, edge_list):
         checksum_list.append(G.get_edge_data(u, v, key)['uid'])
 
     return min('-'.join(checksum_list), '-'.join(checksum_list[::-1]))
-
-
-def unique_linear_paths(G: _nx.MultiDiGraph):
-    # We remove the begin and end nodes
-    edge_lists = [x[1:-1] for x in _nx.all_simple_edge_paths(G, 'begin', 'end')]
-    # For each path, we create a unique checksum
-    checksums = [assembly_checksum(G, edge_list) for edge_list in edge_lists]
-    # We remove duplicates
-    out = list()
-    for i in range(len(edge_lists)):
-        if checksums[i] not in checksums[:i]:
-            out.append(edge_lists[i])
-    return out
 
 
 def ends_from_cutsite(cutsite: tuple[tuple[int, int], AbstractCut], seq: _Dseq):
@@ -890,7 +884,7 @@ class Assembly:
         locu, locv = self.G.get_edge_data(u, v, key)['locations']
         return u, v, locu, locv
 
-    def get_linear_assemblies(self, only_adjacent_edges: bool = False):
+    def get_linear_assemblies(self, only_adjacent_edges: bool = False, max_assemblies: int = 50):
         """Get linear assemblies, applying the constrains described in __init__, ensuring that paths represent
         real assemblies (see assembly_is_valid). Subassemblies are removed (see remove_subassemblies)."""
 
@@ -909,34 +903,94 @@ class Assembly:
                 G.add_edge('begin', node)
                 G.add_edge(node, 'end')
 
-        assemblies = [tuple(map(self.format_assembly_edge, x)) for x in unique_linear_paths(G)]
+        unique_linear_paths = self.get_unique_linear_paths(G, max_assemblies)
+        possible_assemblies = self.get_possible_assembly_number(unique_linear_paths)
+        if possible_assemblies > max_assemblies:
+            raise ValueError(f'Too many assemblies ({possible_assemblies} pre-validation) to assemble')
+
+        assemblies = sum(map(lambda x: self.node_path2assembly_list(x, False), unique_linear_paths), [])
+
         out = [a for a in assemblies if self.assembly_is_valid(self.fragments, a, False, self.use_all_fragments)]
         if only_adjacent_edges:
             out = [a for a in out if self.assembly_uses_only_adjacent_edges(a, False)]
         return remove_subassemblies(out)
 
-    def cycle2circular_assemblies(self, cycle):
-        """Convert a cycle in the format [1, 2, 3] (as returned by _nx.cycles.simple_cycles) to a list of all possible circular assemblies.
+    def node_path2assembly_list(self, cycle, circular: bool):
+        """Convert a node path in the format [1, 2, 3] (as returned by _nx.cycles.simple_cycles) to a list of all
+          possible assemblies.
 
-        There may be multiple assemblies for a given cycle,
-        if there are several edges connecting two nodes, for example two overlaps between 1 and 2, and single overlap between 2 and 3 should
-        return 3 assemblies. If there was a built-in function in networkx that returned cycles like in all_simple_edge_paths, this would not
-        be necessary.
+        There may be multiple assemblies for a given node path, if there are several edges connecting two nodes,
+        for example two overlaps between 1 and 2, and single overlap between 2 and 3 should return 3 assemblies.
         """
         combine = list()
-        for u, v in zip(cycle, cycle[1:] + cycle[:1]):
+        pairing = zip(cycle, cycle[1:] + cycle[:1]) if circular else zip(cycle, cycle[1:])
+        for u, v in pairing:
             combine.append([(u, v, key) for key in self.G[u][v]])
         return [tuple(map(self.format_assembly_edge, x)) for x in _itertools.product(*combine)]
 
-    def get_circular_assemblies(self, only_adjacent_edges: bool = False):
+    def get_unique_linear_paths(self, G_with_begin_end: _nx.MultiDiGraph, max_paths):
+        # We remove the begin and end nodes, and get all paths without edges
+        # e.g. we will get [1, 2, 3] only once, even if multiple edges connect
+        # 1 and 2 or 2 and 3, by converting to DiGraph.
+
+        # Cutoff has a different meaning of what one would expect, see https://github.com/networkx/networkx/issues/2762
+        node_paths = [
+            x[1:-1]
+            for x in limit_iterator(
+                _nx.all_simple_paths(_nx.DiGraph(G_with_begin_end), 'begin', 'end', cutoff=(len(self.fragments) + 1)),
+                10000,
+            )
+        ]
+
+        # Remove those that contain the same node twice
+        node_paths = [x for x in node_paths if len(x) == len(set(map(abs, x)))]
+
+        if self.use_all_fragments:
+            node_paths = [x for x in node_paths if len(x) == len(self.fragments)]
+
+        # For each path, we check if there are reverse complement duplicates
+        # See: https://github.com/manulera/ShareYourCloning_backend/issues/160
+        unique_node_paths = list()
+        for p in node_paths:
+            if [-x for x in p[::-1]] not in unique_node_paths:
+                unique_node_paths.append(p)
+
+        return unique_node_paths
+
+    def get_possible_assembly_number(self, paths):
+        possibilities = 0
+        for path in paths:
+            this_path = 1
+            for u, v in zip(path, path[1:]):
+                if v in self.G[u]:
+                    this_path *= len(self.G[u][v])
+            possibilities += this_path
+        return possibilities
+
+    def get_circular_assemblies(self, only_adjacent_edges: bool = False, max_assemblies: int = 50):
         """Get circular assemblies, applying the constrains described in __init__, ensuring that paths represent
         real assemblies (see assembly_is_valid)."""
         # The constrain of circular sequence is that the first node is the fragment with the smallest index in its initial orientation,
         # this is ensured by the circular_permutation_min_abs function + the filter below
-        sorted_cycles = map(circular_permutation_min_abs, _nx.cycles.simple_cycles(self.G))
+        sorted_cycles = map(
+            circular_permutation_min_abs,
+            limit_iterator(_nx.cycles.simple_cycles(self.G, length_bound=len(self.fragments)), 10000),
+        )
         sorted_cycles = filter(lambda x: x[0] > 0, sorted_cycles)
         # cycles.simple_cycles returns lists [1,2,3] not assemblies, see self.cycle2circular_assemblies
-        assemblies = sum(map(self.cycle2circular_assemblies, sorted_cycles), [])
+
+        # We apply constrains already here because sometimes the combinatorial explosion is too large
+        if self.use_all_fragments:
+            sorted_cycles = [c for c in sorted_cycles if len(c) == len(self.fragments)]
+
+        # Remove cycles with duplicates
+        sorted_cycles = [c for c in sorted_cycles if len(c) == len(set(map(abs, c)))]
+        possible_assembly_number = self.get_possible_assembly_number([c + c[:1] for c in sorted_cycles])
+        if possible_assembly_number > max_assemblies:
+            raise ValueError(f'Too many assemblies ({possible_assembly_number} pre-validation) to assemble')
+
+        assemblies = sum(map(lambda x: self.node_path2assembly_list(x, True), sorted_cycles), [])
+
         out = [a for a in assemblies if self.assembly_is_valid(self.fragments, a, True, self.use_all_fragments)]
         if only_adjacent_edges:
             out = [a for a in out if self.assembly_uses_only_adjacent_edges(a, True)]
@@ -984,7 +1038,7 @@ class Assembly:
         shift_by = (edge_pair_index[0] + 1) % len(assembly)
         return assembly[shift_by:] + assembly[:shift_by]
 
-    def get_insertion_assemblies(self, only_adjacent_edges: bool = False):
+    def get_insertion_assemblies(self, only_adjacent_edges: bool = False, max_assemblies: int = 50):
         """Assemblies that represent the insertion of a fragment or series of fragment inside a linear construct. For instance,
         digesting CCCCGAATTCCCCGAATTC with EcoRI and inserting the fragment with two overhangs into the EcoRI site of AAAGAATTCAAA.
         This is not so much meant for the use-case of linear fragments that represent actual linear fragments, but for linear
@@ -993,8 +1047,23 @@ class Assembly:
         if only_adjacent_edges:
             raise NotImplementedError('only_adjacent_edges not implemented for insertion assemblies')
 
+        cycles = limit_iterator(_nx.cycles.simple_cycles(self.G), 10000)
+
+        # We apply constrains already here because sometimes the combinatorial explosion is too large
+        if self.use_all_fragments:
+            cycles = [c for c in cycles if len(c) == len(self.fragments)]
+
+        # Remove cycles with duplicates
+        cycles = [c for c in cycles if len(c) == len(set(map(abs, c)))]
+
+        possible_assembly_number = self.get_possible_assembly_number([c + c[:1] for c in cycles])
+
+        if possible_assembly_number > max_assemblies:
+            raise ValueError(f'Too many assemblies ({possible_assembly_number} pre-validation) to assemble')
+
         # We find cycles first
-        assemblies = sum(map(self.cycle2circular_assemblies, _nx.cycles.simple_cycles(self.G)), [])
+        iterator = limit_iterator(_nx.cycles.simple_cycles(self.G), 10000)
+        assemblies = sum(map(lambda x: self.node_path2assembly_list(x, True), iterator), [])
         # We select those that contain exactly only one suitable edge
         assemblies = [b for a in assemblies if (b := self.format_insertion_assembly(a)) is not None]
         # First fragment should be in the + orientation
@@ -1005,14 +1074,14 @@ class Assembly:
             if self.assembly_is_valid(self.fragments, a, False, self.use_all_fragments, is_insertion=True)
         ]
 
-    def assemble_linear(self, only_adjacent_edges: bool = False):
+    def assemble_linear(self, only_adjacent_edges: bool = False, max_assemblies: int = 50):
         """Assemble linear constructs, from assemblies returned by self.get_linear_assemblies."""
-        assemblies = self.get_linear_assemblies(only_adjacent_edges)
+        assemblies = self.get_linear_assemblies(only_adjacent_edges, max_assemblies)
         return [assemble(self.fragments, a) for a in assemblies]
 
-    def assemble_circular(self, only_adjacent_edges: bool = False):
+    def assemble_circular(self, only_adjacent_edges: bool = False, max_assemblies: int = 50):
         """Assemble circular constructs, from assemblies returned by self.get_circular_assemblies."""
-        assemblies = self.get_circular_assemblies(only_adjacent_edges)
+        assemblies = self.get_circular_assemblies(only_adjacent_edges, max_assemblies)
         return [assemble(self.fragments, a) for a in assemblies]
 
     def assemble_insertion(self, only_adjacent_edges: bool = False):
@@ -1172,11 +1241,11 @@ class PCRAssembly(Assembly):
 
         return
 
-    def get_linear_assemblies(self, only_adjacent_edges: bool = False):
+    def get_linear_assemblies(self, only_adjacent_edges: bool = False, max_assemblies: int = 50):
         if only_adjacent_edges:
             raise NotImplementedError('only_adjacent_edges not implemented for PCR assemblies')
 
-        return super().get_linear_assemblies()
+        return super().get_linear_assemblies(max_assemblies=max_assemblies)
 
     def get_circular_assemblies(self, only_adjacent_edges: bool = False):
         raise NotImplementedError('get_circular_assemblies not implemented for PCR assemblies')
@@ -1217,12 +1286,14 @@ class SingleFragmentAssembly(Assembly):
 
         return
 
-    def get_circular_assemblies(self, only_adjacent_edges: bool = False):
+    def get_circular_assemblies(self, only_adjacent_edges: bool = False, max_assemblies: int = 50):
         # We don't want the same location twice
-        assemblies = filter(lambda x: x[0][2] != x[0][3], super().get_circular_assemblies(only_adjacent_edges))
+        assemblies = filter(
+            lambda x: x[0][2] != x[0][3], super().get_circular_assemblies(only_adjacent_edges, max_assemblies)
+        )
         return [a for a in assemblies if self.assembly_is_valid(self.fragments, a, True, self.use_all_fragments)]
 
-    def get_insertion_assemblies(self, only_adjacent_edges: bool = False):
+    def get_insertion_assemblies(self, only_adjacent_edges: bool = False, max_assemblies: int = 50):
         """This could be renamed splicing assembly, but the essence is similar"""
 
         if only_adjacent_edges:
@@ -1240,7 +1311,7 @@ class SingleFragmentAssembly(Assembly):
             return True
 
         # We don't want the same location twice
-        assemblies = filter(splicing_assembly_filter, super().get_insertion_assemblies())
+        assemblies = filter(splicing_assembly_filter, super().get_insertion_assemblies(max_assemblies=max_assemblies))
         return [
             a
             for a in assemblies
