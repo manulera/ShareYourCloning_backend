@@ -1,0 +1,50 @@
+LOCUS       name                    1362 bp    DNA     linear   UNK 01-JAN-1980
+DEFINITION  description.
+ACCESSION   id
+VERSION     id
+KEYWORDS    .
+SOURCE      .
+  ORGANISM  .
+            .
+FEATURES             Location/Qualifiers
+     misc_RNA        550..625
+                     /label="gRNA scaffold"
+                     /note="guide RNA scaffold for the Streptococcus pyogenes
+                     CRISPR/Cas9 system"
+     misc_RNA        723..798
+                     /label="gRNA scaffold"
+                     /note="guide RNA scaffold for the Streptococcus pyogenes
+                     CRISPR/Cas9 system"
+     misc_RNA        896..971
+                     /label="gRNA scaffold"
+                     /note="guide RNA scaffold for the Streptococcus pyogenes
+                     CRISPR/Cas9 system"
+     misc_RNA        1069..1144
+                     /label="gRNA scaffold"
+                     /note="guide RNA scaffold for the Streptococcus pyogenes
+                     CRISPR/Cas9 system"
+ORIGIN
+        1 ggggacagct ttcttgtaca aagtggaacg acttgccttc cgcacaatac atcatttctt
+       61 cttagctttt tttcttcttc ttcgttcata cagttttttt ttgtttatca gcttacattt
+      121 tcttgaaccg tagctttcgt tttcttcttt ttaactttcc attcggagtt tttgtatctt
+      181 gtttcatagt ttgtcccagg attagaatga ttaggcatcg aaccttcaag aatttgattg
+      241 aataaaacat cttcattctt aagatatgaa gataatcttc aaaaggcccc tgggaatctg
+      301 aaagaagaga agcaggccca tttatatggg aaagaacaat agtatttctt atataggccc
+      361 atttaagttg aaaacaatct tcaaaagtcc cacatcgctt agataagaaa acgaagctga
+      421 gtttatatac agctagagtc gaagtagtga ttaacaaagc accagtggtc tagtggtaga
+      481 atagtaccct gccacggtac agacccgggt tcgattcccg gctggtgcag ctggctaacc
+      541 gtgaggggag ttttagagct agaaatagca agttaaaata aggctagtcc gttatcaact
+      601 tgaaaaagtg gcaccgagtc ggtgcaacaa agcaccagtg gtctagtggt agaatagtac
+      661 cctgccacgg tacagacccg ggttcgattc ccggctggtg caccgtgtac tgtagttaca
+      721 gtgttttaga gctagaaata gcaagttaaa ataaggctag tccgttatca acttgaaaaa
+      781 gtggcaccga gtcggtgcaa caaagcacca gtggtctagt ggtagaatag taccctgcca
+      841 cggtacagac ccgggttcga ttcccggctg gtgcatgtgg ttccccggcc gtcttgtttt
+      901 agagctagaa atagcaagtt aaaataaggc tagtccgtta tcaacttgaa aaagtggcac
+      961 cgagtcggtg caacaaagca ccagtggtct agtggtagaa tagtaccctg ccacggtaca
+     1021 gacccgggtt cgattcccgg ctggtgcaat actctagtcc tcaacgccgt tttagagcta
+     1081 gaaatagcaa gttaaaataa ggctagtccg ttatcaactt gaaaaagtgg caccgagtcg
+     1141 gtgctttttt ttgcaaaatt ttccagtcga tttcttcttc ctctgttctt cggcgttcaa
+     1201 tttctggggt tttctcttcg ttttctgtaa ctgaaaccta aaatttgacc taaaaaaaat
+     1261 ctcaaataat atgattcagt ggttttgtac ttttcagtta gttgagtttt gcagttccga
+     1321 tgagataaac caatatcaac tttattatac aaagttgtcc cc
+//
