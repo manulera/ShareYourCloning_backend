@@ -64,7 +64,7 @@ import ncbi_requests
 import os
 from record_stub_route import RecordStubRoute
 from starlette.responses import RedirectResponse
-from primer_design import homologous_recombination_primers, gibson_assembly_primers, restriction_enzyme_primers
+from primer_design import homologous_recombination_primers, gibson_assembly_primers, simple_pair_primers
 import asyncio
 import re
 
@@ -1124,10 +1124,11 @@ async def primer_design_gibson_assembly(
 
 
 @router.post(
-    '/primer_design/restriction_ligation',
-    response_model=create_model('RestrictionLigationPrimerDesignResponse', primers=(list[PrimerModel], ...)),
+    '/primer_design/simple_pair',
+    response_model=create_model('SimplePairPrimerDesignResponse', primers=(list[PrimerModel], ...)),
+    summary='Design primers for PCR, you can also include restriction enzyme sites with filler bases.',
 )
-async def primer_design_restriction_ligation(
+async def primer_design_simple_pair(
     pcr_template: PrimerDesignQuery,
     spacers: list[str] | None = Body(
         None,
@@ -1170,7 +1171,7 @@ async def primer_design_restriction_ligation(
     # This is to my knowledge the only way to get the enzymes
     rb = RestrictionBatch()
     try:
-        fwd, rvs = restriction_enzyme_primers(
+        fwd, rvs = simple_pair_primers(
             template,
             minimal_hybridization_length,
             target_tm,
