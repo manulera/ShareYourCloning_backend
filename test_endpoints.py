@@ -1998,11 +1998,11 @@ class PrimerDesignTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 422)
 
-    def test_restriction_ligation(self):
+    def test_simple_pair(self):
         from Bio.Restriction import EcoRI, BamHI
 
         # Create a test sequence
-        dseqr = Dseqrecord('aaaATGCATGCATGCATGCATGCATGCccc')
+        dseqr = Dseqrecord('aaaGGCTTCACCAAGTCCTTGGAACAGccc')
         dseqr.name = 'test_sequence'
         json_seq = format_sequence_genbank(dseqr)
         json_seq.id = 0
@@ -2015,14 +2015,13 @@ class PrimerDesignTest(unittest.TestCase):
 
         params = {
             'minimal_hybridization_length': 10,
-            'target_tm': 55,
+            'target_tm': 30,
             'left_enzyme': 'EcoRI',
             'right_enzyme': 'BamHI',
             'filler_bases': 'GC',
         }
 
-        response = client.post('/primer_design/restriction_ligation', json={'pcr_template': query}, params=params)
-
+        response = client.post('/primer_design/simple_pair', json={'pcr_template': query}, params=params)
         self.assertEqual(response.status_code, 200)
 
         payload = response.json()
@@ -2037,6 +2036,35 @@ class PrimerDesignTest(unittest.TestCase):
         self.assertTrue(fwd_primer.sequence.startswith('GC' + str(EcoRI.site)))
         self.assertTrue(rvs_primer.sequence.startswith('GC' + str(BamHI.site)))
 
+        # Same without enzymes
+        params_no_enzymes = copy.deepcopy(params)
+        params_no_enzymes.pop('left_enzyme')
+        params_no_enzymes.pop('right_enzyme')
+        response = client.post('/primer_design/simple_pair', json={'pcr_template': query}, params=params_no_enzymes)
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['primers']), 2)  # 2 primers (forward and reverse)
+        fwd_primer = PrimerModel.model_validate(payload['primers'][0])
+        rvs_primer = PrimerModel.model_validate(payload['primers'][1])
+        self.assertEqual(fwd_primer.name, 'test_sequence_fwd')
+        self.assertEqual(rvs_primer.name, 'test_sequence_rvs')
+        self.assertTrue(fwd_primer.sequence.startswith('GGCTT'))
+        self.assertTrue(rvs_primer.sequence.startswith('CTGTT'))
+
+        # Same, now inverted
+        query2 = copy.deepcopy(query)
+        query2['forward_orientation'] = False
+        response = client.post('/primer_design/simple_pair', json={'pcr_template': query2}, params=params_no_enzymes)
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['primers']), 2)  # 2 primers (forward and reverse)
+        fwd_primer = PrimerModel.model_validate(payload['primers'][0])
+        rvs_primer = PrimerModel.model_validate(payload['primers'][1])
+        self.assertEqual(fwd_primer.name, 'test_sequence_fwd')
+        self.assertEqual(rvs_primer.name, 'test_sequence_rvs')
+        self.assertTrue(fwd_primer.sequence.startswith('CTGTT'))
+        self.assertTrue(rvs_primer.sequence.startswith('GGCTT'))
+
         # Test primer name when sequence name is unset
         query2 = copy.deepcopy(query)
         dseqr2 = copy.deepcopy(dseqr)
@@ -2044,7 +2072,7 @@ class PrimerDesignTest(unittest.TestCase):
         json_seq2 = format_sequence_genbank(dseqr2)
         json_seq2.id = 0
         query2['sequence'] = json_seq2.model_dump()
-        response = client.post('/primer_design/restriction_ligation', json={'pcr_template': query2}, params=params)
+        response = client.post('/primer_design/simple_pair', json={'pcr_template': query2}, params=params)
         payload = response.json()
         fwd_primer = PrimerModel.model_validate(payload['primers'][0])
         rvs_primer = PrimerModel.model_validate(payload['primers'][1])
@@ -2054,7 +2082,7 @@ class PrimerDesignTest(unittest.TestCase):
 
         # Test with spacers
         response = client.post(
-            '/primer_design/restriction_ligation',
+            '/primer_design/simple_pair',
             json={'pcr_template': query, 'spacers': ['ATTT', 'CCAG']},
             params=params,
         )
@@ -2073,28 +2101,28 @@ class PrimerDesignTest(unittest.TestCase):
 
         # Test error case with invalid parameters
         params['minimal_hybridization_length'] = 100  # Too long
-        response = client.post('/primer_design/restriction_ligation', json={'pcr_template': query}, params=params)
+        response = client.post('/primer_design/simple_pair', json={'pcr_template': query}, params=params)
         self.assertEqual(response.status_code, 400)
         self.assertIn('Primers could not be designed', response.json()['detail'])
 
         # Test error case with invalid enzyme
         params['minimal_hybridization_length'] = 10  # Reset to valid value
         params['left_enzyme'] = 'InvalidEnzyme'
-        response = client.post('/primer_design/restriction_ligation', json={'pcr_template': query}, params=params)
+        response = client.post('/primer_design/simple_pair', json={'pcr_template': query}, params=params)
         self.assertEqual(response.status_code, 404)
         self.assertIn('These enzymes do not exist', response.json()['detail'])
 
         # Test error case with wrong filler bases
         params['left_enzyme'] = 'EcoRI'
         params['filler_bases'] = 'zAA'
-        response = client.post('/primer_design/restriction_ligation', json={'pcr_template': query}, params=params)
+        response = client.post('/primer_design/simple_pair', json={'pcr_template': query}, params=params)
         self.assertEqual(response.status_code, 400)
         self.assertIn('Filler bases can only contain ACGT bases.', response.json()['detail'])
 
         # Test error case with wrong spacer number
         params['filler_bases'] = 'GC'
         response = client.post(
-            '/primer_design/restriction_ligation', json={'pcr_template': query, 'spacers': ['ATGC']}, params=params
+            '/primer_design/simple_pair', json={'pcr_template': query, 'spacers': ['ATGC']}, params=params
         )
         self.assertEqual(response.status_code, 422)
         self.assertIn('The number of spacers must be', response.json()['detail'])

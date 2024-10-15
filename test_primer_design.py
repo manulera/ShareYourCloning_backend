@@ -1,4 +1,4 @@
-from primer_design import homologous_recombination_primers, gibson_assembly_primers, restriction_enzyme_primers
+from primer_design import homologous_recombination_primers, gibson_assembly_primers, simple_pair_primers
 from Bio.SeqFeature import SimpleLocation, SeqFeature
 from unittest import TestCase
 from pydna.dseqrecord import Dseqrecord
@@ -409,7 +409,7 @@ class TestGibsonAssemblyPrimers(TestCase):
             self.assertEqual(str(e), 'Primers could not be designed for template 1, 2, try changing settings.')
 
 
-class TestRestrictionEnzymePrimers(TestCase):
+class TestSimplePairPrimers(TestCase):
     def test_restriction_enzyme_primers(self):
         """
         Test the restriction_enzyme_primers function.
@@ -425,7 +425,7 @@ class TestRestrictionEnzymePrimers(TestCase):
         template.name = 'dummy'
         template.id = '0'
 
-        fwd, rvs = restriction_enzyme_primers(
+        fwd, rvs = simple_pair_primers(
             template, minimal_hybridization_length, target_tm, left_enzyme, right_enzyme, filler_bases
         )
 
@@ -439,7 +439,7 @@ class TestRestrictionEnzymePrimers(TestCase):
 
         # Check that the name is correct when the name is 'name'
         template.name = 'name'
-        fwd, rvs = restriction_enzyme_primers(
+        fwd, rvs = simple_pair_primers(
             template, minimal_hybridization_length, target_tm, left_enzyme, right_enzyme, filler_bases
         )
 
@@ -447,7 +447,7 @@ class TestRestrictionEnzymePrimers(TestCase):
         self.assertEqual(rvs.name, 'seq_0_BamHI_rvs')
 
         # Test with only left enzyme
-        fwd, rvs = restriction_enzyme_primers(
+        fwd, rvs = simple_pair_primers(
             template, minimal_hybridization_length, target_tm, left_enzyme, None, filler_bases
         )
 
@@ -455,7 +455,7 @@ class TestRestrictionEnzymePrimers(TestCase):
         self.assertFalse(rvs.sequence.startswith('GC' + str(BamHI.site)))
 
         # Test with only right enzyme
-        fwd, rvs = restriction_enzyme_primers(
+        fwd, rvs = simple_pair_primers(
             template, minimal_hybridization_length, target_tm, None, right_enzyme, filler_bases
         )
 
@@ -463,17 +463,13 @@ class TestRestrictionEnzymePrimers(TestCase):
         self.assertTrue(rvs.sequence.startswith('GC' + str(BamHI.site)))
 
         # Test with no enzymes
-        fwd, rvs = restriction_enzyme_primers(
-            template, minimal_hybridization_length, target_tm, None, None, filler_bases
-        )
+        fwd, rvs = simple_pair_primers(template, minimal_hybridization_length, target_tm, None, None, filler_bases)
 
         self.assertFalse(fwd.sequence.startswith('GC' + str(EcoRI.site)))
         self.assertFalse(rvs.sequence.startswith('GC' + str(BamHI.site)))
 
         # Test with enzyme that has ambiguous bases
-        fwd, rvs = restriction_enzyme_primers(
-            template, minimal_hybridization_length, target_tm, AflIII, AflIII, filler_bases
-        )
+        fwd, rvs = simple_pair_primers(template, minimal_hybridization_length, target_tm, AflIII, AflIII, filler_bases)
         actual_site = (
             str(AflIII.site).replace('R', ambiguous_dna_values['R'][0]).replace('Y', ambiguous_dna_values['Y'][0])
         )
@@ -483,7 +479,7 @@ class TestRestrictionEnzymePrimers(TestCase):
 
         # Test spacers on one side only
         spacers = ['ACGT' * 10, '']
-        fwd, rvs = restriction_enzyme_primers(
+        fwd, rvs = simple_pair_primers(
             template, minimal_hybridization_length, target_tm, left_enzyme, right_enzyme, filler_bases, spacers=spacers
         )
 
@@ -492,9 +488,26 @@ class TestRestrictionEnzymePrimers(TestCase):
 
         # Both spacers
         spacers = ['ACGT' * 10, 'ACGT' * 10]
-        fwd, rvs = restriction_enzyme_primers(
+        fwd, rvs = simple_pair_primers(
             template, minimal_hybridization_length, target_tm, left_enzyme, right_enzyme, filler_bases, spacers=spacers
         )
 
         self.assertTrue('GC' + str(left_enzyme.site) + 'ACGT' * 10 in fwd.sequence)
         self.assertTrue('GC' + str(right_enzyme.site) + 'ACGT' * 10 in rvs.sequence)
+
+    def test_without_restriction_enzymes(self):
+        """
+        Test the restriction_enzyme_primers function without restriction enzymes.
+        """
+        template = Dseqrecord('ATGCAAACAGTGAACAGATGGAGACAATAATGATGGATGAC')
+        minimal_hybridization_length = 10
+        target_tm = 55
+        filler_bases = 'GC'
+        template.name = 'dummy'
+        template.id = '0'
+
+        fwd, rvs = simple_pair_primers(template, minimal_hybridization_length, target_tm, None, None, filler_bases)
+
+        # Check that primers are correct
+        self.assertTrue(fwd.sequence.startswith('ATGCA'))
+        self.assertTrue(rvs.sequence.startswith('GTCAT'))

@@ -116,7 +116,14 @@ def gibson_assembly_primers(
     return [PrimerModel(id=0, name=primer.name, sequence=str(primer.seq)) for primer in all_primers]
 
 
-def restriction_enzyme_primers(
+def sanitize_enzyme_site(site: str) -> str:
+    """
+    Replaces any ambiguous bases with the first value of the ambiguous base from the Biopython IUPACData.
+    """
+    return ''.join(b if b not in ambiguous_dna_values else ambiguous_dna_values[b][0] for b in site)
+
+
+def simple_pair_primers(
     template: Dseqrecord,
     minimal_hybridization_length: int,
     target_tm: float,
@@ -125,6 +132,10 @@ def restriction_enzyme_primers(
     filler_bases: str,
     spacers: list[str] | None = None,
 ) -> tuple[PrimerModel, PrimerModel]:
+    """
+    Design primers to amplify a DNA fragment, if left_enzyme or right_enzyme are set, the primers will be designed
+    to include the restriction enzyme sites.
+    """
 
     if spacers is None:
         spacers = ['', '']
@@ -140,22 +151,14 @@ def restriction_enzyme_primers(
 
     template_name = template.name if template.name != 'name' else f'seq_{template.id}'
 
-    left_site = (
-        ''
-        if left_enzyme is None
-        else ''.join(b if b not in ambiguous_dna_values else ambiguous_dna_values[b][0] for b in left_enzyme.site)
-    )
-    right_site = (
-        ''
-        if right_enzyme is None
-        else ''.join(b if b not in ambiguous_dna_values else ambiguous_dna_values[b][0] for b in right_enzyme.site)
-    )
+    left_site = '' if left_enzyme is None else filler_bases + sanitize_enzyme_site(left_enzyme.site)
+    right_site = '' if right_enzyme is None else filler_bases + sanitize_enzyme_site(right_enzyme.site)
 
-    fwd_primer_seq = filler_bases + left_site + spacers[0] + fwd_primer.seq
-    rvs_primer_seq = filler_bases + right_site + reverse_complement(spacers[1]) + rvs_primer.seq
+    fwd_primer_seq = left_site + spacers[0] + fwd_primer.seq
+    rvs_primer_seq = right_site + reverse_complement(spacers[1]) + rvs_primer.seq
 
-    fwd_primer_name = f'{template_name}_{left_enzyme}_fwd'
-    rvs_primer_name = f'{template_name}_{right_enzyme}_rvs'
+    fwd_primer_name = f'{template_name}_{left_enzyme}_fwd' if left_enzyme is not None else f'{template_name}_fwd'
+    rvs_primer_name = f'{template_name}_{right_enzyme}_rvs' if right_enzyme is not None else f'{template_name}_rvs'
 
     return (
         PrimerModel(id=0, name=fwd_primer_name, sequence=str(fwd_primer_seq)),
