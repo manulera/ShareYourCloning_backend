@@ -1218,7 +1218,7 @@ if not SERVE_FRONTEND:
                 </head>
                 <body>
                     <h1>Welcome to ShareYourCloning API</h1>
-                    <p>You can access the endpoints documentation <a href="/docs">here</a></p>
+                    <p>You can access the endpoints documentation <a href="./docs">here</a></p>
                 </body>
             </html>
             """

@@ -47,5 +47,7 @@ COPY --from=builder $VIRTUAL_ENV $VIRTUAL_ENV
 COPY . .
 
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# For example, ROOT_PATH="/syc"
+ENV ROOT_PATH=""
+# Only add --root-path if ROOT_PATH is not empty, otherwise uvicorn will throw an error
+CMD uvicorn main:app --host 0.0.0.0 --port 8000 ${ROOT_PATH:+--root-path ${ROOT_PATH}}
