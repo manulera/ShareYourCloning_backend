@@ -68,6 +68,8 @@ async def get_annotation_from_locus_tag(locus_tag: str, assembly_accession: str)
 async def get_sequence_length_from_sequence_accession(sequence_accession: str) -> int:
     url = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi'
     params = {'id': sequence_accession, 'db': 'nuccore', 'retmode': 'json'}
+    if headers is not None:
+        params['api_key'] = headers['api_key']
     resp = await async_get(url, headers=headers, params=params)
     data = resp.json()
     if 'result' not in data:
