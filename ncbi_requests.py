@@ -70,6 +70,10 @@ async def get_sequence_length_from_sequence_accession(sequence_accession: str) -
     params = {'id': sequence_accession, 'db': 'nuccore', 'retmode': 'json'}
     resp = await async_get(url, headers=headers, params=params)
     data = resp.json()
+    if 'result' not in data:
+        raise HTTPException(503, 'NCBI returned an error (try again)')
+    if len(data['result']['uids']) == 0:
+        raise HTTPException(404, 'wrong sequence accession')
     sequence_id = data['result']['uids'][0]
     return data['result'][sequence_id]['slen']
 
