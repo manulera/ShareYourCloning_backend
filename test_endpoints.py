@@ -242,6 +242,17 @@ class GenBankTest(unittest.TestCase):
         sequence = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
         self.assertEqual(sequence.name, 'hello')
 
+    def test_long_sequence(self):
+        """Test that a long sequence raises an error"""
+        source = RepositoryIdSource(
+            id=1,
+            repository_name='genbank',
+            repository_id='CU329670.1',
+        )
+        response = client.post('/repository_id/genbank', json=source.model_dump())
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('sequence is too long', response.json()['detail'])
+
 
 class AddGeneTest(unittest.TestCase):
     def test_request_plasmid(self):

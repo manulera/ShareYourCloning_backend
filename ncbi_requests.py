@@ -65,6 +65,15 @@ async def get_annotation_from_locus_tag(locus_tag: str, assembly_accession: str)
     return matching_annotations[0]
 
 
+async def get_sequence_length_from_sequence_accession(sequence_accession: str) -> int:
+    url = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi'
+    params = {'id': sequence_accession, 'db': 'nuccore', 'retmode': 'json'}
+    resp = await async_get(url, headers=headers, params=params)
+    data = resp.json()
+    sequence_id = data['result']['uids'][0]
+    return data['result'][sequence_id]['slen']
+
+
 async def get_genbank_sequence_subset(sequence_accession, start, end, strand):
     gb_strand = 1 if strand == 1 else 2
     url = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi'
@@ -100,4 +109,4 @@ def validate_coordinates_pre_request(start, end, strand):
     if start < 1:
         raise HTTPException(422, 'start must be greater than 0')
     if end - start > 10000:
-        raise HTTPException(422, 'sequence is too long (max 10000 bp)')
+        raise HTTPException(400, 'sequence is too long (max 10000 bp)')
