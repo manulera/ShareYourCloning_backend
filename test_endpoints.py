@@ -1642,7 +1642,7 @@ class GenomeRegionTest(unittest.TestCase):
 
         # Coordinates too long
         viral_source.start = 1
-        viral_source.end = 10004
+        viral_source.end = 100004
         response = client.post('/genome_coordinates', json=viral_source.model_dump())
         self.assertStatusCode(response.status_code, 400)
 

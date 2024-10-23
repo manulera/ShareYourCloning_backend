@@ -307,8 +307,8 @@ async def get_from_repository_id_genbank(source: RepositoryIdSource):
     try:
         gb = Genbank('example@gmail.com')
         seq_length = await ncbi_requests.get_sequence_length_from_sequence_accession(source.repository_id)
-        if seq_length > 10000:
-            raise HTTPException(400, 'sequence is too long (max 10000 bp)')
+        if seq_length > 100000:
+            raise HTTPException(400, 'sequence is too long (max 100000 bp)')
         seq = Dseqrecord(gb.nucleotide(source.repository_id))
     except HTTPError as exception:
         repository_id_http_error_handler(exception, source)
