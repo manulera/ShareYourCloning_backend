@@ -198,6 +198,7 @@ async def read_from_file(
         extension_dict = {
             'gbk': 'genbank',
             'gb': 'genbank',
+            'ape': 'genbank',
             'dna': 'snapgene',
             'fasta': 'fasta',
             'embl': 'embl',
