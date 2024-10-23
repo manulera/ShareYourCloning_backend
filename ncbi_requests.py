@@ -99,3 +99,5 @@ def validate_coordinates_pre_request(start, end, strand):
         raise HTTPException(422, 'start must be less than end')
     if start < 1:
         raise HTTPException(422, 'start must be greater than 0')
+    if end - start > 10000:
+        raise HTTPException(422, 'sequence is too long (max 10000 bp)')
