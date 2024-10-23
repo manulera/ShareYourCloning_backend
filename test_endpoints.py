@@ -1644,7 +1644,7 @@ class GenomeRegionTest(unittest.TestCase):
         viral_source.start = 1
         viral_source.end = 10004
         response = client.post('/genome_coordinates', json=viral_source.model_dump())
-        self.assertStatusCode(response.status_code, 422)
+        self.assertStatusCode(response.status_code, 400)
 
 
 class PolymeraseExtensionTest(unittest.TestCase):
