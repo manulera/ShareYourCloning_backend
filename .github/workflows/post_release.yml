@@ -1,5 +1,7 @@
 name: Post release
-on: [release]
+on:
+  release:
+    types: [published]
 
 jobs:
   build_and_push_docker_image:
