@@ -28,7 +28,6 @@ jobs:
           context: .
           push: true
           tags: |
-            manulera/shareyourcloningbackend:latest
             manulera/shareyourcloningbackend:prod
             manulera/shareyourcloningbackend:${{ github.ref_name }}
           labels: ${{ steps.meta.outputs.labels }}
