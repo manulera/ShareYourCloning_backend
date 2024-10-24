@@ -167,6 +167,19 @@ async def custom_http_exception_handler(request: Request, exc: Exception):
     return response
 
 
+@router.get('/version')
+async def get_version():
+    version = None
+    commit_sha = None
+    if os.path.exists('version.txt'):
+        with open('version.txt', 'r') as f:
+            version = f.read()
+    if os.path.exists('commit_sha.txt'):
+        with open('commit_sha.txt', 'r') as f:
+            commit_sha = f.read()
+    return {'version': version, 'commit_sha': commit_sha}
+
+
 @router.post(
     '/read_from_file',
     response_model=create_model(
