@@ -28,8 +28,8 @@ jobs:
           tags: |
             manulera/shareyourcloningbackend:latest
             manulera/shareyourcloningbackend:prod
-            manulera/shareyourcloningbackend:${{ github.ref }}
+            manulera/shareyourcloningbackend:${{ github.ref_name }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             COMMIT_SHA=${{ github.sha }}
-            VERSION=${{ github.ref }}
+            VERSION=${{ github.ref_name }}
