@@ -9,6 +9,7 @@ from pydna.crispr import cas9
 from pydantic import conlist, create_model
 from Bio.SeqIO import parse as seqio_parse
 import io
+import glob
 from pydna.genbank import Genbank
 from dna_functions import (
     get_invalid_enzyme_names,
@@ -173,10 +174,10 @@ async def get_version():
     commit_sha = None
     if os.path.exists('version.txt'):
         with open('version.txt', 'r') as f:
-            version = f.read()
+            version = f.read().strip()
     if os.path.exists('commit_sha.txt'):
         with open('commit_sha.txt', 'r') as f:
-            commit_sha = f.read()
+            commit_sha = f.read().strip()
     return {'version': version, 'commit_sha': commit_sha}
 
 
@@ -1248,10 +1249,18 @@ else:
     async def get_frontend_index(request: Request):
         return FileResponse('frontend/index.html')
 
+    frontend_files = (
+        glob.glob('frontend/*.json')
+        + glob.glob('frontend/*.ico')
+        + glob.glob('frontend/*.png')
+        + glob.glob('frontend/*.txt')
+    )
+    frontend_files = [f.split('/')[-1] for f in frontend_files]
+
     @router.get('/{name:path}')
     async def get_other_frontend_files(name: str):
         """Catch-all for frontend files"""
-        if name in ['config.json', 'favicon.ico', 'robots.txt', 'logo192.png', 'logo512.png', 'manifest.json']:
+        if name in frontend_files:
             return FileResponse(f'frontend/{name}')
         raise HTTPException(404)
 
