@@ -35,10 +35,52 @@ import json
 import tempfile
 import pytest
 from Bio.Seq import reverse_complement
+import os
+
+
+# Custom decorator to run code before and after a specific test, with protection against interruptions
+def run_before_after(before_func, after_func):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            before_func()  # Run the before function
+            try:
+                return func(*args, **kwargs)  # Run the actual test
+            finally:
+                after_func()  # Always run the after function, even if there's an exception
+
+        return wrapper
+
+    return decorator
+
 
 client = TestClient(app)
 
-# TODO further tests are needed (combinations)
+
+class VersionTest(unittest.TestCase):
+    def test_version_empty(self):
+        response = client.get('/version')
+        self.assertEqual(response.status_code, 200)
+        resp = response.json()
+        self.assertIsNone(resp['version'])
+        self.assertIsNone(resp['commit_sha'])
+
+    def create_version_files():
+        with open('./version.txt', 'w') as f:
+            f.write('1.2.3')
+        with open('./commit_sha.txt', 'w') as f:
+            f.write('1234567890')
+
+    def delete_version_files():
+        os.remove('./version.txt')
+        os.remove('./commit_sha.txt')
+
+    @run_before_after(create_version_files, delete_version_files)
+    def test_version_file(self):
+        response = client.get('/version')
+        self.assertEqual(response.status_code, 200)
+        resp = response.json()
+        self.assertEqual(resp['version'], '1.2.3')
+        self.assertEqual(resp['commit_sha'], '1234567890')
 
 
 class ReadFileTest(unittest.TestCase):

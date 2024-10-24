@@ -1,0 +1,21 @@
+name: Post release
+on: [release]
+
+jobs:
+  build_and_push_docker_image:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Build and push Docker image (release)
+        if: github.event_name == 'release'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            manulera/shareyourcloningbackend:latest
+            manulera/shareyourcloningbackend:prod
+            manulera/shareyourcloningbackend:${{ github.ref }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            COMMIT_SHA=${{ github.sha }}
+            VERSION=${{ github.ref }}
