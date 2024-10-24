@@ -4,7 +4,7 @@
 # BUILDER IMAGE
 FROM python:3.11-slim-bookworm as builder
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y gcc git g++ envsubst
+RUN apt-get update && apt-get install -y gcc git g++
 
 RUN useradd -ms /bin/bash backend
 USER backend
