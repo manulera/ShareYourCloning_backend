@@ -72,7 +72,7 @@ async def main(
         if plasmid.filename.endswith('.fa') or plasmid.filename.endswith('.fasta'):
             resp = await read_from_file(plasmid, None, None, True, None)
         else:
-            print(plasmid)  # Failing because the second time the file is depleted!
+            print(plasmid)  # TODO: Failing because the second time the file is depleted!
             resp = await read_from_file(plasmid, None, None, None, None)
         resp['sources'][0].id = 3
         # Verify that plasmid is circular
