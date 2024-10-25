@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batch Cloning Gene List</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Batch Cloning Gene List</h1>
+    <form action="/batch_cloning" method="post" enctype="multipart/form-data">
+        <label for="gene_list">Enter your list of genes (one gene per line):</label><br>
+        <textarea id="gene_list" name="gene_list" required>SPAPB1A10.09
+SPBC15D4.01c</textarea><br>
+        <br><br>
+        <label for="plasmid_option">Choose a plasmid option:</label><br>
+        <div>
+            <input type="radio" id="plasmid_addgene" name="plasmid_option" value="addgene" checked
+                onchange="togglePlasmidInput()">
+            <label for="plasmid_addgene">Provide AddGene Identifier</label>
+
+            <br>
+            <input type="radio" id="plasmid_file" name="plasmid_option" value="file" onchange="togglePlasmidInput()">
+            <label for="plasmid_file">Upload Plasmid File</label><br>
+
+
+        </div><br>
+
+        <div id="plasmid_file_input" style="display: none;">
+            <label for="plasmid_file_upload">Upload Plasmid Sequence File:</label><br>
+            <input type="file" id="plasmid_file_upload" name="plasmid_file"
+                accept=".gb,.gbk,.genbank,.fasta,.fa,.seq"><br><br>
+        </div>
+
+        <div id="addgene_input">
+            <label for="addgene_id">AddGene Identifier:</label><br>
+            <input value="39296" type="text" id="addgene_id" name="addgene_id"><br><br>
+        </div>
+        <input type="submit" value="Submit">
+        <script>
+            function togglePlasmidInput() {
+                var selectedOption = document.querySelector('input[name="plasmid_option"]:checked').value;
+                document.getElementById("plasmid_file_input").style.display = selectedOption === "file" ? "block" : "none";
+                document.getElementById("addgene_input").style.display = selectedOption === "addgene" ? "block" : "none";
+            }
+        </script>
+    </form>
+</body>
+
+</html>

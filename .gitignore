@@ -16,3 +16,5 @@ frontend/
 
 # Env secrets
 .env.secret
+
+batch_cloning_output/

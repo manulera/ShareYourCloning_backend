@@ -65,7 +65,7 @@ async def get_annotation_from_locus_tag(locus_tag: str, assembly_accession: str)
     return matching_annotations[0]
 
 
-async def get_annotation_from_query(query: str, assembly_accession: str) -> dict:
+async def get_annotations_from_query(query: str, assembly_accession: str) -> list[dict]:
     url = f'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/{assembly_accession}/annotation_report?search_text={query}'
     resp = await async_get(url, headers=headers)
     if resp.status_code == 404:
@@ -78,7 +78,7 @@ async def get_annotation_from_query(query: str, assembly_accession: str) -> dict
     if len(data['reports']) > 1:
         raise HTTPException(400, 'multiple matches for query')
 
-    return data['reports'][0]['annotation']
+    return [r['annotation'] for r in data['reports']]
 
 
 async def get_sequence_length_from_sequence_accession(sequence_accession: str) -> int:

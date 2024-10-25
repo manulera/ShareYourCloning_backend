@@ -1,5 +1,5 @@
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter
-from typing import Annotated, Union
+from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter, Form
+from typing import Annotated, Union, Literal
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydna.dseqrecord import Dseqrecord
@@ -1240,6 +1240,60 @@ if not SERVE_FRONTEND:
             </html>
             """
         return HTMLResponse(content=html_content, status_code=200)
+
+    @router.get('/batch_cloning')
+    async def get_batch_cloning_page(request: Request):
+        return FileResponse('batch_cloning.html')
+
+    @router.post('/batch_cloning')
+    async def post_batch_cloning(
+        gene_list: str = Form(...),
+        plasmid_file: UploadFile | None = File(None),
+        addgene_id: str | None = Form(None),
+        plasmid_option: Annotated[Literal['addgene', 'file'], Form(...)] = None,
+    ):
+        from pombe_get_primers import main as pombe_primers
+        from pombe_clone import main as pombe_clone
+        from pombe_summary import main as pombe_summary
+        from pombe_gather import main as pombe_gather
+        from tempfile import TemporaryDirectory
+        import shutil
+        import traceback
+
+        plasmid = plasmid_file if plasmid_option == 'file' else int(addgene_id)
+        if plasmid is None:
+            raise HTTPException(status_code=400, detail='No plasmid provided')
+
+        genes = [gene.strip() for gene in gene_list.split() if gene.strip()]
+
+        if not genes:
+            raise HTTPException(status_code=400, detail='No valid genes provided')
+
+        with TemporaryDirectory() as temp_dir:
+
+            for gene in genes:
+                try:
+                    await pombe_primers(gene, temp_dir)
+                except Exception:
+                    raise HTTPException(status_code=404, detail=f'Primers for {gene} not found')
+                try:
+                    await pombe_clone(gene, 'GCF_000002945.2', temp_dir, plasmid)
+                except Exception:
+                    # Show the stack trace in console
+                    print(f"Error occurred while cloning {gene}:")
+                    traceback.print_exc()
+                    raise HTTPException(status_code=400, detail=f'Clone for {gene} failed')
+            try:
+                pombe_summary(temp_dir)
+                pombe_gather(temp_dir)
+            except Exception:
+                raise HTTPException(status_code=400, detail='Summary failed')
+
+            # zip the temp dir and return it
+            zip_filename = f'{temp_dir}_archive'
+            shutil.make_archive(zip_filename, 'zip', temp_dir)
+            zip_file = f'{zip_filename}.zip'
+            return FileResponse(zip_file, filename='batch_cloning_output.zip')
 
 else:
     app.mount('/assets', StaticFiles(directory='frontend/assets'), name='assets')

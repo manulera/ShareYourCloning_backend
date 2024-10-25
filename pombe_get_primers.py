@@ -2,6 +2,11 @@ from bs4 import BeautifulSoup
 import asyncio
 from httpx import AsyncClient, Response
 import re
+import os
+import argparse
+from Bio import SeqIO
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 
 default_settings_primer_design = {
     'length': 80,
@@ -18,16 +23,14 @@ default_settings_primer_design = {
     '.submit': 'Submit',
 }
 
-genes = ['ase1']
-
 
 async def async_post(url, headers, data, params=None) -> Response:
     async with AsyncClient(timeout=20.0) as client:
         return await client.post(url, headers=headers, data=data, params=params)
 
 
-async def main(gene):
-
+async def get_primers(gene):
+    print(f"\033[92mGetting primers for {gene}\033[0m")
     # A first request to access the primers
     data = {
         'gene': gene,
@@ -67,11 +70,45 @@ async def main(gene):
     pattern = r'Sequence:\s+(\S+)'
     left_check_primer_seq = re.search(pattern, left_check_primer).group(1)
     right_check_primer_seq = re.search(pattern, right_check_primer).group(1)
-    print(forward_primer_seq)
-    print(reverse_primer_seq)
-    print(left_check_primer_seq)
-    print(right_check_primer_seq)
+    return forward_primer_seq, reverse_primer_seq, left_check_primer_seq, right_check_primer_seq
+
+
+async def main(gene: str, output_dir: str):
+    gene_dir = os.path.join(output_dir, gene)
+    os.makedirs(gene_dir, exist_ok=True)
+
+    forward_primer, reverse_primer, forward_check, reverse_check = await get_primers(gene)
+
+    primers = [
+        SeqRecord(Seq(forward_primer), id=f"{gene}_fwd", description=''),
+        SeqRecord(Seq(reverse_primer), id=f"{gene}_rvs", description=''),
+        SeqRecord(Seq(forward_check), id=f"{gene}_fwd_check", description=''),
+        SeqRecord(Seq(reverse_check), id=f"{gene}_rvs_check", description=''),
+    ]
+
+    with open(os.path.join(gene_dir, 'primers.fa'), 'w') as f:
+        SeqIO.write(primers, f, 'fasta')
 
 
 if __name__ == '__main__':
-    asyncio.run(main('ase1'))
+    parser = argparse.ArgumentParser(description='Get primers for S. pombe genes')
+    parser.add_argument(
+        '--genes', type=str, required=True, help='Path to a file containing a list of genes, one per line'
+    )
+    parser.add_argument(
+        '--output_dir',
+        type=str,
+        default='batch_cloning_output',
+        help='Directory to save the output files (default: batch_cloning_output)',
+    )
+
+    args = parser.parse_args()
+
+    with open(args.genes, 'r') as f:
+        genes = [line.strip() for line in f if line.strip()]
+
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+
+    for gene in genes:
+        asyncio.run(main(gene, args.output_dir))
