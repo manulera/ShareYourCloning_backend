@@ -1251,6 +1251,8 @@ if not SERVE_FRONTEND:
         plasmid_file: UploadFile | None = File(None),
         addgene_id: str | None = Form(None),
         plasmid_option: Annotated[Literal['addgene', 'file'], Form(...)] = None,
+        checking_primer_forward: str = Form(..., pattern=r'^[ACGTacgt]+$', min_length=1),
+        checking_primer_reverse: str = Form(..., pattern=r'^[ACGTacgt]+$', min_length=1),
     ):
         from pombe_get_primers import main as pombe_primers
         from pombe_clone import main as pombe_clone
@@ -1275,6 +1277,12 @@ if not SERVE_FRONTEND:
                 # Write the plasmid to the temp dir
                 with open(os.path.join(temp_dir, plasmid_file.filename), 'wb') as f:
                     shutil.copyfileobj(plasmid_file.file, f)
+
+            # Write the checking primers
+            with open(os.path.join(temp_dir, 'checking_primers.fa'), 'w') as f:
+                f.write(
+                    f'>common_insert_fwd\n{checking_primer_forward}\n>common_insert_rvs\n{checking_primer_reverse}'
+                )
 
             for gene in genes:
                 try:

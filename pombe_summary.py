@@ -46,16 +46,24 @@ def process_folder(working_dir: str):
         if seq.name == 'amplified_marker':
             amplified_marker_length = len(seq.seq)
 
-        if seq.name == 'check_pcr':
-            check_pcr_length = len(seq.seq)
+        if seq.name == 'check_pcr_left':
+            check_pcr_left_length = len(seq.seq)
 
-    primer_names = ['primer_fwd', 'primer_rvs', 'primer_fwd_check', 'primer_rvs_check']
+        if seq.name == 'check_pcr_right':
+            check_pcr_right_length = len(seq.seq)
+
+    primer_names = ['primer_fwd', 'primer_rvs', 'primer_fwd_check', None, 'primer_rvs_check', None]
     primer_dict = dict()
 
-    for i, name in enumerate(primer_names):
-        primer_dict[name] = strategy.primers[i].sequence
+    for i, primer in enumerate(strategy.primers):
+        if primer_names[i] is None:
+            continue
+        name = primer_names[i]
+        primer_dict[name] = primer.sequence
         # Find what the alignment bit of the primer is
-        aligned_seq = find_primer_aligned_sequence(pcr_sources, strategy.primers[i])
+        aligned_seq = find_primer_aligned_sequence(pcr_sources, primer)
+        if 'rvs' in name:
+            aligned_seq = reverse_complement(aligned_seq)
         primer_dict[name + '_bound'] = aligned_seq
         primer_dict[name + '_tm'] = tm.tm_default(aligned_seq)
 
@@ -65,7 +73,8 @@ def process_folder(working_dir: str):
         'insertion_start': insertion_start,
         'insertion_end': insertion_end,
         'amplified_marker_length': amplified_marker_length,
-        'check_pcr_length': check_pcr_length,
+        'check_pcr_left_length': check_pcr_left_length,
+        'check_pcr_right_length': check_pcr_right_length,
     }
 
     summary.update(primer_dict)
