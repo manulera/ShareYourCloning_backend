@@ -1259,6 +1259,7 @@ if not SERVE_FRONTEND:
         from tempfile import TemporaryDirectory
         import shutil
         import traceback
+        import json
 
         plasmid = plasmid_file if plasmid_option == 'file' else addgene_id
         if plasmid is None:
@@ -1298,6 +1299,10 @@ if not SERVE_FRONTEND:
                 pombe_gather(temp_dir)
             except Exception:
                 raise HTTPException(status_code=400, detail='Summary failed')
+
+            # Write the version
+            with open(os.path.join(temp_dir, 'version.json'), 'w') as f:
+                f.write(json.dumps(await get_version(), indent=2))
 
             # zip the temp dir and return it
             zip_filename = f'{temp_dir}_archive'
