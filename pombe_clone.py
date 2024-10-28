@@ -23,8 +23,9 @@ async def main(
 ):
     print(f"\033[92mCloning {gene}\033[0m")
     # Parse primers =================================================================================
-    primer_records = SeqIO.parse(os.path.join(output_dir, gene, 'primers.fa'), 'fasta')
-
+    primer_records = list(SeqIO.parse(os.path.join(output_dir, gene, 'primers.fa'), 'fasta'))
+    checking_primers = list(SeqIO.parse(os.path.join(output_dir, 'checking_primers.fa'), 'fasta'))
+    primer_records = primer_records[:3] + checking_primers[1:] + primer_records[3:] + checking_primers[:1]
     primers = []
     for i, primer in enumerate(primer_records):
         primers.append(PrimerModel(sequence=str(primer.seq), id=i + 1, name=primer.id))
@@ -71,7 +72,6 @@ async def main(
         if plasmid.filename.endswith('.fa') or plasmid.filename.endswith('.fasta'):
             resp = await read_from_file(plasmid, None, None, True, None)
         else:
-            print(plasmid)  # TODO: Failing because the second time the file is depleted!
             resp = await read_from_file(plasmid, None, None, None, None)
         resp['sources'][0].id = 3
         # Verify that plasmid is circular
@@ -110,17 +110,26 @@ async def main(
     hrec_source: HomologousRecombinationSource = HomologousRecombinationSource.model_validate(resp['sources'][0])
     hrec_source.output = 8
 
-    # Checking pcr ======================================================================================
-    check_pcr_source = PCRSource(id=9, output_name='check_pcr')
-    resp = await pcr(check_pcr_source, [hrec_product], [primers[2], primers[3]], 20, 0)
+    # Checking pcr 1 ======================================================================================
+    check_pcr_source_left = PCRSource(id=9, output_name='check_pcr_left')
+    resp = await pcr(check_pcr_source_left, [hrec_product], [primers[2], primers[3]], 20, 0)
 
-    check_pcr_product: TextFileSequence = TextFileSequence.model_validate(resp['sequences'][0])
-    check_pcr_product.id = 10
-    check_pcr_source: PCRSource = PCRSource.model_validate(resp['sources'][0])
-    check_pcr_source.output = 10
+    check_pcr_product_left: TextFileSequence = TextFileSequence.model_validate(resp['sequences'][0])
+    check_pcr_product_left.id = 10
+    check_pcr_source_left: PCRSource = PCRSource.model_validate(resp['sources'][0])
+    check_pcr_source_left.output = 10
 
-    sources = [locus_source, plasmid_source, pcr_source, hrec_source, check_pcr_source]
-    sequences = [locus_seq, plasmid_seq, pcr_product, hrec_product, check_pcr_product]
+    # Checking pcr 2 ======================================================================================
+    check_pcr_source_right = PCRSource(id=11, output_name='check_pcr_right')
+    resp = await pcr(check_pcr_source_right, [hrec_product], [primers[4], primers[5]], 20, 0)
+
+    check_pcr_product_right: TextFileSequence = TextFileSequence.model_validate(resp['sequences'][0])
+    check_pcr_product_right.id = 12
+    check_pcr_source_right: PCRSource = PCRSource.model_validate(resp['sources'][0])
+    check_pcr_source_right.output = 12
+
+    sources = [locus_source, plasmid_source, pcr_source, hrec_source, check_pcr_source_left, check_pcr_source_right]
+    sequences = [locus_seq, plasmid_seq, pcr_product, hrec_product, check_pcr_product_left, check_pcr_product_right]
 
     cloning_strategy = {
         'sources': [s.model_dump() for s in sources],
