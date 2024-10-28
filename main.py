@@ -1260,7 +1260,7 @@ if not SERVE_FRONTEND:
         import shutil
         import traceback
 
-        plasmid = plasmid_file if plasmid_option == 'file' else int(addgene_id)
+        plasmid = plasmid_file if plasmid_option == 'file' else addgene_id
         if plasmid is None:
             raise HTTPException(status_code=400, detail='No plasmid provided')
 
@@ -1270,6 +1270,10 @@ if not SERVE_FRONTEND:
             raise HTTPException(status_code=400, detail='No valid genes provided')
 
         with TemporaryDirectory() as temp_dir:
+            if plasmid_option == 'file':
+                # Write the plasmid to the temp dir
+                with open(os.path.join(temp_dir, plasmid_file.filename), 'wb') as f:
+                    shutil.copyfileobj(plasmid_file.file, f)
 
             for gene in genes:
                 try:
@@ -1277,7 +1281,13 @@ if not SERVE_FRONTEND:
                 except Exception:
                     raise HTTPException(status_code=404, detail=f'Primers for {gene} not found')
                 try:
-                    await pombe_clone(gene, 'GCF_000002945.2', temp_dir, plasmid)
+                    if plasmid_option == 'file':
+                        with open(os.path.join(temp_dir, plasmid_file.filename), 'rb') as f:
+                            await pombe_clone(
+                                gene, 'GCF_000002945.2', temp_dir, UploadFile(file=f, filename=plasmid_file.filename)
+                            )
+                    else:
+                        await pombe_clone(gene, 'GCF_000002945.2', temp_dir, addgene_id)
                 except Exception:
                     # Show the stack trace in console
                     print(f"Error occurred while cloning {gene}:")

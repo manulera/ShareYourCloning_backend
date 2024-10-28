@@ -10,7 +10,6 @@ from pydantic_models import (
     BaseCloningStrategy,
     UploadedFileSource,
 )
-from fastapi import UploadFile
 
 from ncbi_requests import get_annotations_from_query
 import asyncio
@@ -20,7 +19,7 @@ from pydna.parsers import parse as pydna_parse
 
 
 async def main(
-    gene: str, assembly_accession: str, output_dir: str, plasmid: str | UploadFile = '19343', padding: int = 1000
+    gene: str, assembly_accession: str, output_dir: str, plasmid: str | dict = '19343', padding: int = 1000
 ):
     print(f"\033[92mCloning {gene}\033[0m")
     # Parse primers =================================================================================
@@ -77,7 +76,7 @@ async def main(
         resp['sources'][0].id = 3
         # Verify that plasmid is circular
         if not pydna_parse(resp['sequences'][0].file_content)[0].circular:
-            raise ValueError(f'Plasmid {plasmid} is not circular')
+            raise ValueError('Plasmid is not circular')
         plasmid_source: UploadedFileSource = UploadedFileSource.model_validate(resp['sources'][0])
         plasmid_source.output = 4
     else:
