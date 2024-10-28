@@ -18,6 +18,25 @@
             height: 200px;
             margin-bottom: 10px;
         }
+
+        #checking_primers input {
+            font-family: monospace;
+            width: 100%;
+        }
+
+        p.explanation {
+            font-size: 0.9em;
+            margin: 5px 0;
+            color: #666;
+        }
+
+        input[type="submit"] {
+            display: block;
+            margin: 20px auto 40px;
+            padding: 12px 30px;
+            font-size: 1.1em;
+            cursor: pointer;
+        }
     </style>
 </head>
 
@@ -44,19 +63,76 @@ SPBC15D4.01c</textarea><br>
         <div id="plasmid_file_input" style="display: none;">
             <label for="plasmid_file_upload">Upload Plasmid Sequence File:</label><br>
             <input type="file" id="plasmid_file_upload" name="plasmid_file"
-                accept=".gb,.gbk,.genbank,.fasta,.fa,.seq"><br><br>
+                accept=".gb,.gbk,.genbank,.fasta,.fa,.seq,.dna"><br><br>
         </div>
 
         <div id="addgene_input">
             <label for="addgene_id">AddGene Identifier:</label><br>
             <input value="39296" type="text" id="addgene_id" name="addgene_id"><br><br>
         </div>
+
+        <div>
+            <label for="primer_check">Checking primers:</label><br>
+            <p class="explanation">
+                These primers are used to verify the integration of the marker cassette. Default primers are provided
+                for KanMX6 and NatMX6 cassettes, but you can specify your own primers if using a different marker.
+            </p>
+            <input type="radio" id="natmx6" name="primer_check" value="natmx6" checked onchange="togglePrimerCheck()">
+            <label for="natmx6">NatMx6</label>
+            <br>
+            <input type="radio" id="kanmx6" name="primer_check" value="kanmx6" onchange="togglePrimerCheck()">
+            <label for="kanmx6">KanMx6</label>
+            <br>
+            <input type="radio" id="other" name="primer_check" value="other" onchange="togglePrimerCheck()">
+            <label for="other">Other</label>
+        </div>
+        <br>
+        <div id="checking_primers">
+            <label for="checking-primer-forward">Checking Primer Forward:</label><br>
+            <p class="explanation">
+                Should align with the top strand of the resulting allele, and will produce a PCR product with a primer
+                that aligns with the bottom strand on the right side of the insertion.
+            </p>
+            <input type="text" id="checking-primer-forward" name="checking_primer_forward" pattern="[ACGTacgt]+"
+                required minlength="1"><br><br>
+
+            <label for="checking-primer-reverse">Checking Primer Reverse:</label><br>
+            <p class="explanation">
+                Should align with the bottom strand of the resulting allele, and will produce a PCR product with a
+                primer that aligns with the top strand on the left side of the insertion.
+            </p>
+            <input type="text" id="checking-primer-reverse" name="checking_primer_reverse" pattern="[ACGTacgt]+"
+                required minlength="1"><br><br>
+        </div>
+
+        <br>
         <input type="submit" value="Submit">
         <script>
             function togglePlasmidInput() {
                 var selectedOption = document.querySelector('input[name="plasmid_option"]:checked').value;
                 document.getElementById("plasmid_file_input").style.display = selectedOption === "file" ? "block" : "none";
                 document.getElementById("addgene_input").style.display = selectedOption === "addgene" ? "block" : "none";
+            }
+
+            function togglePrimerCheck() {
+                var selectedOption = document.querySelector('input[name="primer_check"]:checked').value;
+                if (selectedOption === "other") {
+                    // Clear the content of primer inputs
+                    document.getElementById("checking-primer-forward").value = "";
+                    document.getElementById("checking-primer-reverse").value = "";
+                }
+                else if (selectedOption === "kanmx6") {
+                    document.getElementById("checking-primer-forward").value = "CGCTATACTGCTGTCGATTCG";
+                    document.getElementById("checking-primer-reverse").value = "CGGATGTGATGTGAGAACTGTATCCTAGC";
+                } else if (selectedOption === "natmx6") {
+                    document.getElementById("checking-primer-forward").value = "GTACCACTCTTGACGACACG";
+                    document.getElementById("checking-primer-reverse").value = "GCATGCTCATGTAGAGCGCC";
+                }
+            }
+
+            window.onload = () => {
+                togglePrimerCheck();
+                togglePlasmidInput();
             }
         </script>
     </form>

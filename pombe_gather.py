@@ -29,9 +29,27 @@ def main(input_dir: str):
         rows.append(summary)
 
     df = pd.DataFrame(rows)
+
+    # Primer summary table:
+    primer_summary = list()
+    primer_names = ['primer_fwd', 'primer_rvs', 'primer_fwd_check', 'primer_rvs_check']
+    for i, row in df.iterrows():
+        gene = row['gene']
+        for primer_name in primer_names:
+            primer_row = OrderedDict()
+            primer_row['name'] = primer_name.replace('primer_', gene + '_')
+            primer_row['sequence'] = row[primer_name]
+            primer_row['bound'] = row[primer_name + '_bound']
+            primer_row['tm'] = row[primer_name + '_tm']
+            primer_summary.append(primer_row)
+    primer_df = pd.DataFrame(primer_summary)
+
     df.to_csv(os.path.join(input_dir, 'summary.tsv'), index=False, sep='\t')
+    primer_df.to_csv(os.path.join(input_dir, 'primer_summary.tsv'), index=False, sep='\t')
     # also as excel
-    df.to_excel(os.path.join(input_dir, 'summary.xlsx'), index=False)
+    with pd.ExcelWriter(os.path.join(input_dir, 'summary.xlsx')) as writer:
+        df.to_excel(writer, sheet_name='summary', index=False)
+        primer_df.to_excel(writer, sheet_name='primer_summary', index=False)
 
     # Write out_dict to yaml
     with open(os.path.join(input_dir, 'summary.yaml'), 'w') as f:
