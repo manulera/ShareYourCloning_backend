@@ -25,6 +25,7 @@ from pydantic_models import (
     BaseCloningStrategy,
     SimpleSequenceLocation as PydanticSimpleLocation,
     BenchlingUrlSource,
+    SnapGenePlasmidSource,
 )
 from pydna.dseqrecord import Dseqrecord
 import unittest
@@ -2273,6 +2274,54 @@ class BenchlingUrlSourceTest(unittest.TestCase):
         response = client.post('/repository_id/benchling', json=source.model_dump())
         self.assertEqual(response.status_code, 404)
         self.assertIn('file requested from url not found', response.json()['detail'])
+
+
+class SnapGenePlasmidSourceTest(unittest.TestCase):
+
+    def test_valid_url(self):
+
+        source = SnapGenePlasmidSource(
+            id=0, repository_id='basic_cloning_vectors/pEASY-T1_(linearized)', repository_name='snapgene'
+        )
+        response = client.post('/repository_id/snapgene', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sequences']), 1)
+        self.assertEqual(len(payload['sources']), 1)
+        out_source = payload['sources'][0]
+        # It should have been renamed
+        self.assertEqual(out_source['output_name'], 'pEASY-T1_(linearized)')
+        # Remove that and compare with original source
+        out_source['output_name'] = None
+        self.assertEqual(out_source, source.model_dump())
+        seq = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertEqual(seq.name, 'pEASY-T1_(linearized)')
+
+        # We can also provide a name
+        source2 = SnapGenePlasmidSource(
+            id=0,
+            repository_id='basic_cloning_vectors/pEASY-T1_(linearized)',
+            repository_name='snapgene',
+            output_name='my_name',
+        )
+        response = client.post('/repository_id/snapgene', json=source2.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['sources'][0]['output_name'], 'my_name')
+        seq = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertEqual(seq.name, 'my_name')
+
+    def test_invalid_url(self):
+        # Invalid url
+        source = SnapGenePlasmidSource(id=0, repository_id='hello/world', repository_name='snapgene')
+        response = client.post('/repository_id/snapgene', json=source.model_dump())
+        self.assertEqual(response.status_code, 404)
+
+        # Wrongly formatted url
+        source_dict = source.model_dump()
+        source_dict['repository_id'] = 'hello'
+        response = client.post('/repository_id/snapgene', json=source_dict)
+        self.assertEqual(response.status_code, 422)
 
 
 if __name__ == '__main__':
