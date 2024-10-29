@@ -35,6 +35,7 @@ from shareyourcloning_linkml.datamodel import (
     BenchlingUrlSource as _BenchlingUrlSource,
     CloningStrategy as _CloningStrategy,
     OverlapExtensionPCRLigationSource as _OverlapExtensionPCRLigationSource,
+    SnapGenePlasmidSource as _SnapGenePlasmidSource,
 )
 from pydna.utils import shift_location as _shift_location
 from assembly2 import edge_representation2subfragment_representation, subfragment_representation2edge_representation
@@ -112,6 +113,10 @@ class AddGeneIdSource(SourceCommonClass, _AddGeneIdSource):
 
 
 class BenchlingUrlSource(SourceCommonClass, _BenchlingUrlSource):
+    pass
+
+
+class SnapGenePlasmidSource(SourceCommonClass, _SnapGenePlasmidSource):
     pass
 
 

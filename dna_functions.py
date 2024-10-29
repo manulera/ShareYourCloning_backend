@@ -12,6 +12,8 @@ import regex
 from Bio.SeqFeature import SimpleLocation, Location
 from pydna.utils import shift_location
 from pydna.common_sub_strings import common_sub_strings
+from Bio.SeqIO import parse as seqio_parse
+import io
 
 
 def format_sequence_genbank(seq: Dseqrecord, seq_name: str = None) -> TextFileSequence:
@@ -66,6 +68,16 @@ def get_sequences_from_gb_file_url(url: str) -> list[Dseqrecord]:
     if resp.status_code != 200:
         raise HTTPError(url, 404, 'file requested from url not found', 'file requested from url not found', None)
     return pydna_parse(resp.text)
+
+
+def get_sequence_from_snagene_url(url: str) -> Dseqrecord:
+    resp = requests.get(url)
+    # Check that resp.content is not empty
+    if len(resp.content) == 0:
+        raise HTTPError(url, 404, 'invalid snapgene id', 'invalid snapgene id', None)
+    parsed_seq = next(seqio_parse(io.BytesIO(resp.content), 'snapgene'))
+    circularize = 'topology' in parsed_seq.annotations.keys() and parsed_seq.annotations['topology'] == 'circular'
+    return Dseqrecord(parsed_seq, circular=circularize)
 
 
 def request_from_addgene(source: AddGeneIdSource) -> tuple[Dseqrecord, AddGeneIdSource]:

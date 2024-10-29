@@ -89,3 +89,14 @@ benchling_url_examples = {
         },
     },
 }
+
+snapgene_plasmid_examples = {
+    'default': {
+        'summary': 'Typical example',
+        'value': {
+            'id': 0,
+            'repository_name': 'snapgene',
+            'repository_id': 'basic_cloning_vectors/pEASY-T1_(linearized)',
+        },
+    },
+}

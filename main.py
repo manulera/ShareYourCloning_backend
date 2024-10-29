@@ -18,6 +18,7 @@ from dna_functions import (
     request_from_addgene,
     oligonucleotide_hybridization_overhangs,
     get_sequences_from_gb_file_url,
+    get_sequence_from_snagene_url,
 )
 from pydantic_models import (
     PCRSource,
@@ -41,6 +42,7 @@ from pydantic_models import (
     BaseCloningStrategy,
     PrimerDesignQuery,
     BenchlingUrlSource,
+    SnapGenePlasmidSource,
     OverlapExtensionPCRLigationSource,
 )
 from fastapi.middleware.cors import CORSMiddleware
@@ -307,7 +309,9 @@ def repository_id_url_error_handler(exception: URLError, source: RepositoryIdSou
         sequences=(list[TextFileSequence], ...),
     ),
 )
-async def get_from_repository_id(source: RepositoryIdSource | AddGeneIdSource | BenchlingUrlSource):
+async def get_from_repository_id(
+    source: RepositoryIdSource | AddGeneIdSource | BenchlingUrlSource | SnapGenePlasmidSource,
+):
     return RedirectResponse(f'/repository_id/{source.repository_name}', status_code=307)
 
 
@@ -363,6 +367,30 @@ async def get_from_benchling_url(
         return {
             'sequences': [format_sequence_genbank(s, source.output_name) for s in dseqs],
             'sources': [source for s in dseqs],
+        }
+    except HTTPError as exception:
+        repository_id_http_error_handler(exception, source)
+
+
+@router.post(
+    '/repository_id/snapgene',
+    response_model=create_model(
+        'SnapGenePlasmidResponse', sources=(list[SnapGenePlasmidSource], ...), sequences=(list[TextFileSequence], ...)
+    ),
+)
+async def get_from_repository_id_snapgene(
+    source: Annotated[SnapGenePlasmidSource, Body(openapi_examples=request_examples.snapgene_plasmid_examples)]
+):
+    try:
+        plasmid_set, plasmid_name = source.repository_id.split('/')
+        url = f'https://www.snapgene.com/local/fetch.php?set={plasmid_set}&plasmid={plasmid_name}'
+        dseq = get_sequence_from_snagene_url(url)
+        # Unless a name is provided, we use the plasmid name from snapgene
+        if source.output_name is None:
+            source.output_name = plasmid_name
+        return {
+            'sequences': [format_sequence_genbank(dseq, source.output_name)],
+            'sources': [source],
         }
     except HTTPError as exception:
         repository_id_http_error_handler(exception, source)
@@ -1299,7 +1327,7 @@ if not SERVE_FRONTEND:
                         await pombe_clone(gene, 'GCF_000002945.2', temp_dir, addgene_id)
                 except Exception:
                     # Show the stack trace in console
-                    print(f"Error occurred while cloning {gene}:")
+                    print(f'Error occurred while cloning {gene}:')
                     traceback.print_exc()
                     raise HTTPException(status_code=400, detail=f'Clone for {gene} failed')
             try:
