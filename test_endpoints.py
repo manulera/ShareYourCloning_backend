@@ -98,6 +98,22 @@ class ReadFileTest(unittest.TestCase):
                 'nb_sequences': 1,
             },
             {'file': './examples/sequences/ase1.embl', 'format': 'embl', 'nb_sequences': 1},
+            # Ape files as of 2024-10-30 did not have a properly formatted LOCUS line
+            {
+                'file': './test_files/example.ape',
+                'format': 'genbank',
+                'nb_sequences': 1,
+                'warning': True,
+                'circular': False,
+            },
+            # Euroscarf files as of 2024-10-30 did not have a properly formatted LOCUS line
+            {
+                'file': './test_files/pKT128_euroscarf.gb',
+                'format': 'genbank',
+                'nb_sequences': 1,
+                'warning': True,
+                'circular': True,
+            },
         ]
 
         for example in examples:
@@ -117,6 +133,14 @@ class ReadFileTest(unittest.TestCase):
                 self.assertGreater(len(seq), 3)
             for source in sources:
                 self.assertEqual(source.sequence_file_format, example['format'])
+
+            if 'warning' in example and example['warning']:
+                self.assertIn('x-warning', response.headers)
+            else:
+                self.assertNotIn('x-warning', response.headers)
+            if 'circular' in example:
+                for seq in resulting_sequences:
+                    self.assertEqual(seq.circular, example['circular'])
 
         # Test naming
         with open(example['file'], 'rb') as f:

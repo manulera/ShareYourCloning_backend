@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter, Form
+from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter, Form, Response
 from typing import Annotated, Union, Literal
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -69,6 +69,9 @@ from starlette.responses import RedirectResponse
 from primer_design import homologous_recombination_primers, gibson_assembly_primers, simple_pair_primers
 import asyncio
 import re
+import warnings
+import io
+from Bio import BiopythonParserWarning
 
 # ENV variables ========================================
 RECORD_STUBS = os.environ['RECORD_STUBS'] == '1' if 'RECORD_STUBS' in os.environ else False
@@ -96,6 +99,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
+    expose_headers=['x-warning'],
 )
 
 # TODO limit the maximum size of submitted files
@@ -187,14 +191,32 @@ async def get_version():
     response_model=create_model(
         'UploadedFileResponse', sources=(list[UploadedFileSource], ...), sequences=(list[TextFileSequence], ...)
     ),
+    responses={
+        200: {
+            'description': 'The sequence was successfully parsed',
+            'headers': {
+                'x-warning': {
+                    'description': 'A warning returned if the file can be read but is not in the expected format',
+                    'schema': {'type': 'string'},
+                },
+            },
+        },
+        422: {
+            'description': 'Biopython cannot process this file.',
+        },
+        404: {
+            'description': 'The index_in_file is out of range.',
+        },
+    },
 )
 async def read_from_file(
+    response: Response,
     file: UploadFile = File(...),
     sequence_file_format: SequenceFileFormat | None = Query(
         None,
         description='Format of the sequence file. Unless specified, it will be guessed from the extension',
     ),
-    index_in_file: int = Query(
+    index_in_file: int | None = Query(
         None,
         description='The index of the sequence in the file for multi-sequence files',
     ),
@@ -202,7 +224,7 @@ async def read_from_file(
         False,
         description='circularize the sequence read (for FASTA files)',
     ),
-    output_name: str = Query(
+    output_name: str | None = Query(
         None,
         description='Name of the output sequence',
     ),
@@ -233,11 +255,30 @@ async def read_from_file(
     if sequence_file_format != 'fasta' and circularize is True:
         raise HTTPException(400, 'circularize is only supported for fasta files.')
 
-    try:
-        dseqs = await custom_file_parser(file, sequence_file_format, circularize)
+    file_content = await file.read()
+    if sequence_file_format == 'snapgene':
+        file_streamer = io.BytesIO(file_content)
+    else:
+        file_streamer = io.StringIO(file_content.decode())
 
-    except ValueError:
-        raise HTTPException(422, 'Biopython cannot process this file.')
+    try:
+        # Capture warnings without converting to errors:
+        with warnings.catch_warnings(record=True, category=UserWarning) as warnings_captured:
+            dseqs = await custom_file_parser(file_streamer, sequence_file_format, circularize)
+
+        # If there were warnings, add them to the response header
+        warnings_captured = [w for w in warnings_captured if w.category is not BiopythonParserWarning]
+
+        if warnings_captured:
+            warning_messages = [str(w.message) for w in warnings_captured]
+            response.headers['x-warning'] = '; '.join(warning_messages)
+
+    except ValueError as e:
+        if 'LOCUS' in str(e):
+            raise HTTPException(422, str(e))
+        else:
+            print('error >>', e)
+            raise HTTPException(422, 'Biopython cannot process this file.')
 
     # This happens when textfiles are empty or contain something else, or when reading a text file as snapgene file,
     # since StringIO does not raise an error when "Unexpected end of packet" is found
