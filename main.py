@@ -7,8 +7,6 @@ from pydna.primer import Primer as PydnaPrimer
 from pydna.dseq import Dseq
 from pydna.crispr import cas9
 from pydantic import conlist, create_model
-from Bio.SeqIO import parse as seqio_parse
-import io
 import glob
 from pydna.genbank import Genbank
 from dna_functions import (
@@ -19,6 +17,7 @@ from dna_functions import (
     oligonucleotide_hybridization_overhangs,
     get_sequences_from_gb_file_url,
     get_sequence_from_snagene_url,
+    custom_file_parser,
 )
 from pydantic_models import (
     PCRSource,
@@ -191,7 +190,7 @@ async def get_version():
 )
 async def read_from_file(
     file: UploadFile = File(...),
-    sequence_file_format: SequenceFileFormat = Query(
+    sequence_file_format: SequenceFileFormat | None = Query(
         None,
         description='Format of the sequence file. Unless specified, it will be guessed from the extension',
     ),
@@ -235,22 +234,8 @@ async def read_from_file(
         raise HTTPException(400, 'circularize is only supported for fasta files.')
 
     try:
-        if sequence_file_format == 'snapgene':
+        dseqs = await custom_file_parser(file, sequence_file_format, circularize)
 
-            async def file_streamer():
-                return io.BytesIO((await file.read()))
-
-        else:
-
-            async def file_streamer():
-                return io.StringIO((await file.read()).decode())
-
-        with await file_streamer() as handle:
-            for parsed_seq in seqio_parse(handle, sequence_file_format):
-                circularize = circularize or (
-                    'topology' in parsed_seq.annotations.keys() and parsed_seq.annotations['topology'] == 'circular'
-                )
-                dseqs.append(Dseqrecord(parsed_seq, circular=circularize))
     except ValueError:
         raise HTTPException(422, 'Biopython cannot process this file.')
 

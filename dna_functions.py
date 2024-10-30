@@ -14,6 +14,7 @@ from pydna.utils import shift_location
 from pydna.common_sub_strings import common_sub_strings
 from Bio.SeqIO import parse as seqio_parse
 import io
+from fastapi import UploadFile
 
 
 def format_sequence_genbank(seq: Dseqrecord, seq_name: str = None) -> TextFileSequence:
@@ -215,3 +216,29 @@ def oligonucleotide_hybridization_overhangs(
 
     # Return possible overhangs
     return [start_on_rvs - start_on_fwd for start_on_fwd, start_on_rvs, length in matches]
+
+
+async def custom_file_parser(
+    file: UploadFile, sequence_file_format: SequenceFileFormat, circularize: bool = False
+) -> list[Dseqrecord]:
+    """
+    Parse a file with SeqIO.parse (specifying the format and using the topology annotation to determine circularity).
+
+    If the format is genbank and the parsing of the LOCUS line fails, fallback to custom regex-based parsing.
+    """
+
+    out = list()
+
+    if sequence_file_format == 'snapgene':
+        file_streamer = io.BytesIO((await file.read()))
+    else:
+        file_streamer = io.StringIO((await file.read()).decode())
+
+    with file_streamer as handle:
+        for parsed_seq in seqio_parse(handle, sequence_file_format):
+            circularize = circularize or (
+                'topology' in parsed_seq.annotations.keys() and parsed_seq.annotations['topology'] == 'circular'
+            )
+            out.append(Dseqrecord(parsed_seq, circular=circularize))
+
+    return out
