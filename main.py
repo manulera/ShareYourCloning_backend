@@ -435,8 +435,15 @@ async def get_from_repository_id_snapgene(
     ),
 )
 async def get_from_repository_id_euroscarf(source: EuroscarfSource):
+    """
+    Return the sequence from a plasmid in Euroscarf. Sometimes plasmid files do not contain correct topology information
+    (they indicate linear sequence instead of circular). We force them to be circular.
+    """
     try:
         dseq = await get_sequence_from_euroscarf_url(source.repository_id)
+        # Sometimes the files do not contain correct topology information, so we loop them
+        if not dseq.circular:
+            dseq = dseq.looped()
         return {'sequences': [format_sequence_genbank(dseq, source.output_name)], 'sources': [source]}
     except HTTPError as exception:
         repository_id_http_error_handler(exception, source)

@@ -2365,6 +2365,15 @@ class EuroscarfSourceTest(unittest.TestCase):
         self.assertEqual(len(sequence), 4738)
         self.assertTrue(any('yEGFP' in f.qualifiers['gene'] for f in sequence.features))
 
+        # Ensure that linear files are circularised
+        source = EuroscarfSource(id=0, repository_id='P30555', repository_name='euroscarf')
+        response = client.post('/repository_id/euroscarf', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sequences']), 1)
+        sequence = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertTrue(sequence.circular)
+
     def test_invalid_url(self):
         # Compatible with regex, but does not exist
         source = EuroscarfSource(id=0, repository_id='P99999999999999', repository_name='euroscarf')
