@@ -18,6 +18,7 @@ from dna_functions import (
     get_sequences_from_gb_file_url,
     get_sequence_from_snagene_url,
     custom_file_parser,
+    get_sequence_from_euroscarf_url,
 )
 from pydantic_models import (
     PCRSource,
@@ -42,6 +43,7 @@ from pydantic_models import (
     PrimerDesignQuery,
     BenchlingUrlSource,
     SnapGenePlasmidSource,
+    EuroscarfSource,
     OverlapExtensionPCRLigationSource,
 )
 from fastapi.middleware.cors import CORSMiddleware
@@ -264,7 +266,7 @@ async def read_from_file(
     try:
         # Capture warnings without converting to errors:
         with warnings.catch_warnings(record=True, category=UserWarning) as warnings_captured:
-            dseqs = await custom_file_parser(file_streamer, sequence_file_format, circularize)
+            dseqs = custom_file_parser(file_streamer, sequence_file_format, circularize)
 
         # If there were warnings, add them to the response header
         warnings_captured = [w for w in warnings_captured if w.category is not BiopythonParserWarning]
@@ -332,12 +334,15 @@ def repository_id_url_error_handler(exception: URLError, source: RepositoryIdSou
     '/repository_id',
     response_model=create_model(
         'RepositoryIdResponse',
-        sources=(list[RepositoryIdSource] | list[AddGeneIdSource] | list[BenchlingUrlSource], ...),
+        sources=(
+            list[RepositoryIdSource] | list[AddGeneIdSource] | list[BenchlingUrlSource] | list[EuroscarfSource],
+            ...,
+        ),
         sequences=(list[TextFileSequence], ...),
     ),
 )
 async def get_from_repository_id(
-    source: RepositoryIdSource | AddGeneIdSource | BenchlingUrlSource | SnapGenePlasmidSource,
+    source: RepositoryIdSource | AddGeneIdSource | BenchlingUrlSource | SnapGenePlasmidSource | EuroscarfSource,
 ):
     return RedirectResponse(f'/repository_id/{source.repository_name}', status_code=307)
 
@@ -369,9 +374,9 @@ async def get_from_repository_id_genbank(source: RepositoryIdSource):
         'AddgeneIdResponse', sources=(list[AddGeneIdSource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
-def get_from_repository_id_addgene(source: AddGeneIdSource):
+async def get_from_repository_id_addgene(source: AddGeneIdSource):
     try:
-        dseq, out_source = request_from_addgene(source)
+        dseq, out_source = await request_from_addgene(source)
     except HTTPError as exception:
         repository_id_http_error_handler(exception, source)
     except URLError as exception:
@@ -390,7 +395,7 @@ async def get_from_benchling_url(
     source: Annotated[BenchlingUrlSource, Body(openapi_examples=request_examples.benchling_url_examples)]
 ):
     try:
-        dseqs = get_sequences_from_gb_file_url(source.repository_id)
+        dseqs = await get_sequences_from_gb_file_url(source.repository_id)
         return {
             'sequences': [format_sequence_genbank(s, source.output_name) for s in dseqs],
             'sources': [source for s in dseqs],
@@ -419,6 +424,20 @@ async def get_from_repository_id_snapgene(
             'sequences': [format_sequence_genbank(dseq, source.output_name)],
             'sources': [source],
         }
+    except HTTPError as exception:
+        repository_id_http_error_handler(exception, source)
+
+
+@router.post(
+    '/repository_id/euroscarf',
+    response_model=create_model(
+        'EuroscarfResponse', sources=(list[EuroscarfSource], ...), sequences=(list[TextFileSequence], ...)
+    ),
+)
+async def get_from_repository_id_euroscarf(source: EuroscarfSource):
+    try:
+        dseq = await get_sequence_from_euroscarf_url(source.repository_id)
+        return {'sequences': [format_sequence_genbank(dseq, source.output_name)], 'sources': [source]}
     except HTTPError as exception:
         repository_id_http_error_handler(exception, source)
 

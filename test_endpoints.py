@@ -25,6 +25,7 @@ from pydantic_models import (
     BaseCloningStrategy,
     SimpleSequenceLocation as PydanticSimpleLocation,
     BenchlingUrlSource,
+    EuroscarfSource,
     SnapGenePlasmidSource,
 )
 from pydna.dseqrecord import Dseqrecord
@@ -2345,6 +2346,35 @@ class SnapGenePlasmidSourceTest(unittest.TestCase):
         source_dict = source.model_dump()
         source_dict['repository_id'] = 'hello'
         response = client.post('/repository_id/snapgene', json=source_dict)
+        self.assertEqual(response.status_code, 422)
+
+
+class EuroscarfSourceTest(unittest.TestCase):
+
+    def test_valid_url(self):
+        source = EuroscarfSource(id=0, repository_id='P30174', repository_name='euroscarf')
+        response = client.post('/repository_id/euroscarf', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sequences']), 1)
+        self.assertEqual(len(payload['sources']), 1)
+        out_source = payload['sources'][0]
+        self.assertEqual(out_source, source.model_dump())
+        sequence = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertEqual(sequence.name, 'pKT128')
+        self.assertEqual(len(sequence), 4738)
+        self.assertTrue(any('yEGFP' in f.qualifiers['gene'] for f in sequence.features))
+
+    def test_invalid_url(self):
+        # Compatible with regex, but does not exist
+        source = EuroscarfSource(id=0, repository_id='P99999999999999', repository_name='euroscarf')
+        response = client.post('/repository_id/euroscarf', json=source.model_dump())
+        self.assertEqual(response.status_code, 404)
+
+        # Not compatible with regex
+        source_dict = source.model_dump()
+        source_dict['repository_id'] = 'hello'
+        response = client.post('/repository_id/euroscarf', json=source_dict)
         self.assertEqual(response.status_code, 422)
 
 
