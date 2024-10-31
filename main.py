@@ -83,8 +83,8 @@ origins = []
 if os.environ.get('ALLOWED_ORIGINS') is not None:
     origins = os.environ['ALLOWED_ORIGINS'].split(',')
 elif not SERVE_FRONTEND:
-    # Default to the yarn start frontend url
-    origins = ['http://localhost:3000']
+    # Default to the yarn start frontend url and the cypress testing
+    origins = ['http://localhost:3000', 'http://localhost:5173']
 
 # =====================================================
 
