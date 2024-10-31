@@ -2224,13 +2224,13 @@ testing-integration = ["build[virtualenv] (>=1.0.3)", "filelock (>=3.4.0)", "jar
 
 [[package]]
 name = "shareyourcloning-linkml"
-version = "0.1.6a0"
+version = "0.1.7a0"
 description = "A LinkML data model for ShareYourCloning"
 optional = false
 python-versions = "<4.0,>=3.9"
 files = [
-    {file = "shareyourcloning_linkml-0.1.6a0-py3-none-any.whl", hash = "sha256:ae3761c0fb67dbe9db29ddde8aa44f4cf1c29549f516be1792748ed2da0c5f7f"},
-    {file = "shareyourcloning_linkml-0.1.6a0.tar.gz", hash = "sha256:2b5ce5ef395c4d566131898b29d17e384cd38fda0ceca466a7b4aa385219379c"},
+    {file = "shareyourcloning_linkml-0.1.7a0-py3-none-any.whl", hash = "sha256:1411a7152ab46069869a3f1d0a0160fccbaa0060cbb2139992b166892887f8f1"},
+    {file = "shareyourcloning_linkml-0.1.7a0.tar.gz", hash = "sha256:6c8c0dccf793cd9a8d86ad7eb9deb06c2d65630379b8fc1dc0e48334b0c72a22"},
 ]
 
 [package.dependencies]
@@ -2703,4 +2703,4 @@ test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "bc03f950d9038cab22bc791f23b4f6871890baf5546ab6fe87a24aed19d5e759"
+content-hash = "e93199befe9b2b7082a6d9ab2363d03cd493badf8eff10a35a77da78ee7dcf72"

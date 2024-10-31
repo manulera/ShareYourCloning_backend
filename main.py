@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter, Form
+from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter, Form, Response
 from typing import Annotated, Union, Literal
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -7,8 +7,6 @@ from pydna.primer import Primer as PydnaPrimer
 from pydna.dseq import Dseq
 from pydna.crispr import cas9
 from pydantic import conlist, create_model
-from Bio.SeqIO import parse as seqio_parse
-import io
 import glob
 from pydna.genbank import Genbank
 from dna_functions import (
@@ -19,6 +17,8 @@ from dna_functions import (
     oligonucleotide_hybridization_overhangs,
     get_sequences_from_gb_file_url,
     get_sequence_from_snagene_url,
+    custom_file_parser,
+    get_sequence_from_euroscarf_url,
 )
 from pydantic_models import (
     PCRSource,
@@ -43,6 +43,7 @@ from pydantic_models import (
     PrimerDesignQuery,
     BenchlingUrlSource,
     SnapGenePlasmidSource,
+    EuroscarfSource,
     OverlapExtensionPCRLigationSource,
 )
 from fastapi.middleware.cors import CORSMiddleware
@@ -70,6 +71,9 @@ from starlette.responses import RedirectResponse
 from primer_design import homologous_recombination_primers, gibson_assembly_primers, simple_pair_primers
 import asyncio
 import re
+import warnings
+import io
+from Bio import BiopythonParserWarning
 
 # ENV variables ========================================
 RECORD_STUBS = os.environ['RECORD_STUBS'] == '1' if 'RECORD_STUBS' in os.environ else False
@@ -79,8 +83,8 @@ origins = []
 if os.environ.get('ALLOWED_ORIGINS') is not None:
     origins = os.environ['ALLOWED_ORIGINS'].split(',')
 elif not SERVE_FRONTEND:
-    # Default to the yarn start frontend url
-    origins = ['http://localhost:3000']
+    # Default to the yarn start frontend url and the cypress testing
+    origins = ['http://localhost:3000', 'http://localhost:5173']
 
 # =====================================================
 
@@ -97,6 +101,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
+    expose_headers=['x-warning'],
 )
 
 # TODO limit the maximum size of submitted files
@@ -188,14 +193,32 @@ async def get_version():
     response_model=create_model(
         'UploadedFileResponse', sources=(list[UploadedFileSource], ...), sequences=(list[TextFileSequence], ...)
     ),
+    responses={
+        200: {
+            'description': 'The sequence was successfully parsed',
+            'headers': {
+                'x-warning': {
+                    'description': 'A warning returned if the file can be read but is not in the expected format',
+                    'schema': {'type': 'string'},
+                },
+            },
+        },
+        422: {
+            'description': 'Biopython cannot process this file.',
+        },
+        404: {
+            'description': 'The index_in_file is out of range.',
+        },
+    },
 )
 async def read_from_file(
+    response: Response,
     file: UploadFile = File(...),
-    sequence_file_format: SequenceFileFormat = Query(
+    sequence_file_format: SequenceFileFormat | None = Query(
         None,
         description='Format of the sequence file. Unless specified, it will be guessed from the extension',
     ),
-    index_in_file: int = Query(
+    index_in_file: int | None = Query(
         None,
         description='The index of the sequence in the file for multi-sequence files',
     ),
@@ -203,7 +226,7 @@ async def read_from_file(
         False,
         description='circularize the sequence read (for FASTA files)',
     ),
-    output_name: str = Query(
+    output_name: str | None = Query(
         None,
         description='Name of the output sequence',
     ),
@@ -214,6 +237,7 @@ async def read_from_file(
         extension_dict = {
             'gbk': 'genbank',
             'gb': 'genbank',
+            'ape': 'genbank',
             'dna': 'snapgene',
             'fasta': 'fasta',
             'embl': 'embl',
@@ -233,25 +257,30 @@ async def read_from_file(
     if sequence_file_format != 'fasta' and circularize is True:
         raise HTTPException(400, 'circularize is only supported for fasta files.')
 
+    file_content = await file.read()
+    if sequence_file_format == 'snapgene':
+        file_streamer = io.BytesIO(file_content)
+    else:
+        file_streamer = io.StringIO(file_content.decode())
+
     try:
-        if sequence_file_format == 'snapgene':
+        # Capture warnings without converting to errors:
+        with warnings.catch_warnings(record=True, category=UserWarning) as warnings_captured:
+            dseqs = custom_file_parser(file_streamer, sequence_file_format, circularize)
 
-            async def file_streamer():
-                return io.BytesIO((await file.read()))
+        # If there were warnings, add them to the response header
+        warnings_captured = [w for w in warnings_captured if w.category is not BiopythonParserWarning]
 
+        if warnings_captured:
+            warning_messages = [str(w.message) for w in warnings_captured]
+            response.headers['x-warning'] = '; '.join(warning_messages)
+
+    except ValueError as e:
+        if 'LOCUS' in str(e):
+            raise HTTPException(422, str(e))
         else:
-
-            async def file_streamer():
-                return io.StringIO((await file.read()).decode())
-
-        with await file_streamer() as handle:
-            for parsed_seq in seqio_parse(handle, sequence_file_format):
-                circularize = circularize or (
-                    'topology' in parsed_seq.annotations.keys() and parsed_seq.annotations['topology'] == 'circular'
-                )
-                dseqs.append(Dseqrecord(parsed_seq, circular=circularize))
-    except ValueError:
-        raise HTTPException(422, 'Biopython cannot process this file.')
+            print('error >>', e)
+            raise HTTPException(422, 'Biopython cannot process this file.')
 
     # This happens when textfiles are empty or contain something else, or when reading a text file as snapgene file,
     # since StringIO does not raise an error when "Unexpected end of packet" is found
@@ -305,12 +334,15 @@ def repository_id_url_error_handler(exception: URLError, source: RepositoryIdSou
     '/repository_id',
     response_model=create_model(
         'RepositoryIdResponse',
-        sources=(list[RepositoryIdSource] | list[AddGeneIdSource] | list[BenchlingUrlSource], ...),
+        sources=(
+            list[RepositoryIdSource] | list[AddGeneIdSource] | list[BenchlingUrlSource] | list[EuroscarfSource],
+            ...,
+        ),
         sequences=(list[TextFileSequence], ...),
     ),
 )
 async def get_from_repository_id(
-    source: RepositoryIdSource | AddGeneIdSource | BenchlingUrlSource | SnapGenePlasmidSource,
+    source: RepositoryIdSource | AddGeneIdSource | BenchlingUrlSource | SnapGenePlasmidSource | EuroscarfSource,
 ):
     return RedirectResponse(f'/repository_id/{source.repository_name}', status_code=307)
 
@@ -342,9 +374,9 @@ async def get_from_repository_id_genbank(source: RepositoryIdSource):
         'AddgeneIdResponse', sources=(list[AddGeneIdSource], ...), sequences=(list[TextFileSequence], ...)
     ),
 )
-def get_from_repository_id_addgene(source: AddGeneIdSource):
+async def get_from_repository_id_addgene(source: AddGeneIdSource):
     try:
-        dseq, out_source = request_from_addgene(source)
+        dseq, out_source = await request_from_addgene(source)
     except HTTPError as exception:
         repository_id_http_error_handler(exception, source)
     except URLError as exception:
@@ -363,7 +395,7 @@ async def get_from_benchling_url(
     source: Annotated[BenchlingUrlSource, Body(openapi_examples=request_examples.benchling_url_examples)]
 ):
     try:
-        dseqs = get_sequences_from_gb_file_url(source.repository_id)
+        dseqs = await get_sequences_from_gb_file_url(source.repository_id)
         return {
             'sequences': [format_sequence_genbank(s, source.output_name) for s in dseqs],
             'sources': [source for s in dseqs],
@@ -392,6 +424,27 @@ async def get_from_repository_id_snapgene(
             'sequences': [format_sequence_genbank(dseq, source.output_name)],
             'sources': [source],
         }
+    except HTTPError as exception:
+        repository_id_http_error_handler(exception, source)
+
+
+@router.post(
+    '/repository_id/euroscarf',
+    response_model=create_model(
+        'EuroscarfResponse', sources=(list[EuroscarfSource], ...), sequences=(list[TextFileSequence], ...)
+    ),
+)
+async def get_from_repository_id_euroscarf(source: EuroscarfSource):
+    """
+    Return the sequence from a plasmid in Euroscarf. Sometimes plasmid files do not contain correct topology information
+    (they indicate linear sequence instead of circular). We force them to be circular.
+    """
+    try:
+        dseq = await get_sequence_from_euroscarf_url(source.repository_id)
+        # Sometimes the files do not contain correct topology information, so we loop them
+        if not dseq.circular:
+            dseq = dseq.looped()
+        return {'sequences': [format_sequence_genbank(dseq, source.output_name)], 'sources': [source]}
     except HTTPError as exception:
         repository_id_http_error_handler(exception, source)
 

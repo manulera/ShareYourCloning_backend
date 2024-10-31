@@ -14,6 +14,10 @@ from pydna.utils import shift_location
 from pydna.common_sub_strings import common_sub_strings
 from Bio.SeqIO import parse as seqio_parse
 import io
+import warnings
+from Bio.SeqIO.InsdcIO import GenBankIterator, GenBankScanner
+import re
+import httpx
 
 
 def format_sequence_genbank(seq: Dseqrecord, seq_name: str = None) -> TextFileSequence:
@@ -62,12 +66,14 @@ def get_invalid_enzyme_names(enzyme_names_list: list[str | None]) -> list[str]:
     return invalid_names
 
 
-def get_sequences_from_gb_file_url(url: str) -> list[Dseqrecord]:
+async def get_sequences_from_gb_file_url(url: str) -> list[Dseqrecord]:
     # TODO once pydna parse is fixed it should handle urls that point to non-gb files
-    resp = requests.get(url)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url)
+
     if resp.status_code != 200:
         raise HTTPError(url, 404, 'file requested from url not found', 'file requested from url not found', None)
-    return pydna_parse(resp.text)
+    return custom_file_parser(io.StringIO(resp.text), SequenceFileFormat('genbank'))
 
 
 def get_sequence_from_snagene_url(url: str) -> Dseqrecord:
@@ -80,10 +86,11 @@ def get_sequence_from_snagene_url(url: str) -> Dseqrecord:
     return Dseqrecord(parsed_seq, circular=circularize)
 
 
-def request_from_addgene(source: AddGeneIdSource) -> tuple[Dseqrecord, AddGeneIdSource]:
+async def request_from_addgene(source: AddGeneIdSource) -> tuple[Dseqrecord, AddGeneIdSource]:
 
     url = f'https://www.addgene.org/{source.repository_id}/sequences/'
-    resp = requests.get(url)
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url)
     if resp.status_code == 404:
         raise HTTPError(url, 404, 'wrong addgene id', 'wrong addgene id', None)
     soup = BeautifulSoup(resp.content, 'html.parser')
@@ -92,7 +99,7 @@ def request_from_addgene(source: AddGeneIdSource) -> tuple[Dseqrecord, AddGeneId
     plasmid_name = soup.find('span', class_='material-name').text
 
     if source.sequence_file_url:
-        dseqr = get_sequences_from_gb_file_url(source.sequence_file_url)[0]
+        dseqr = (await get_sequences_from_gb_file_url(source.sequence_file_url))[0]
         dseqr.name = plasmid_name
         return dseqr, source
 
@@ -116,7 +123,7 @@ def request_from_addgene(source: AddGeneIdSource) -> tuple[Dseqrecord, AddGeneId
                 new_source.addgene_sequence_type = _type
                 sources.append(new_source)
                 # There should be only one sequence
-                products.append(get_sequences_from_gb_file_url(seq_url)[0])
+                products.append((await get_sequences_from_gb_file_url(seq_url))[0])
 
     if len(products) == 0:
         # They may have only partial sequences
@@ -215,3 +222,96 @@ def oligonucleotide_hybridization_overhangs(
 
     # Return possible overhangs
     return [start_on_rvs - start_on_fwd for start_on_fwd, start_on_rvs, length in matches]
+
+
+class MyGenBankScanner(GenBankScanner):
+    def _feed_first_line(self, consumer, line):
+        # A regex for LOCUS       pKM265       4536 bp    DNA   circular  SYN        21-JUN-2013
+        m = re.match(
+            r'(?i)LOCUS\s+(?P<name>\S+)\s+(?P<size>\d+ bp)\s+(?P<molecule_type>\S+)\s+(?P<topology>(?:circular|linear))\s+.+(?P<date>\d{2}-\w{3}-\d{4})',
+            line,
+        )
+        if m is None:
+            raise ValueError('LOCUS line cannot be parsed')
+        name, size, molecule_type, topology, date = m.groups()
+        # If topology not present, error
+        if topology is None:
+            raise ValueError('LOCUS line does not contain topology')
+        consumer.locus(name)
+        consumer.size(size[:-3])
+        consumer.molecule_type(molecule_type)
+        consumer.topology(topology.lower())
+        consumer.date(date)
+
+
+class MyGenBankIterator(GenBankIterator):
+
+    def parse(self, handle):
+        """Start parsing the file, and return a SeqRecord generator."""
+        records = MyGenBankScanner(debug=0).parse_records(handle)
+        return records
+
+
+def custom_file_parser(
+    file_streamer: io.BytesIO | io.StringIO, sequence_file_format: SequenceFileFormat, circularize: bool = False
+) -> list[Dseqrecord]:
+    """
+    Parse a file with SeqIO.parse (specifying the format and using the topology annotation to determine circularity).
+
+    If the format is genbank and the parsing of the LOCUS line fails, fallback to custom regex-based parsing.
+    """
+
+    out = list()
+
+    with file_streamer as handle:
+        try:
+            for parsed_seq in seqio_parse(handle, sequence_file_format):
+                circularize = circularize or (
+                    'topology' in parsed_seq.annotations.keys() and parsed_seq.annotations['topology'] == 'circular'
+                )
+                out.append(Dseqrecord(parsed_seq, circular=circularize))
+        except ValueError as e:
+            # If the error is about the LOCUS line, we try to parse with regex
+            warnings.warn(
+                'LOCUS line is wrongly formatted, we used a more permissive parser.',
+                stacklevel=2,
+            )
+            # Reset the file handle position to the start since we consumed it in the first attempt
+            if 'LOCUS line does not contain' in str(e):
+                handle.seek(0)
+                out = list()
+                for parsed_seq in MyGenBankIterator(handle):
+                    circularize = circularize or (
+                        'topology' in parsed_seq.annotations.keys()
+                        and parsed_seq.annotations['topology'] == 'circular'
+                    )
+                    out.append(Dseqrecord(parsed_seq, circular=circularize))
+            else:
+                raise e
+
+    return out
+
+
+async def get_sequence_from_euroscarf_url(plasmid_id: str) -> Dseqrecord:
+    url = f'http://www.euroscarf.de/plasmid_details.php?accno={plasmid_id}'
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url)
+    if resp.status_code != 200:
+        raise HTTPError(url, resp.status_code, 'invalid euroscarf id', 'invalid euroscarf id', None)
+    # Use beautifulsoup to parse the html
+    soup = BeautifulSoup(resp.text, 'html.parser')
+    # Identify if it's an error
+    body_tag = soup.find('body')
+    if body_tag is None:
+        if 'Call to a member function getName()' in resp.text:
+            raise HTTPError(url, 404, 'invalid euroscarf id', 'invalid euroscarf id', None)
+        else:
+            msg = f'Could not retrieve plasmid details, double-check the euroscarf site: {url}'
+            raise HTTPError(url, 503, msg, msg, None)
+    # Get the download link
+    subpath = soup.find('a', href=lambda x: x and x.startswith('files/dna'))
+    if subpath is None:
+        msg = f'Could not retrieve plasmid details, double-check the euroscarf site: {url}'
+        raise HTTPError(url, 503, msg, msg, None)
+    genbank_url = f'http://www.euroscarf.de/{subpath.get("href")}'
+    return (await get_sequences_from_gb_file_url(genbank_url))[0]
