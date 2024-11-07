@@ -37,6 +37,7 @@ from shareyourcloning_linkml.datamodel import (
     OverlapExtensionPCRLigationSource as _OverlapExtensionPCRLigationSource,
     SnapGenePlasmidSource as _SnapGenePlasmidSource,
     EuroscarfSource as _EuroscarfSource,
+    GatewaySource as _GatewaySource,
 )
 from pydna.utils import shift_location as _shift_location
 from assembly2 import edge_representation2subfragment_representation, subfragment_representation2edge_representation
@@ -332,6 +333,18 @@ class RestrictionAndLigationSource(AssemblySourceCommonClass, _RestrictionAndLig
         restriction_enzymes=list['str'],
     ):
         return super().from_assembly(assembly, id, circular, fragments, restriction_enzymes=restriction_enzymes)
+
+
+class GatewaySource(AssemblySourceCommonClass, _GatewaySource):
+    @classmethod
+    def from_assembly(
+        cls,
+        assembly: list[tuple[int, int, Location, Location]],
+        id: int,
+        fragments: list[_SeqRecord],
+        reaction_type: str,
+    ):
+        return super().from_assembly(assembly, id, False, fragments, reaction_type=reaction_type)
 
 
 class OligoHybridizationSource(SourceCommonClass, _OligoHybridizationSource):
