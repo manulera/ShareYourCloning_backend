@@ -2394,11 +2394,18 @@ class EuroscarfSourceTest(unittest.TestCase):
 
 class GatewaySourceTest(unittest.TestCase):
 
+    attB1 = 'ACAACTTTGTACAAAAAAGCAGAAG'
+    attB2 = 'ACAACTTTGTACAAGAAAGCTGGGC'
+    attP1 = 'AAAATAATGATTTTATTTGACTGATAGTGACCTGTTCGTTGCAACAAATTGATGAGCAATGCTTTTTTATAATGCCAACTTTGTACAAAAAAGCTGAACGAGAAGCGTAAAATGATATAAATATCAATATATTAAATTAGATTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATCCAGTCACTATGAATCAACTACTTAGATGGTATTAGTGACCTGTA'
+    attP2 = 'AAATAATGATTTTATTTTGACTGATAGTGACCTGTTCGTTGCAACAAATTGATAAGCAATGCTTTCTTATAATGCCAACTTTGTACAAGAAAGCTGAACGAGAAACGTAAAATGATATAAATATCAATATATTAAATTAGACTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATCCAGTCACTATGAATCAACTACTTAGATGGTATTAGTGACCTGTA'
+    attR1 = 'ACAACTTTGTACAAAAAAGCTGAACGAGAAACGTAAAATGATATAAATATCAATATATTAAATTAGATTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATGCAGTCACTATG'
+    attL1 = 'CAAATAATGATTTTATTTTGACTGATAGTGACCTGTTCGTTGCAACAAATTGATAAGCAATGCTTTCTTATAATGCCAACTTTGTACAAAAAAGCAGGCT'
+
     def test_gateway_source(self):
-        attB1 = 'ACAACTTTGTACAAAAAAGCAGAAG'
-        attP1 = 'AAAATAATGATTTTATTTGACTGATAGTGACCTGTTCGTTGCAACAAATTGATGAGCAATGCTTTTTTATAATGCCAACTTTGTACAAAAAAGCTGAACGAGAAGCGTAAAATGATATAAATATCAATATATTAAATTAGATTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATCCAGTCACTATGAATCAACTACTTAGATGGTATTAGTGACCTGTA'
-        attR1 = 'ACAACTTTGTACAAAAAAGCTGAACGAGAAACGTAAAATGATATAAATATCAATATATTAAATTAGATTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATGCAGTCACTATG'
-        attL1 = 'CAAATAATGATTTTATTTTGACTGATAGTGACCTGTTCGTTGCAACAAATTGATAAGCAATGCTTTCTTATAATGCCAACTTTGTACAAAAAAGCAGGCT'
+        attB1 = self.attB1
+        attP1 = self.attP1
+        attR1 = self.attR1
+        attL1 = self.attL1
 
         product_BP = 'aaaACAACTTTGTACAAAAAAGCTGAACGAGAAGCGTAAAATGATATAAATATCAATATATTAAATTAGATTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATCCAGTCACTATGAATCAACTACTTAGATGGTATTAGTGACCTGTAccc'
         product_PB = (
@@ -2531,6 +2538,63 @@ class GatewaySourceTest(unittest.TestCase):
         self.assertIn('Inputs are not compatible for LR reaction', payload['detail'])
         self.assertIn('fragment 1: attB1', payload['detail'])
         self.assertTrue(payload['detail'].endswith('fragment 2: attB1, attL1, attR1, attP1'))
+
+    def test_only_multi_site(self):
+        attB1 = self.attB1
+        attB2 = self.attB2
+        attP1 = self.attP1
+        attP2 = self.attP2
+
+        seq1 = Dseqrecord('aaa' + attB1 + 'ggg' + attB2 + 'ccc', circular=True)
+        seq2 = Dseqrecord('aaa' + attP1 + 'ggg' + attP2 + 'ccc', circular=True)
+
+        fragments = [seq1, seq2]
+        fragments = [format_sequence_genbank(f) for f in fragments]
+        fragments[0].id = 1
+        fragments[1].id = 2
+
+        source = GatewaySource(id=0, reaction_type='BP')
+        data = {
+            'source': source.model_dump(),
+            'sequences': [f.model_dump() for f in fragments],
+        }
+        response = client.post('/gateway', json=data)
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sources']), 4)
+
+        # Here only multi-site
+        response = client.post('/gateway', json=data, params={'only_multi_site': True})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sources']), 2)
+
+    def test_single_input(self):
+        attB1 = self.attB1
+        attP1 = self.attP1
+
+        seq1 = Dseqrecord('aaa' + attB1 + 'ccc' + attP1)
+
+        fragments = [seq1]
+        fragments = [format_sequence_genbank(f) for f in fragments]
+        fragments[0].id = 1
+
+        source = GatewaySource(id=0, reaction_type='BP')
+
+        data = {
+            'source': source.model_dump(),
+            'sequences': [f.model_dump() for f in fragments],
+        }
+        response = client.post('/gateway', json=data, params={'only_multi_site': True})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sources']), 1)
+
+        product = (
+            'TTTGTACAAAAAAGCAGAAGcccAAAATAATGATTTTATTTGACTGATAGTGACCTGTTCGTTGCAACAAATTGATGAGCAATGCTTTTTTATAATGCCAAC'
+        ).upper()
+        seqs = [read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']]
+        self.assertEqual(str(seqs[0].seq), product)
 
 
 if __name__ == '__main__':

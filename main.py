@@ -705,7 +705,7 @@ def generate_assemblies(
     allow_insertion_assemblies: bool,
     assembly_kwargs: dict = {},
     product_callback: Callable[[Dseqrecord], Dseqrecord] = lambda x: x,
-):
+) -> dict[Literal['sources', 'sequences'], list[AssemblySource] | list[TextFileSequence]]:
     try:
         out_sources = []
         if len(fragments) > 1:
@@ -1096,6 +1096,9 @@ async def gateway(
     source: GatewaySource,
     sequences: conlist(TextFileSequence, min_length=1),
     circular_only: bool = Query(False, description='Only return circular assemblies.'),
+    only_multi_site: bool = Query(
+        False, description='Only return assemblies where more than one site per sequence recombined.'
+    ),
 ):
 
     fragments = [read_dsrecord_from_json(seq) for seq in sequences]
@@ -1131,6 +1134,16 @@ async def gateway(
             400,
             f'Inputs are not compatible for {source.reaction_type} reaction.\n\n' + '\n'.join(formatted_strings),
         )
+
+    if only_multi_site:
+        multi_site_sources = [
+            i
+            for i, s in enumerate(resp['sources'])
+            if all(join.left_location != join.right_location for join in s.assembly)
+        ]
+        sources = [resp['sources'][i] for i in multi_site_sources]
+        sequences = [resp['sequences'][i] for i in multi_site_sources]
+        return {'sources': sources, 'sequences': sequences}
 
     return resp
 
