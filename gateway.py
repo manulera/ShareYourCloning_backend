@@ -3,6 +3,8 @@ from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord as _Dseqrecord
 import re
 import itertools as _itertools
+from Bio.SeqFeature import SimpleLocation, SeqFeature
+from pydna.utils import shift_location
 
 ambiguous_only_dna_values = {**_ambiguous_dna_values}
 for normal_base in 'ACGT':
@@ -26,8 +28,7 @@ def dseqrecord_finditer(pattern: str, seq: _Dseqrecord) -> list[re.Match]:
     return (m for m in matches if m.start() <= len(seq))
 
 
-# Taken from gateway_features.txt, shipped with ApE
-raw_gateway_sites = {
+raw_gateway_common = {
     'attB1': 'CHWVTWTGTACAAAAAANNNG',
     'attB2': 'CHWVTWTGTACAAGAAANNNG',
     'attB3': 'CHWVTWTGTATAATAAANNNG',
@@ -38,37 +39,62 @@ raw_gateway_sites = {
     'attL3': 'VAAWWAWKRWTTTWWTTYGACTGATAGTGACCTGTWCGTYGMAACAVATTGATRAGCAATKMTTTYYTATAWTGHCMASTWTGTATAATAAANNNG',
     'attL4': 'VAAWWAWKRWTTTWWTTYGACTGATAGTGACCTGTWCGTYGMAACAVATTGATRAGCAATKMTTTYYTATAWTGHCMASTWTGTATAGAAAANNNG',
     'attL5': 'VAAWWAWKRWTTTWWTTYGACTGATAGTGACCTGTWCGTYGMAACAVATTGATRAGCAATKMTTTYYTATAWTGHCMASTWTGTATACAAAANNNG',
-    'attP1': 'VAAWWAWKRWTTTWWTTYGACTGATAGTGACCTGTWCGTYGMAACAVATTGATRAGCAATKMTTTYYTATAWTGHCMASTWTGTACAAAAAAGYWGARCGAGAARCGTAARRTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATRCTGTAARACACAACATATBCAGTCV',
-    'attP2': 'VAAWWAWKRWTTTWWTTYGACTGATAGTGACCTGTWCGTYGMAACAVATTGATRAGCAATKMTTTYYTATAWTGHCMASTWTGTACAAGAAAGYWGARCGAGAARCGTAARRTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATRCTGTAARACACAACATATBCAGTCV',
-    'attP3': 'VAAWWAWKRWTTTWWTTYGACTGATAGTGACCTGTWCGTYGMAACAVATTGATRAGCAATKMTTTYYTATAWTGHCMASTWTGTATAATAAAGYWGARCGAGAARCGTAARRTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATRCTGTAARACACAACATATBCAGTCV',
-    'attP4': 'VAAWWAWKRWTTTWWTTYGACTGATAGTGACCTGTWCGTYGMAACAVATTGATRAGCAATKMTTTYYTATAWTGHCMASTWTGTATAGAAAAGYWGARCGAGAARCGTAARRTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATRCTGTAARACACAACATATBCAGTCV',
-    'attP5': 'VAAWWAWKRWTTTWWTTYGACTGATAGTGACCTGTWCGTYGMAACAVATTGATRAGCAATKMTTTYYTATAWTGHCMASTWTGTATACAAAAGYWGARCGAGAARCGTAARRTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATRCTGTAARACACAACATATBCAGTCV',
     'attR1': 'CHWVTWTGTACAAAAAAGYWGARCGAGAARCGTAARRTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATRCTGTAARACACAACATATBCAGTCV',
     'attR2': 'CHWVTWTGTACAAGAAAGYWGARCGAGAARCGTAARRTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATRCTGTAARACACAACATATBCAGTCV',
     'attR3': 'CHWVTWTGTATAATAAAGYWGARCGAGAARCGTAARRTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATRCTGTAARACACAACATATBCAGTCV',
     'attR4': 'CHWVTWTGTATAGAAAAGYWGARCGAGAARCGTAARRTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATRCTGTAARACACAACATATBCAGTCV',
     'attR5': 'CHWVTWTGTATACAAAAGYWGARCGAGAARCGTAARRTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATRCTGTAARACACAACATATBCAGTCV',
-    'overlap_4': 'twtGTATAGAaaag',
-    'overlap_3': 'twtGTATAATaaag',
-    'overlap_2': 'twtGTACAAGaaag',
-    'overlap_1': 'twtGTACAAAaaag',
+    'overlap_1': 'twtGTACAAAaaa',
+    'overlap_2': 'twtGTACAAGaaa',
+    'overlap_3': 'twtGTATAATaaa',
+    'overlap_4': 'twtGTATAGAaaa',
+    'overlap_5': 'twtGTATACAaaa',
 }
 
-gateway_sites = {
+
+raw_gateway_sites_greedy = {
+    **raw_gateway_common,
+    'attP1': 'VAAWWAWKRWTTTWWTTYGACTGATAGTGACCTGTWCGTYGMAACAVATTGATRAGCAATKMTTTYYTATAWTGHCMASTWTGTACAAAAAAGYWGARCGAGAARCGTAARRTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATRCTGTAARACACAACATATBCAGTCV',
+    'attP2': 'VAAWWAWKRWTTTWWTTYGACTGATAGTGACCTGTWCGTYGMAACAVATTGATRAGCAATKMTTTYYTATAWTGHCMASTWTGTACAAGAAAGYWGARCGAGAARCGTAARRTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATRCTGTAARACACAACATATBCAGTCV',
+    'attP3': 'VAAWWAWKRWTTTWWTTYGACTGATAGTGACCTGTWCGTYGMAACAVATTGATRAGCAATKMTTTYYTATAWTGHCMASTWTGTATAATAAAGYWGARCGAGAARCGTAARRTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATRCTGTAARACACAACATATBCAGTCV',
+    'attP4': 'VAAWWAWKRWTTTWWTTYGACTGATAGTGACCTGTWCGTYGMAACAVATTGATRAGCAATKMTTTYYTATAWTGHCMASTWTGTATAGAAAAGYWGARCGAGAARCGTAARRTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATRCTGTAARACACAACATATBCAGTCV',
+    'attP5': 'VAAWWAWKRWTTTWWTTYGACTGATAGTGACCTGTWCGTYGMAACAVATTGATRAGCAATKMTTTYYTATAWTGHCMASTWTGTATACAAAAGYWGARCGAGAARCGTAARRTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATRCTGTAARACACAACATATBCAGTCV',
+}
+
+raw_gateway_sites_conservative = {
+    **raw_gateway_common,
+    'attP1': 'AAAWWAWKRWTTTWWTTTGACTGATAGTGACCTGTTCGTTGCAACAMATTGATRAGCAATGCTTTYTTATAATGCCMASTTTGTACAAAAAAGYWGAACGAGAARCGTAAARTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATSCAGTCACTATGAAYCAACTACTTAGATGGTATTAGTGACCTGTA',
+    'attP2': 'AAAWWAWKRWTTTWWTTTGACTGATAGTGACCTGTTCGTTGCAACAMATTGATRAGCAATGCTTTYTTATAATGCCMASTTTGTACAAGAAAGYWGAACGAGAARCGTAAARTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATSCAGTCACTATGAAYCAACTACTTAGATGGTATTAGTGACCTGTA',
+    'attP3': 'AAAWWAWKRWTTTWWTTTGACTGATAGTGACCTGTTCGTTGCAACAMATTGATRAGCAATGCTTTYTTATAATGCCMASTTTGTATAATAAAGYWGAACGAGAARCGTAAARTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATSCAGTCACTATGAAYCAACTACTTAGATGGTATTAGTGACCTGTA',
+    'attP4': 'AAAWWAWKRWTTTWWTTTGACTGATAGTGACCTGTTCGTTGCAACAMATTGATRAGCAATGCTTTYTTATAATGCCMASTTTGTATAGAAAAGYWGAACGAGAARCGTAAARTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATSCAGTCACTATGAAYCAACTACTTAGATGGTATTAGTGACCTGTA',
+    'attP5': 'AAAWWAWKRWTTTWWTTTGACTGATAGTGACCTGTTCGTTGCAACAMATTGATRAGCAATGCTTTYTTATAATGCCMASTTTGTATACAAAAGYWGAACGAGAARCGTAAARTGATATAAATATCAATATATTAAATTAGAYTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATSCAGTCACTATGAAYCAACTACTTAGATGGTATTAGTGACCTGTA',
+}
+
+gateway_sites_greedy = {
     k: {
         'forward_regex': compute_regex_site(v),
         'reverse_regex': compute_regex_site(reverse_complement(v)),
         'consensus_sequence': v,
     }
-    for k, v in raw_gateway_sites.items()
+    for k, v in raw_gateway_sites_greedy.items()
+}
+
+gateway_sites_conservative = {
+    k: {
+        'forward_regex': compute_regex_site(v),
+        'reverse_regex': compute_regex_site(reverse_complement(v)),
+        'consensus_sequence': v,
+    }
+    for k, v in raw_gateway_sites_conservative.items()
 }
 
 
-def gateway_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, type=None):
+def gateway_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, reaction: str, greedy: bool) -> list[tuple[int, int, int]]:
     """Find gateway overlaps"""
-    if type not in ['BP', 'LR']:
-        raise ValueError(f'Invalid overlap type: {type}')
+    if reaction not in ['BP', 'LR']:
+        raise ValueError(f'Invalid overlap type: {reaction}')
 
+    gateway_sites = gateway_sites_greedy if greedy else gateway_sites_conservative
     out = list()
     # Iterate over the four possible att sites
     for num in range(1, 5):
@@ -79,7 +105,7 @@ def gateway_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, type=None):
             overlap_regex = gateway_sites[f'overlap_{num}'][pattern]
 
             # Iterate over pairs B, P and P, B for BP and L, R and R, L for LR
-            for site_x, site_y in zip(type, type[::-1]):
+            for site_x, site_y in zip(reaction, reaction[::-1]):
                 site_x_regex = gateway_sites[f'att{site_x}{num}'][pattern]
                 matches_x = list(dseqrecord_finditer(site_x_regex, seqx))
                 if len(matches_x) == 0:
@@ -109,3 +135,31 @@ def gateway_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, type=None):
                     )
 
     return out
+
+
+def find_gateway_sites(seq: _Dseqrecord, greedy: bool) -> dict[str, list[SimpleLocation]]:
+    """Find all gateway sites in a sequence and return a dictionary with the name and positions of the sites."""
+    gateway_sites = gateway_sites_greedy if greedy else gateway_sites_conservative
+    out = dict()
+    for site in gateway_sites:
+        if not site.startswith('att'):
+            continue
+
+        for pattern in ['forward_regex', 'reverse_regex']:
+            matches = list(dseqrecord_finditer(gateway_sites[site][pattern], seq))
+            for match in matches:
+                if site not in out:
+                    out[site] = []
+                strand = 1 if pattern == 'forward_regex' else -1
+                loc = SimpleLocation(match.start(), match.end(), strand)
+                loc = shift_location(loc, 0, len(seq))
+                out[site].append(loc)
+    return out
+
+
+def annotate_gateway_sites(seq: _Dseqrecord, greedy: bool) -> _Dseqrecord:
+    sites = find_gateway_sites(seq, greedy)
+    for site in sites:
+        for loc in sites[site]:
+            seq.features.append(SeqFeature(loc, type='protein_bind', qualifiers={'label': [site]}))
+    return seq

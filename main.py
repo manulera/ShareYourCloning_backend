@@ -45,6 +45,7 @@ from pydantic_models import (
     SnapGenePlasmidSource,
     EuroscarfSource,
     OverlapExtensionPCRLigationSource,
+    GatewaySource,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
@@ -74,6 +75,7 @@ import re
 import warnings
 import io
 from Bio import BiopythonParserWarning
+from gateway import gateway_overlap, find_gateway_sites, annotate_gateway_sites
 
 # ENV variables ========================================
 RECORD_STUBS = os.environ['RECORD_STUBS'] == '1' if 'RECORD_STUBS' in os.environ else False
@@ -108,7 +110,10 @@ app.add_middleware(
 
 
 def format_known_assembly_response(
-    source: AssemblySource, out_sources: list[AssemblySource], fragments: list[Dseqrecord]
+    source: AssemblySource,
+    out_sources: list[AssemblySource],
+    fragments: list[Dseqrecord],
+    product_callback: Callable[[Dseqrecord], Dseqrecord] = lambda x: x,
 ):
     """Common function for assembly sources, when assembly is known"""
     # If a specific assembly is requested
@@ -116,7 +121,9 @@ def format_known_assembly_response(
     for s in out_sources:
         if s == source:
             return {
-                'sequences': [format_sequence_genbank(assemble(fragments, assembly_plan), s.output_name)],
+                'sequences': [
+                    format_sequence_genbank(product_callback(assemble(fragments, assembly_plan)), s.output_name)
+                ],
                 'sources': [s],
             }
     raise HTTPException(400, 'The provided assembly is not valid.')
@@ -697,6 +704,7 @@ def generate_assemblies(
     algo: Callable,
     allow_insertion_assemblies: bool,
     assembly_kwargs: dict = {},
+    product_callback: Callable[[Dseqrecord], Dseqrecord] = lambda x: x,
 ):
     try:
         out_sources = []
@@ -717,19 +725,21 @@ def generate_assemblies(
                 ]
         else:
             asm = SingleFragmentAssembly(fragments, algorithm=algo, **assembly_kwargs)
-            out_sources += [create_source(a, True) for a in asm.get_circular_assemblies()]
+            out_sources.extend(create_source(a, True) for a in asm.get_circular_assemblies())
             if not circular_only and allow_insertion_assemblies:
-                out_sources += [create_source(a, False) for a in asm.get_insertion_assemblies()]
+                out_sources.extend(create_source(a, False) for a in asm.get_insertion_assemblies())
 
     except ValueError as e:
         raise HTTPException(400, *e.args)
 
     # If a specific assembly is requested
     if len(source.assembly):
-        return format_known_assembly_response(source, out_sources, fragments)
+        return format_known_assembly_response(source, out_sources, fragments, product_callback)
 
     out_sequences = [
-        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(fragments)), source.output_name)
+        format_sequence_genbank(
+            product_callback(assemble(fragments, s.get_assembly_plan(fragments))), source.output_name
+        )
         for s in out_sources
     ]
 
@@ -1072,6 +1082,55 @@ async def restriction_and_ligation(
 
     if len(resp['sources']) == 0:
         raise HTTPException(400, 'No compatible restriction-ligation was found.')
+
+    return resp
+
+
+@router.post(
+    '/gateway',
+    response_model=create_model(
+        'GatewayResponse', sources=(list[GatewaySource], ...), sequences=(list[TextFileSequence], ...)
+    ),
+)
+async def gateway(
+    source: GatewaySource,
+    sequences: conlist(TextFileSequence, min_length=1),
+    circular_only: bool = Query(False, description='Only return circular assemblies.'),
+):
+
+    fragments = [read_dsrecord_from_json(seq) for seq in sequences]
+    greedy = source.greedy
+
+    # Lambda function for code clarity
+    def create_source(a, is_circular):
+        return GatewaySource.from_assembly(
+            assembly=a,
+            circular=is_circular,
+            id=source.id,
+            reaction_type=source.reaction_type,
+            fragments=fragments,
+        )
+
+    # Algorithm used by assembly class
+    def algo(x, y, _l):
+        # By default, we allow blunt ends
+        return gateway_overlap(x, y, source.reaction_type, greedy)
+
+    def annotate(x):
+        return annotate_gateway_sites(x, greedy)
+
+    resp = generate_assemblies(source, create_source, fragments, circular_only, algo, False, product_callback=annotate)
+
+    if len(resp['sources']) == 0:
+        # Build a list of all the sites in the fragments
+        sites_in_fragments = list()
+        for frag in fragments:
+            sites_in_fragments.append(list(find_gateway_sites(frag, greedy).keys()))
+        formatted_strings = [f'fragment {i + 1}: {", ".join(sites)}' for i, sites in enumerate(sites_in_fragments)]
+        raise HTTPException(
+            400,
+            f'Inputs are not compatible for {source.reaction_type} reaction.\n\n' + '\n'.join(formatted_strings),
+        )
 
     return resp
 

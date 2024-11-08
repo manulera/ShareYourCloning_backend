@@ -340,11 +340,12 @@ class GatewaySource(AssemblySourceCommonClass, _GatewaySource):
     def from_assembly(
         cls,
         assembly: list[tuple[int, int, Location, Location]],
+        circular: bool,
         id: int,
         fragments: list[_SeqRecord],
         reaction_type: str,
     ):
-        return super().from_assembly(assembly, id, False, fragments, reaction_type=reaction_type)
+        return super().from_assembly(assembly, id, circular, fragments, reaction_type=reaction_type)
 
 
 class OligoHybridizationSource(SourceCommonClass, _OligoHybridizationSource):

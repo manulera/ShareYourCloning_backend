@@ -1,15 +1,17 @@
-from gateway import gateway_overlap
+from gateway import gateway_overlap, find_gateway_sites
 import assembly2 as assembly
 import glob
 from dna_functions import custom_file_parser
+from pydna.dseqrecord import Dseqrecord
+from Bio.SeqFeature import SimpleLocation
 
 
 def algoBP(x, y, _):
-    return gateway_overlap(x, y, 'BP')
+    return gateway_overlap(x, y, 'BP', greedy=False)
 
 
 def algoLR(x, y, _):
-    return gateway_overlap(x, y, 'LR')
+    return gateway_overlap(x, y, 'LR', greedy=False)
 
 
 def test_gateway_manual_cloning():
@@ -69,9 +71,26 @@ def test_gateway_manual_cloning():
             seq.name = file.split('/')[-1]
             inputs.append(seq)
 
-    def algo(x, y, _):
-        return gateway_overlap(x, y, 'LR')
-
-    asm = assembly.Assembly(inputs, algorithm=algo, use_all_fragments=True, use_fragment_order=False)
+    asm = assembly.Assembly(inputs, algorithm=algoLR, use_all_fragments=True, use_fragment_order=False)
 
     out = asm.assemble_circular()
+
+
+def test_find_gateway_sites():
+    seq = Dseqrecord('CAACTTTGTATACAAAAGTTGaaaCAACTTTGTATAATAAAGTTG')
+    assert find_gateway_sites(seq, greedy=False) == {
+        'attB5': [SimpleLocation(0, 21, 1)],
+        'attB3': [SimpleLocation(24, 45, 1)],
+    }
+
+    # Works on circular sequences
+    seq = Dseqrecord('CAACTTTGTATACAAAAGTTGaaaCAACTTTGTATAATAAAGTTG', circular=True)
+    for shift in range(len(seq)):
+        seq_shifted = seq.shifted(shift)
+        sites = find_gateway_sites(seq_shifted, greedy=False)
+        assert str(sites['attB5'][0].extract(seq_shifted).seq) == 'CAACTTTGTATACAAAAGTTG'
+        assert str(sites['attB3'][0].extract(seq_shifted).seq) == 'CAACTTTGTATAATAAAGTTG'
+
+    # Finds several sites of the same type
+    seq = Dseqrecord('CAACTTTGTATAATAAAGTTGaaaCAACTTTGTATAATAAAGTTG')
+    assert find_gateway_sites(seq, greedy=False) == {'attB3': [SimpleLocation(0, 21, 1), SimpleLocation(24, 45, 1)]}

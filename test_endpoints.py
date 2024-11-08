@@ -27,6 +27,7 @@ from pydantic_models import (
     BenchlingUrlSource,
     EuroscarfSource,
     SnapGenePlasmidSource,
+    GatewaySource,
 )
 from pydna.dseqrecord import Dseqrecord
 import unittest
@@ -38,6 +39,10 @@ import tempfile
 import pytest
 from Bio.Seq import reverse_complement
 import os
+
+
+def get_all_feature_labels(seq: Dseqrecord):
+    return [f.qualifiers['label'][0] for f in seq.features]
 
 
 # Custom decorator to run code before and after a specific test, with protection against interruptions
@@ -2385,6 +2390,147 @@ class EuroscarfSourceTest(unittest.TestCase):
         source_dict['repository_id'] = 'hello'
         response = client.post('/repository_id/euroscarf', json=source_dict)
         self.assertEqual(response.status_code, 422)
+
+
+class GatewaySourceTest(unittest.TestCase):
+
+    def test_gateway_source(self):
+        attB1 = 'ACAACTTTGTACAAAAAAGCAGAAG'
+        attP1 = 'AAAATAATGATTTTATTTGACTGATAGTGACCTGTTCGTTGCAACAAATTGATGAGCAATGCTTTTTTATAATGCCAACTTTGTACAAAAAAGCTGAACGAGAAGCGTAAAATGATATAAATATCAATATATTAAATTAGATTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATCCAGTCACTATGAATCAACTACTTAGATGGTATTAGTGACCTGTA'
+        attR1 = 'ACAACTTTGTACAAAAAAGCTGAACGAGAAACGTAAAATGATATAAATATCAATATATTAAATTAGATTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATGCAGTCACTATG'
+        attL1 = 'CAAATAATGATTTTATTTTGACTGATAGTGACCTGTTCGTTGCAACAAATTGATAAGCAATGCTTTCTTATAATGCCAACTTTGTACAAAAAAGCAGGCT'
+
+        product_BP = 'aaaACAACTTTGTACAAAAAAGCTGAACGAGAAGCGTAAAATGATATAAATATCAATATATTAAATTAGATTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATCCAGTCACTATGAATCAACTACTTAGATGGTATTAGTGACCTGTAccc'
+        product_PB = (
+            'aaaAAAATAATGATTTTATTTGACTGATAGTGACCTGTTCGTTGCAACAAATTGATGAGCAATGCTTTTTTATAATGCCAACTTTGTACAAAAAAGCAGAAGccc'
+        )
+
+        product_RL = 'aaaACAACTTTGTACAAAAAAGCAGGCTccc'
+        product_LR = 'aaaCAAATAATGATTTTATTTTGACTGATAGTGACCTGTTCGTTGCAACAAATTGATAAGCAATGCTTTCTTATAATGCCAACTTTGTACAAAAAAGCTGAACGAGAAACGTAAAATGATATAAATATCAATATATTAAATTAGATTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATGCAGTCACTATGccc'
+
+        seq1 = Dseqrecord('aaa' + attB1 + 'ccc')
+        seq2 = Dseqrecord('aaa' + attP1 + 'ccc')
+        seq3 = Dseqrecord('aaa' + attR1 + 'ccc')
+        seq4 = Dseqrecord('aaa' + attL1 + 'ccc')
+
+        fragmentsBP = [seq1, seq2]
+        fragmentsBP = [format_sequence_genbank(f) for f in fragmentsBP]
+        fragmentsBP[0].id = 1
+        fragmentsBP[1].id = 2
+
+        fragmentsLR = [seq3, seq4]
+        fragmentsLR = [format_sequence_genbank(f) for f in fragmentsLR]
+        fragmentsLR[0].id = 3
+        fragmentsLR[1].id = 4
+
+        sourceBP = GatewaySource(id=0, reaction_type='BP')
+        sourceLR = GatewaySource(id=0, reaction_type='LR')
+
+        # BP reaction ===========================================
+        data = {
+            'source': sourceBP.model_dump(),
+            'sequences': [f.model_dump() for f in fragmentsBP],
+        }
+        response = client.post('/gateway', json=data)
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sources']), 2)
+        self.assertEqual(payload['sources'][0]['reaction_type'], 'BP')
+
+        seqs = [read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']]
+        self.assertEqual(len(seqs), 2)
+        str_seqs = [str(s.seq) for s in seqs]
+        self.assertIn(product_BP.upper(), str_seqs)
+        self.assertIn(product_PB.upper(), str_seqs)
+        # They contain annotations of gateway sites
+        self.assertIn('attB1', get_all_feature_labels(seqs[0]))
+        self.assertIn('attR1', get_all_feature_labels(seqs[0]))
+        self.assertIn('attB1', get_all_feature_labels(seqs[1]))
+        self.assertIn('attL1', get_all_feature_labels(seqs[1]))
+
+        # We can submit the specific source and get one output only
+        data = {
+            'source': payload['sources'][0],
+            'sequences': [f.model_dump() for f in fragmentsBP],
+        }
+        response = client.post('/gateway', json=data)
+        self.assertEqual(response.status_code, 200)
+        payload2 = response.json()
+        self.assertEqual(len(payload2['sequences']), 1)
+        self.assertEqual(payload2['sequences'][0], payload['sequences'][0])
+
+        # The outputs are not valid inputs for same reaction
+        data = {
+            'source': sourceBP.model_dump(),
+            'sequences': payload['sequences'],
+        }
+        response = client.post('/gateway', json=data)
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertIn('Inputs are not compatible for BP reaction', payload['detail'])
+        self.assertIn('fragment 1: attB1, attR1', payload['detail'])
+        self.assertIn('fragment 2: attB1, attL1', payload['detail'])
+
+        # The LR inputs are not valid either
+        data = {
+            'source': sourceBP.model_dump(),
+            'sequences': [f.model_dump() for f in fragmentsLR],
+        }
+        response = client.post('/gateway', json=data)
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertIn('Inputs are not compatible for BP reaction', payload['detail'])
+        self.assertIn('fragment 1: attB1, attR1', payload['detail'])
+        self.assertIn('fragment 2: attB1, attL1', payload['detail'])
+
+        # LR reaction ===========================================
+        data = {
+            'source': sourceLR.model_dump(),
+            'sequences': [f.model_dump() for f in fragmentsLR],
+        }
+        response = client.post('/gateway', json=data)
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        returned_seqs = payload['sequences']
+        self.assertEqual(len(payload['sources']), 2)
+        self.assertEqual(payload['sources'][0]['reaction_type'], 'LR')
+
+        seqs = [read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']]
+        # They contain annotations of gateway sites
+        self.assertIn('attB1', get_all_feature_labels(seqs[0]))
+        self.assertIn('attB1', get_all_feature_labels(seqs[1]))
+        self.assertIn('attL1', get_all_feature_labels(seqs[1]))
+        self.assertIn('attR1', get_all_feature_labels(seqs[1]))
+
+        self.assertEqual(len(seqs), 2)
+        str_seqs = [str(s.seq) for s in seqs]
+        self.assertIn(product_LR.upper(), str_seqs)
+        self.assertIn(product_RL.upper(), str_seqs)
+
+        # The outputs are not valid inputs for same reaction
+        data = {
+            'source': sourceLR.model_dump(),
+            'sequences': returned_seqs,
+        }
+        response = client.post('/gateway', json=data)
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertIn('Inputs are not compatible for LR reaction', payload['detail'])
+        self.assertIn('fragment 1: attB1', payload['detail'])
+        self.assertTrue(payload['detail'].endswith('fragment 2: attB1, attL1, attR1'))
+
+        # Check that greedy would find an attP1 site after the LR reaction, while not
+        # greedy does not
+        data = {
+            'source': {**sourceLR.model_dump(), 'greedy': True},
+            'sequences': returned_seqs,
+        }
+        response = client.post('/gateway', json=data)
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertIn('Inputs are not compatible for LR reaction', payload['detail'])
+        self.assertIn('fragment 1: attB1', payload['detail'])
+        self.assertTrue(payload['detail'].endswith('fragment 2: attB1, attL1, attR1, attP1'))
 
 
 if __name__ == '__main__':
