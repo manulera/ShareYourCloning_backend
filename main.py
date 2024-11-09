@@ -1,5 +1,5 @@
 from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter, Form, Response
-from typing import Annotated, Union, Literal
+from typing import Annotated, Union, Literal, Callable
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydna.dseqrecord import Dseqrecord
@@ -45,6 +45,7 @@ from pydantic_models import (
     SnapGenePlasmidSource,
     EuroscarfSource,
     OverlapExtensionPCRLigationSource,
+    GatewaySource,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
@@ -74,6 +75,7 @@ import re
 import warnings
 import io
 from Bio import BiopythonParserWarning
+from gateway import gateway_overlap, find_gateway_sites, annotate_gateway_sites
 
 # ENV variables ========================================
 RECORD_STUBS = os.environ['RECORD_STUBS'] == '1' if 'RECORD_STUBS' in os.environ else False
@@ -108,7 +110,10 @@ app.add_middleware(
 
 
 def format_known_assembly_response(
-    source: AssemblySource, out_sources: list[AssemblySource], fragments: list[Dseqrecord]
+    source: AssemblySource,
+    out_sources: list[AssemblySource],
+    fragments: list[Dseqrecord],
+    product_callback: Callable[[Dseqrecord], Dseqrecord] = lambda x: x,
 ):
     """Common function for assembly sources, when assembly is known"""
     # If a specific assembly is requested
@@ -116,7 +121,9 @@ def format_known_assembly_response(
     for s in out_sources:
         if s == source:
             return {
-                'sequences': [format_sequence_genbank(assemble(fragments, assembly_plan), s.output_name)],
+                'sequences': [
+                    format_sequence_genbank(product_callback(assemble(fragments, assembly_plan)), s.output_name)
+                ],
                 'sources': [s],
             }
     raise HTTPException(400, 'The provided assembly is not valid.')
@@ -689,6 +696,56 @@ async def restriction(
     return {'sequences': products, 'sources': sources}
 
 
+def generate_assemblies(
+    source: AssemblySource,
+    create_source: Callable[[list, bool], AssemblySource],
+    fragments: list[TextFileSequence],
+    circular_only: bool,
+    algo: Callable,
+    allow_insertion_assemblies: bool,
+    assembly_kwargs: dict = {},
+    product_callback: Callable[[Dseqrecord], Dseqrecord] = lambda x: x,
+) -> dict[Literal['sources', 'sequences'], list[AssemblySource] | list[TextFileSequence]]:
+    try:
+        out_sources = []
+        if len(fragments) > 1:
+            asm = Assembly(
+                fragments,
+                algorithm=algo,
+                use_all_fragments=True,
+                use_fragment_order=False,
+                **assembly_kwargs,
+            )
+            circular_assemblies = asm.get_circular_assemblies()
+            out_sources += [create_source(a, True) for a in circular_assemblies]
+            if not circular_only:
+                out_sources += [
+                    create_source(a, False)
+                    for a in filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
+                ]
+        else:
+            asm = SingleFragmentAssembly(fragments, algorithm=algo, **assembly_kwargs)
+            out_sources.extend(create_source(a, True) for a in asm.get_circular_assemblies())
+            if not circular_only and allow_insertion_assemblies:
+                out_sources.extend(create_source(a, False) for a in asm.get_insertion_assemblies())
+
+    except ValueError as e:
+        raise HTTPException(400, *e.args)
+
+    # If a specific assembly is requested
+    if len(source.assembly):
+        return format_known_assembly_response(source, out_sources, fragments, product_callback)
+
+    out_sequences = [
+        format_sequence_genbank(
+            product_callback(assemble(fragments, s.get_assembly_plan(fragments))), source.output_name
+        )
+        for s in out_sources
+    ]
+
+    return {'sources': out_sources, 'sequences': out_sequences}
+
+
 @router.post(
     '/ligation',
     response_model=create_model(
@@ -716,43 +773,13 @@ async def ligation(
         blunt = len(asm[0][2]) == 0
 
     algo = combine_algorithms(blunt_overlap, sticky_end_sub_strings) if blunt else sticky_end_sub_strings
-    try:
-        out_sources = []
-        if len(fragments) > 1:
-            asm = Assembly(
-                fragments,
-                algorithm=algo,
-                limit=allow_partial_overlap,
-                use_all_fragments=True,
-                use_fragment_order=False,
-            )
-            circular_assemblies = asm.get_circular_assemblies()
-            out_sources += [create_source(a, True) for a in circular_assemblies]
-            if not circular_only:
-                out_sources += [
-                    create_source(a, False)
-                    for a in filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
-                ]
-        else:
-            asm = SingleFragmentAssembly(fragments, algorithm=algo, limit=allow_partial_overlap)
-            out_sources += [create_source(a, True) for a in asm.get_circular_assemblies()]
-            # Not possible to have insertion assemblies in this case
-    except ValueError as e:
-        raise HTTPException(400, *e.args)
-
-    # If a specific assembly is requested
-    if len(source.assembly):
-        return format_known_assembly_response(source, out_sources, fragments)
-
-    if len(out_sources) == 0:
+    resp = generate_assemblies(
+        source, create_source, fragments, circular_only, algo, False, {'limit': allow_partial_overlap}
+    )
+    if len(resp['sources']) == 0:
         raise HTTPException(400, 'No ligations were found.')
 
-    out_sequences = [
-        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(fragments)), source.output_name)
-        for s in out_sources
-    ]
-
-    return {'sources': out_sources, 'sequences': out_sequences}
+    return resp
 
 
 @router.post(
@@ -1001,46 +1028,17 @@ async def gibson_assembly(
     def create_source(a, is_circular):
         return source.__class__.from_assembly(assembly=a, circular=is_circular, id=source.id, fragments=fragments)
 
-    try:
-        out_sources = []
-        if len(fragments) > 1:
-            asm = Assembly(
-                fragments,
-                algorithm=gibson_overlap,
-                use_fragment_order=False,
-                use_all_fragments=True,
-                limit=minimal_homology,
-            )
-            circular_assemblies = asm.get_circular_assemblies()
-            out_sources += [create_source(a, True) for a in circular_assemblies]
-            if not circular_only:
-                out_sources += [
-                    create_source(a, False)
-                    for a in filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
-                ]
-        else:
-            asm = SingleFragmentAssembly(fragments, algorithm=gibson_overlap, limit=minimal_homology)
-            out_sources += [create_source(a, True) for a in asm.get_circular_assemblies()]
-            # Not possible to have insertion assemblies with gibson
-    except ValueError as e:
-        raise HTTPException(400, *e.args)
+    resp = generate_assemblies(
+        source, create_source, fragments, circular_only, gibson_overlap, False, {'limit': minimal_homology}
+    )
 
-    # If a specific assembly is requested
-    if len(source.assembly):
-        return format_known_assembly_response(source, out_sources, fragments)
-
-    if len(out_sources) == 0:
+    if len(resp['sources']) == 0:
         raise HTTPException(
             400,
             f'No {"circular " if circular_only else ""}assembly with at least {minimal_homology} bps of homology was found.',
         )
 
-    out_sequences = [
-        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(fragments)), source.output_name)
-        for s in out_sources
-    ]
-
-    return {'sources': out_sources, 'sequences': out_sequences}
+    return resp
 
 
 @router.post(
@@ -1080,39 +1078,74 @@ async def restriction_and_ligation(
         # By default, we allow blunt ends
         return restriction_ligation_overlap(x, y, enzymes, allow_partial_overlap, True)
 
-    try:
-        out_sources = []
-        if len(fragments) > 1:
-            asm = Assembly(fragments, algorithm=algo, use_fragment_order=False, use_all_fragments=True)
-            circular_assemblies = asm.get_circular_assemblies()
-            out_sources += [create_source(a, True) for a in circular_assemblies]
-            if not circular_only:
-                out_sources += [
-                    create_source(a, False)
-                    for a in filter_linear_subassemblies(asm.get_linear_assemblies(), circular_assemblies, fragments)
-                ]
-        else:
-            asm = SingleFragmentAssembly(fragments, algorithm=algo)
-            circular_assemblies = asm.get_circular_assemblies()
-            out_sources += [create_source(a, True) for a in circular_assemblies]
-            if not circular_only:
-                out_sources += [create_source(a, False) for a in asm.get_insertion_assemblies()]
-    except ValueError as e:
-        raise HTTPException(400, *e.args)
+    resp = generate_assemblies(source, create_source, fragments, circular_only, algo, True)
 
-    # If a specific assembly is requested
-    if len(source.assembly):
-        return format_known_assembly_response(source, out_sources, fragments)
-
-    if len(out_sources) == 0:
+    if len(resp['sources']) == 0:
         raise HTTPException(400, 'No compatible restriction-ligation was found.')
 
-    out_sequences = [
-        format_sequence_genbank(assemble(fragments, s.get_assembly_plan(fragments)), source.output_name)
-        for s in out_sources
-    ]
+    return resp
 
-    return {'sources': out_sources, 'sequences': out_sequences}
+
+@router.post(
+    '/gateway',
+    response_model=create_model(
+        'GatewayResponse', sources=(list[GatewaySource], ...), sequences=(list[TextFileSequence], ...)
+    ),
+)
+async def gateway(
+    source: GatewaySource,
+    sequences: conlist(TextFileSequence, min_length=1),
+    circular_only: bool = Query(False, description='Only return circular assemblies.'),
+    only_multi_site: bool = Query(
+        False, description='Only return assemblies where more than one site per sequence recombined.'
+    ),
+):
+
+    fragments = [read_dsrecord_from_json(seq) for seq in sequences]
+    greedy = source.greedy
+
+    # Lambda function for code clarity
+    def create_source(a, is_circular):
+        return GatewaySource.from_assembly(
+            assembly=a,
+            circular=is_circular,
+            id=source.id,
+            reaction_type=source.reaction_type,
+            fragments=fragments,
+        )
+
+    # Algorithm used by assembly class
+    def algo(x, y, _l):
+        # By default, we allow blunt ends
+        return gateway_overlap(x, y, source.reaction_type, greedy)
+
+    def annotate(x):
+        return annotate_gateway_sites(x, greedy)
+
+    resp = generate_assemblies(source, create_source, fragments, circular_only, algo, False, product_callback=annotate)
+
+    if len(resp['sources']) == 0:
+        # Build a list of all the sites in the fragments
+        sites_in_fragments = list()
+        for frag in fragments:
+            sites_in_fragments.append(list(find_gateway_sites(frag, greedy).keys()))
+        formatted_strings = [f'fragment {i + 1}: {", ".join(sites)}' for i, sites in enumerate(sites_in_fragments)]
+        raise HTTPException(
+            400,
+            f'Inputs are not compatible for {source.reaction_type} reaction.\n\n' + '\n'.join(formatted_strings),
+        )
+
+    if only_multi_site:
+        multi_site_sources = [
+            i
+            for i, s in enumerate(resp['sources'])
+            if all(join.left_location != join.right_location for join in s.assembly)
+        ]
+        sources = [resp['sources'][i] for i in multi_site_sources]
+        sequences = [resp['sequences'][i] for i in multi_site_sources]
+        return {'sources': sources, 'sequences': sequences}
+
+    return resp
 
 
 @router.post(
