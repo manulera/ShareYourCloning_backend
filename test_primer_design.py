@@ -1,4 +1,10 @@
-from primer_design import homologous_recombination_primers, gibson_assembly_primers, simple_pair_primers
+from primer_design import (
+    homologous_recombination_primers,
+    gibson_assembly_primers,
+    simple_pair_primers,
+    gateway_attB_primers,
+    primer_design_attB,
+)
 from Bio.SeqFeature import SimpleLocation, SeqFeature
 from unittest import TestCase
 from pydna.dseqrecord import Dseqrecord
@@ -511,3 +517,27 @@ class TestSimplePairPrimers(TestCase):
         # Check that primers are correct
         self.assertTrue(fwd.sequence.startswith('ATGCA'))
         self.assertTrue(rvs.sequence.startswith('GTCAT'))
+
+
+class TestGatewayAttBPrimers(TestCase):
+    def test_normal_examples(self):
+        """
+        Test the gateway_attB_primers function.
+        """
+        template = Dseqrecord('ATGCAAACAGTGAACAGATGGAGACAATAATGATGGATGAC')
+        template.id = '0'
+        minimal_hybridization_length = 10
+        target_tm = 55
+        left_site = 'attB1'
+        right_site = 'attB5'
+        spacers = None
+
+        primers = gateway_attB_primers(
+            template, minimal_hybridization_length, target_tm, (left_site, right_site), spacers
+        )
+
+        self.assertEqual(len(primers), 2)
+        self.assertEqual(primers[0].name, 'seq_0_attB1_fwd')
+        self.assertEqual(primers[1].name, 'seq_0_attB5_rvs')
+        self.assertTrue(primers[0].sequence.startswith('GGGG' + primer_design_attB['attB1']))
+        self.assertTrue(primers[1].sequence.startswith('GGGG' + primer_design_attB['attB5']))
