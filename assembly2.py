@@ -19,6 +19,7 @@ from dna_utils import sum_is_sticky
 from Bio.Seq import reverse_complement
 from Bio.Restriction.Restriction import RestrictionBatch, AbstractCut
 import regex
+import copy
 
 # Currently unused, commented out because it's not tested
 # def primers_clash(assembly, fragments):
@@ -519,6 +520,28 @@ def assemble(fragments, assembly, is_insertion=False):
                 feature.location = _shift_location(feature.location, 0, len(out_dseqrecord))
 
     return out_dseqrecord
+
+
+def annotate_primer_binding_sites(
+    input_dseqr: _Dseqrecord, fragments: list[_Dseqrecord], assembly: list[tuple[int, int, Location, Location]]
+) -> _Dseqrecord:
+    """Annotate the primer binding sites in a Dseqrecord."""
+    fwd, _, rvs = fragments
+    start_rvs = len(input_dseqr) - len(rvs)
+
+    output_dseqr = copy.deepcopy(input_dseqr)
+    output_dseqr.add_feature(
+        x=0, y=len(fwd), type_='primer_bind', strand=1, label=[fwd.name], note=['sequence: ' + str(fwd.seq)]
+    )
+    output_dseqr.add_feature(
+        x=start_rvs,
+        y=len(output_dseqr),
+        type_='primer_bind',
+        strand=-1,
+        label=[rvs.name],
+        note=['sequence: ' + str(rvs.seq)],
+    )
+    return output_dseqr
 
 
 def edge_representation2subfragment_representation(assembly, is_circular):

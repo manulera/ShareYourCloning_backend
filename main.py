@@ -63,6 +63,7 @@ from assembly2 import (
     SingleFragmentAssembly,
     blunt_overlap,
     combine_algorithms,
+    annotate_primer_binding_sites,
 )
 import request_examples
 import ncbi_requests
@@ -799,7 +800,7 @@ async def pcr(
         raise HTTPException(400, 'The number of primers should be twice the number of sequences.')
 
     pydna_sequences = [read_dsrecord_from_json(s) for s in sequences]
-    pydna_primers = [PydnaPrimer(p.sequence, id=str(p.id)) for p in primers]
+    pydna_primers = [PydnaPrimer(p.sequence, id=str(p.id), name=p.name) for p in primers]
 
     # TODO: This may have to be re-written if we allow mismatches
     # If an assembly is provided, we ignore minimal_annealing
@@ -838,19 +839,34 @@ async def pcr(
             assembly=a,
             circular=False,
             fragments=fragments,
+            add_primer_features=source.add_primer_features,
         )
         for a in possible_assemblies
     ]
 
     # If a specific assembly is requested
     if len(source.assembly):
-        return format_known_assembly_response(source, out_sources, fragments)
+
+        def callback(x):
+            if source.add_primer_features:
+                return annotate_primer_binding_sites(x, fragments, source.get_assembly_plan(fragments))
+            else:
+                return x
+
+        return format_known_assembly_response(source, out_sources, fragments, callback)
 
     if len(possible_assemblies) == 0:
         raise HTTPException(400, 'No pair of annealing primers was found. Try changing the annealing settings.')
 
+    def callback(fragments, a):
+        out_seq = assemble(fragments, a)
+        if source.add_primer_features:
+            return annotate_primer_binding_sites(out_seq, fragments, possible_assemblies)
+        else:
+            return out_seq
+
     out_sequences = [
-        format_sequence_genbank(assemble(fragments, a), source.output_name)
+        format_sequence_genbank(callback(fragments, a), source.output_name)
         for s, a in zip(out_sources, possible_assemblies)
     ]
 
