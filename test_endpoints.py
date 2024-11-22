@@ -1318,15 +1318,18 @@ class GibsonAssemblyTest(unittest.TestCase):
 
         source = GibsonAssemblySource(id=0)
 
+        # All equivalent classes should give the same result
         data = {'source': source.model_dump(), 'sequences': [f.model_dump() for f in json_fragments]}
-        response = client.post('/gibson_assembly', json=data, params={'minimal_homology': 4})
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        sequences = [read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']]
-
-        self.assertEqual(len(sequences), 2)
-        self.assertEqual(str(sequences[0].seq), 'TTTTacgatAAtgctccCCCCtcatGGGGatata'.upper())
-        self.assertEqual(str(sequences[1].seq), 'TTTTacgatAAtgctccCCCCatgaGGGGatata'.upper())
+        for cls_name in ['GibsonAssemblySource', 'OverlapExtensionPCRLigationSource', 'InFusionSource']:
+            data['source']['type'] = cls_name
+            response = client.post('/gibson_assembly', json=data, params={'minimal_homology': 4})
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
+            sequences = [read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']]
+            self.assertEqual(payload['sources'][0]['type'], cls_name)
+            self.assertEqual(len(sequences), 2)
+            self.assertEqual(str(sequences[0].seq), 'TTTTacgatAAtgctccCCCCtcatGGGGatata'.upper())
+            self.assertEqual(str(sequences[1].seq), 'TTTTacgatAAtgctccCCCCatgaGGGGatata'.upper())
 
         # Circularisation works
         f1 = Dseqrecord('AGAGACCaaaAGAGACC')
@@ -1371,6 +1374,9 @@ class GibsonAssemblyTest(unittest.TestCase):
         response = client.post('/gibson_assembly', json=data)
         self.assertEqual(response.status_code, 400)
         self.assertTrue('Too many possible paths' in response.json()['detail'])
+
+    def test_equivalent_classes(self):
+        pass
 
 
 class RestrictionAndLigationTest(unittest.TestCase):

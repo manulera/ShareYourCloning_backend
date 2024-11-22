@@ -2224,24 +2224,17 @@ testing-integration = ["build[virtualenv] (>=1.0.3)", "filelock (>=3.4.0)", "jar
 
 [[package]]
 name = "shareyourcloning-linkml"
-version = "0.1.0"
+version = "0.1.9a0"
 description = "A LinkML data model for ShareYourCloning"
 optional = false
-python-versions = "^3.9"
-files = []
-develop = false
+python-versions = "<4.0,>=3.9"
+files = [
+    {file = "shareyourcloning_linkml-0.1.9a0-py3-none-any.whl", hash = "sha256:f8c10c57c7cbc21128df4e436dd1d1a42ec8a0a85087b3a258d3723b4e654b45"},
+    {file = "shareyourcloning_linkml-0.1.9a0.tar.gz", hash = "sha256:cbd0b8560491306a3c988f0da9b354257694e4b8452f86adf396f2a897386a70"},
+]
 
 [package.dependencies]
-pydantic = "^2.7.1"
-
-[package.extras]
-docs = []
-
-[package.source]
-type = "git"
-url = "https://github.com/genestorian/ShareYourCloning_LinkML"
-reference = "fbdf48178d9e72616d7555e64f42323026616897"
-resolved_reference = "fbdf48178d9e72616d7555e64f42323026616897"
+pydantic = ">=2.7.1,<3.0.0"
 
 [[package]]
 name = "shellingham"
@@ -2710,4 +2703,4 @@ test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "9b4d7b9043e49d05c56f58ab64851713e8ffef3ab4e1cf20fe430ed0401af9f1"
+content-hash = "aede493acac225de8818047139d33d280360dc5af0ad25b3de5cdf718f884a57"
