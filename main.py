@@ -33,6 +33,7 @@ from pydantic_models import (
     HomologousRecombinationSource,
     CRISPRSource,
     GibsonAssemblySource,
+    InFusionSource,
     RestrictionAndLigationSource,
     AssemblySource,
     GenomeCoordinatesSource,
@@ -1025,13 +1026,13 @@ async def homologous_recombination(
     '/gibson_assembly',
     response_model=create_model(
         'GibsonAssemblyResponse',
-        sources=(list[Union[GibsonAssemblySource, OverlapExtensionPCRLigationSource]], ...),
+        sources=(list[Union[GibsonAssemblySource, OverlapExtensionPCRLigationSource, InFusionSource]], ...),
         sequences=(list[TextFileSequence], ...),
     ),
 )
 async def gibson_assembly(
     sequences: conlist(TextFileSequence, min_length=1),
-    source: Union[GibsonAssemblySource, OverlapExtensionPCRLigationSource],
+    source: Union[GibsonAssemblySource, OverlapExtensionPCRLigationSource, InFusionSource],
     minimal_homology: int = Query(
         40, description='The minimum homology between consecutive fragments in the assembly.'
     ),

@@ -38,6 +38,7 @@ from shareyourcloning_linkml.datamodel import (
     SnapGenePlasmidSource as _SnapGenePlasmidSource,
     EuroscarfSource as _EuroscarfSource,
     GatewaySource as _GatewaySource,
+    InFusionSource as _InFusionSource,
 )
 from pydna.utils import shift_location as _shift_location
 from assembly2 import edge_representation2subfragment_representation, subfragment_representation2edge_representation
@@ -299,6 +300,10 @@ class GibsonAssemblySource(AssemblySourceCommonClass, _GibsonAssemblySource):
 
 
 class OverlapExtensionPCRLigationSource(AssemblySourceCommonClass, _OverlapExtensionPCRLigationSource):
+    pass
+
+
+class InFusionSource(AssemblySourceCommonClass, _InFusionSource):
     pass
 
 
