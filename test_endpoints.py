@@ -990,6 +990,22 @@ class PCRTest(unittest.TestCase):
         dseq1 = sequences[0]
         source1 = sources[0]
 
+        # No annotations
+        self.assertEqual(len(dseq1.features), 0)
+
+        # Primer annotations can be added
+        data['source']['add_primer_features'] = True
+        response = client.post('/pcr', json=data, params={'minimal_annealing': 8})
+        payload = response.json()
+        dseq2 = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertEqual(len(dseq2.features), 2)
+        self.assertEqual(dseq2.features[0].type, 'primer_bind')
+        self.assertEqual(dseq2.features[1].type, 'primer_bind')
+
+        # The labels are set to primer names
+        self.assertEqual(dseq2.features[0].qualifiers['label'], [primer_fwd.name])
+        self.assertEqual(dseq2.features[1].qualifiers['label'], [primer_rvs.name])
+
         # The sequence matches what we expect
         self.assertEqual(str(dseq1.seq), 'ACGTACGTAAAAAAGCGCGCGC')
 
@@ -1013,6 +1029,16 @@ class PCRTest(unittest.TestCase):
         source2 = sources[0]
         self.assertEqual(source1, source2)
         self.assertEqual(str(dseq2.seq), 'ACGTACGTAAAAAAGCGCGCGC')
+
+        # No annotations
+        self.assertEqual(len(dseq2.features), 0)
+
+        # Primer annotations can be added
+        data['source']['add_primer_features'] = True
+        response = client.post('/pcr', json=data)
+        payload = response.json()
+        dseq3 = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertEqual(len(dseq3.features), 2)
 
     def test_same_primer_twice(self):
         """
