@@ -323,17 +323,20 @@ async def annotate_with_plannotate(
 ) -> tuple[Dseqrecord, PlannotateAnnotationReport, str]:
     async with httpx.AsyncClient() as client:
         try:
-            print('aaaaaaaaaaaaaa')
             response = await client.post(
                 url,
                 files={'file': (file_name, file_content, 'text/plain')},
+                timeout=20,
             )
             if response.status_code != 200:
-                raise HTTPError(url, response.status_code, 'plannotate server error', 'plannotate server error', None)
+                detail = response.json().get('detail', 'plannotate server error')
+                raise HTTPError(url, response.status_code, detail, detail, None)
             data = response.json()
             dseqr = custom_file_parser(io.StringIO(data['gb_file']), 'genbank')[0]
             report = [PlannotateAnnotationReport.model_validate(r) for r in data['report']]
             return dseqr, report, data['version']
+        except httpx.TimeoutException as e:
+            raise HTTPError(url, 504, 'plannotate server timeout', 'plannotate server timeout', None) from e
         except httpx.ConnectError as e:
             raise HTTPError(
                 url, 500, 'cannot connect to plannotate server', 'cannot connect to plannotate server', None

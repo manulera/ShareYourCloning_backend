@@ -1354,6 +1354,7 @@ if PLANNOTATE_URL is not None:
     )
     async def annotate_with_plannotate(
         sequence: TextFileSequence,
+        source: AnnotationSource,
     ):
         input_seqr = read_dsrecord_from_json(sequence)
         # Make a request submitting sequence as a file:
@@ -1362,14 +1363,11 @@ if PLANNOTATE_URL is not None:
                 sequence.file_content, f'{sequence.id}.gb', PLANNOTATE_URL + 'annotate'
             )
         except HTTPError as e:
-            raise HTTPException(e.code, *e.args) from e
+            raise HTTPException(e.code, e.msg) from e
 
-        source = AnnotationSource(
-            id=0,
-            annotation_report=annotations,
-            annotation_tool='plannotate',
-            annotation_tool_version=version,
-        )
+        source.annotation_report = annotations
+        source.annotation_tool = 'plannotate'
+        source.annotation_tool_version = version
         seqr.name = input_seqr.name + '_annotated'
 
         return {'sources': [source], 'sequences': [format_sequence_genbank(seqr, source.output_name)]}
