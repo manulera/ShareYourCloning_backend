@@ -28,6 +28,7 @@ from pydantic_models import (
     EuroscarfSource,
     SnapGenePlasmidSource,
     GatewaySource,
+    AnnotationSource,
 )
 from pydna.dseqrecord import Dseqrecord
 import unittest
@@ -2655,7 +2656,10 @@ class PlannotateTest(unittest.TestCase):
         # Mock the HTTPX GET request
         respx.post('http://dummy/url/annotate').respond(200, json=mock_response_success)
 
-        response = self.client.post('/annotate/plannotate', json=seq.model_dump())
+        source = AnnotationSource(id=0, annotation_tool='plannotate')
+        response = self.client.post(
+            '/annotate/plannotate', json={'sequence': seq.model_dump(), 'source': source.model_dump()}
+        )
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         seq = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
@@ -2672,7 +2676,10 @@ class PlannotateTest(unittest.TestCase):
         respx.post('http://dummy/url/annotate').mock(side_effect=httpx.ConnectError('Connection error'))
         seq = Dseqrecord('aaa')
         seq = format_sequence_genbank(seq)
-        response = self.client.post('/annotate/plannotate', json=seq.model_dump())
+        source = AnnotationSource(id=0, annotation_tool='plannotate')
+        response = self.client.post(
+            '/annotate/plannotate', json={'sequence': seq.model_dump(), 'source': source.model_dump()}
+        )
         self.assertEqual(response.status_code, 500)
 
     @respx.mock
