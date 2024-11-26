@@ -5,6 +5,7 @@ from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
 from pydantic_models import TextFileSequence, AddGeneIdSource, SequenceFileFormat
+from shareyourcloning_linkml.datamodel import PlannotateAnnotationReport
 from pydna.parsers import parse as pydna_parse
 import requests
 from bs4 import BeautifulSoup
@@ -315,3 +316,28 @@ async def get_sequence_from_euroscarf_url(plasmid_id: str) -> Dseqrecord:
         raise HTTPError(url, 503, msg, msg, None)
     genbank_url = f'http://www.euroscarf.de/{subpath.get("href")}'
     return (await get_sequences_from_gb_file_url(genbank_url))[0]
+
+
+async def annotate_with_plannotate(
+    file_content: str, file_name: str, url: str
+) -> tuple[Dseqrecord, PlannotateAnnotationReport, str]:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                url,
+                files={'file': (file_name, file_content, 'text/plain')},
+                timeout=20,
+            )
+            if response.status_code != 200:
+                detail = response.json().get('detail', 'plannotate server error')
+                raise HTTPError(url, response.status_code, detail, detail, None)
+            data = response.json()
+            dseqr = custom_file_parser(io.StringIO(data['gb_file']), 'genbank')[0]
+            report = [PlannotateAnnotationReport.model_validate(r) for r in data['report']]
+            return dseqr, report, data['version']
+        except httpx.TimeoutException as e:
+            raise HTTPError(url, 504, 'plannotate server timeout', 'plannotate server timeout', None) from e
+        except httpx.ConnectError as e:
+            raise HTTPError(
+                url, 500, 'cannot connect to plannotate server', 'cannot connect to plannotate server', None
+            ) from e

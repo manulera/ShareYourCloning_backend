@@ -19,6 +19,7 @@ from dna_functions import (
     get_sequence_from_snagene_url,
     custom_file_parser,
     get_sequence_from_euroscarf_url,
+    annotate_with_plannotate as _annotate_with_plannotate,
 )
 from pydantic_models import (
     PCRSource,
@@ -47,6 +48,7 @@ from pydantic_models import (
     EuroscarfSource,
     OverlapExtensionPCRLigationSource,
     GatewaySource,
+    AnnotationSource,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
@@ -82,6 +84,11 @@ from gateway import gateway_overlap, find_gateway_sites, annotate_gateway_sites
 # ENV variables ========================================
 RECORD_STUBS = os.environ['RECORD_STUBS'] == '1' if 'RECORD_STUBS' in os.environ else False
 SERVE_FRONTEND = os.environ['SERVE_FRONTEND'] == '1' if 'SERVE_FRONTEND' in os.environ else False
+PLANNOTATE_URL = os.environ['PLANNOTATE_URL'] if 'PLANNOTATE_URL' in os.environ else None
+
+# Handle trailing slash:
+if PLANNOTATE_URL is not None and not PLANNOTATE_URL.endswith('/'):
+    PLANNOTATE_URL += '/'
 
 origins = []
 if os.environ.get('ALLOWED_ORIGINS') is not None:
@@ -1332,6 +1339,38 @@ async def primer_design_simple_pair(
         raise HTTPException(400, *e.args)
 
     return {'primers': [fwd, rvs]}
+
+
+if PLANNOTATE_URL is not None:
+
+    @router.post(
+        '/annotate/plannotate',
+        summary='Annotate a sequence with Plannotate',
+        response_model=create_model(
+            'PlannotateResponse',
+            sources=(list[AnnotationSource], ...),
+            sequences=(list[TextFileSequence], ...),
+        ),
+    )
+    async def annotate_with_plannotate(
+        sequence: TextFileSequence,
+        source: AnnotationSource,
+    ):
+        input_seqr = read_dsrecord_from_json(sequence)
+        # Make a request submitting sequence as a file:
+        try:
+            seqr, annotations, version = await _annotate_with_plannotate(
+                sequence.file_content, f'{sequence.id}.gb', PLANNOTATE_URL + 'annotate'
+            )
+        except HTTPError as e:
+            raise HTTPException(e.code, e.msg) from e
+
+        source.annotation_report = annotations
+        source.annotation_tool = 'plannotate'
+        source.annotation_tool_version = version
+        seqr.name = input_seqr.name + '_annotated'
+
+        return {'sources': [source], 'sequences': [format_sequence_genbank(seqr, source.output_name)]}
 
 
 @router.post(

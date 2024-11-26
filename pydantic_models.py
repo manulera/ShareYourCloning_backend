@@ -39,6 +39,7 @@ from shareyourcloning_linkml.datamodel import (
     EuroscarfSource as _EuroscarfSource,
     GatewaySource as _GatewaySource,
     InFusionSource as _InFusionSource,
+    AnnotationSource as _AnnotationSource,
 )
 from pydna.utils import shift_location as _shift_location
 from assembly2 import edge_representation2subfragment_representation, subfragment_representation2edge_representation
@@ -128,6 +129,10 @@ class EuroscarfSource(SourceCommonClass, _EuroscarfSource):
 
 
 class GenomeCoordinatesSource(SourceCommonClass, _GenomeCoordinatesSource):
+    pass
+
+
+class AnnotationSource(SourceCommonClass, _AnnotationSource):
     pass
 
 
