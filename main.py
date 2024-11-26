@@ -85,6 +85,7 @@ from gateway import gateway_overlap, find_gateway_sites, annotate_gateway_sites
 RECORD_STUBS = os.environ['RECORD_STUBS'] == '1' if 'RECORD_STUBS' in os.environ else False
 SERVE_FRONTEND = os.environ['SERVE_FRONTEND'] == '1' if 'SERVE_FRONTEND' in os.environ else False
 PLANNOTATE_URL = os.environ['PLANNOTATE_URL'] if 'PLANNOTATE_URL' in os.environ else None
+PLANNOTATE_TIMEOUT = int(os.environ['PLANNOTATE_TIMEOUT']) if 'PLANNOTATE_TIMEOUT' in os.environ else 20
 
 # Handle trailing slash:
 if PLANNOTATE_URL is not None and not PLANNOTATE_URL.endswith('/'):
@@ -1360,7 +1361,7 @@ if PLANNOTATE_URL is not None:
         # Make a request submitting sequence as a file:
         try:
             seqr, annotations, version = await _annotate_with_plannotate(
-                sequence.file_content, f'{sequence.id}.gb', PLANNOTATE_URL + 'annotate'
+                sequence.file_content, f'{sequence.id}.gb', PLANNOTATE_URL + 'annotate', PLANNOTATE_TIMEOUT
             )
         except HTTPError as e:
             raise HTTPException(e.code, e.msg) from e
