@@ -319,14 +319,14 @@ async def get_sequence_from_euroscarf_url(plasmid_id: str) -> Dseqrecord:
 
 
 async def annotate_with_plannotate(
-    file_content: str, file_name: str, url: str
+    file_content: str, file_name: str, url: str, timeout: int = 20
 ) -> tuple[Dseqrecord, PlannotateAnnotationReport, str]:
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(
                 url,
                 files={'file': (file_name, file_content, 'text/plain')},
-                timeout=20,
+                timeout=timeout,
             )
             if response.status_code != 200:
                 detail = response.json().get('detail', 'plannotate server error')
