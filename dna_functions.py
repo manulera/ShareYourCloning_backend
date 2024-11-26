@@ -267,10 +267,11 @@ def custom_file_parser(
     with file_streamer as handle:
         try:
             for parsed_seq in seqio_parse(handle, sequence_file_format):
-                circularize = circularize or (
-                    'topology' in parsed_seq.annotations.keys() and parsed_seq.annotations['topology'] == 'circular'
-                )
-                out.append(Dseqrecord(parsed_seq, circular=circularize))
+                if 'topology' not in parsed_seq.annotations.keys():
+                    raise ValueError('LOCUS line does not contain topology')
+                else:
+                    circularize = circularize or parsed_seq.annotations['topology'] == 'circular'
+                    out.append(Dseqrecord(parsed_seq, circular=circularize))
         except ValueError as e:
             # If the error is about the LOCUS line, we try to parse with regex
             warnings.warn(
