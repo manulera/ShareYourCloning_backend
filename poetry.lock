@@ -2175,6 +2175,20 @@ socks = ["PySocks (>=1.5.6,!=1.5.7)"]
 use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
+name = "respx"
+version = "0.21.1"
+description = "A utility for mocking out the Python HTTPX and HTTP Core libraries."
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "respx-0.21.1-py2.py3-none-any.whl", hash = "sha256:05f45de23f0c785862a2c92a3e173916e8ca88e4caad715dd5f68584d6053c20"},
+    {file = "respx-0.21.1.tar.gz", hash = "sha256:0bd7fe21bfaa52106caa1223ce61224cf30786985f17c63c5d71eff0307ee8af"},
+]
+
+[package.dependencies]
+httpx = ">=0.21.0"
+
+[[package]]
 name = "rich"
 version = "13.7.1"
 description = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
@@ -2224,13 +2238,13 @@ testing-integration = ["build[virtualenv] (>=1.0.3)", "filelock (>=3.4.0)", "jar
 
 [[package]]
 name = "shareyourcloning-linkml"
-version = "0.1.9a0"
+version = "0.1.10a0"
 description = "A LinkML data model for ShareYourCloning"
 optional = false
 python-versions = "<4.0,>=3.9"
 files = [
-    {file = "shareyourcloning_linkml-0.1.9a0-py3-none-any.whl", hash = "sha256:f8c10c57c7cbc21128df4e436dd1d1a42ec8a0a85087b3a258d3723b4e654b45"},
-    {file = "shareyourcloning_linkml-0.1.9a0.tar.gz", hash = "sha256:cbd0b8560491306a3c988f0da9b354257694e4b8452f86adf396f2a897386a70"},
+    {file = "shareyourcloning_linkml-0.1.10a0-py3-none-any.whl", hash = "sha256:1b39b00195651566ee252dea8a12587bbae31b4c65a30f591ebdd8fe41b36f0c"},
+    {file = "shareyourcloning_linkml-0.1.10a0.tar.gz", hash = "sha256:0a3448a4b50bd46909f2b672568368f356b96aca1c5b760640796ffb18b8b1fb"},
 ]
 
 [package.dependencies]
@@ -2703,4 +2717,4 @@ test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "aede493acac225de8818047139d33d280360dc5af0ad25b3de5cdf718f884a57"
+content-hash = "c88f08376988b48f9118feefe2f3a884b272e1ada60a2355ff39cc68232a7ae9"
