@@ -282,10 +282,7 @@ async def read_from_file(
 
     try:
         # Capture warnings without converting to errors:
-        with warnings.catch_warnings(record=True) as warnings_captured:
-            warnings.filterwarnings(
-                'default', category=UserWarning
-            )  # TODO: Manu, check if "default" is the behavior you wanted
+        with warnings.catch_warnings(record=True, category=UserWarning) as warnings_captured:
             dseqs = custom_file_parser(file_streamer, sequence_file_format, circularize)
 
         # If there were warnings, add them to the response header

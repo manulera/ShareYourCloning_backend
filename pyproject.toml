@@ -10,7 +10,7 @@ package-mode = false
 beautifulsoup4 = "^4.11.1"
 fastapi = "*"
 httpx = "^0.25.0"
-python = "^3.10"
+python = "^3.11"
 python-multipart = "*"
 uvicorn = "*"
 pydna = {git = "https://github.com/BjornFJohansson/pydna", rev = "9d112d715341948855455be67dcbe6adbc5c958e"}
