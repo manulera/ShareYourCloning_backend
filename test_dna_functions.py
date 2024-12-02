@@ -1,4 +1,4 @@
-from dna_functions import find_sequence_regex
+from dna_functions import find_sequence_regex, custom_file_parser
 from dna_utils import sum_is_sticky
 import unittest
 from pydna.dseq import Dseq
@@ -146,3 +146,20 @@ class SequenceRegexTest(unittest.TestCase):
         self.assertEqual([f1.start, f1.end], [6, 10])
         self.assertEqual([f2.start, f2.end], [0, 4])
         self.assertEqual(features[2].extract(template_seq), 'AAGGTTCC')
+
+
+class TestPermisiveParserWithApe(unittest.TestCase):
+    def test_permisive_parser_with_ape_circular(self):
+        with open('test_files/P2RP3.ape', 'r') as f:
+            plasmid = custom_file_parser(f, 'genbank')[0]
+            # Since APE files are not correctly gb formatted (as of 2024-11-27)
+            # the Bio.SeqIO.parse may not recognize the topology of the plasmid
+            # Our custom permissive parser should be then used and the topology
+            # parameter properly recognized
+            self.assertEqual(plasmid.circular, True)
+
+    def test_permisive_parser_with_ape_linear(self):
+        with open('test_files/P2RP3_linear.ape', 'r') as f:
+            # I manually changed the topology of the plasmid to linear
+            plasmid = custom_file_parser(f, 'genbank')[0]
+            self.assertEqual(plasmid.circular, False)
