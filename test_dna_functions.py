@@ -163,3 +163,8 @@ class TestPermisiveParserWithApe(unittest.TestCase):
             # I manually changed the topology of the plasmid to linear
             plasmid = custom_file_parser(f, 'genbank')[0]
             self.assertEqual(plasmid.circular, False)
+
+    def test_permisive_parser_no_topology(self):
+        with open('test_files/ase1_no_topology.gb', 'r') as f:
+            plasmid = custom_file_parser(f, 'genbank')[0]
+            self.assertEqual(plasmid.circular, False)

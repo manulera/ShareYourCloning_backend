@@ -229,19 +229,17 @@ class MyGenBankScanner(GenBankScanner):
     def _feed_first_line(self, consumer, line):
         # A regex for LOCUS       pKM265       4536 bp    DNA   circular  SYN        21-JUN-2013
         m = re.match(
-            r'(?i)LOCUS\s+(?P<name>\S+)\s+(?P<size>\d+ bp)\s+(?P<molecule_type>\S+)\s+(?P<topology>(?:circular|linear))\s+.+(?P<date>\d{2}-\w{3}-\d{4})',
+            r'(?i)LOCUS\s+(?P<name>\S+)\s+(?P<size>\d+ bp)\s+(?P<molecule_type>\S+)\s+(?P<topology>(?:circular|linear))?\s+.+(?P<date>\d{2}-\w{3}-\d{4})',
             line,
         )
         if m is None:
             raise ValueError('LOCUS line cannot be parsed')
         name, size, molecule_type, topology, date = m.groups()
-        # If topology not present, error
-        if topology is None:
-            raise ValueError('LOCUS line does not contain topology')
+
         consumer.locus(name)
         consumer.size(size[:-3])
         consumer.molecule_type(molecule_type)
-        consumer.topology(topology.lower())
+        consumer.topology(topology.lower() if topology is not None else None)
         consumer.date(date)
 
 
