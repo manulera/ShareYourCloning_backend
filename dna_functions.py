@@ -270,8 +270,17 @@ def custom_file_parser(
                 circularize = circularize or (
                     'topology' in parsed_seq.annotations.keys() and parsed_seq.annotations['topology'] == 'circular'
                 )
+                if sequence_file_format == 'genbank' and 'topology' not in parsed_seq.annotations.keys():
+                    # If we could not parse the topology from the LOCUS line, raise an error to
+                    # fallback to regex-based parsing
+                    raise ValueError('LOCUS line does not contain topology')
                 out.append(Dseqrecord(parsed_seq, circular=circularize))
+
         except ValueError as e:
+            # If not locus-related error, raise
+            if 'LOCUS' not in str(e):
+                raise e
+
             # If the error is about the LOCUS line, we try to parse with regex
             warnings.warn(
                 'LOCUS line is wrongly formatted, we used a more permissive parser.',
