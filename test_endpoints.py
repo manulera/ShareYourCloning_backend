@@ -238,33 +238,27 @@ class ReadFileTest(unittest.TestCase):
 
     def test_circularize_fasta_sequence(self):
         """Test that the circularize parameter works when reading from file"""
-        with open('./examples/sequences/dummy_EcoRI.fasta', 'rb') as f:
-            response = client.post('/read_from_file?circularize=True', files={'file': f})
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-
-        resulting_sequences = [
-            read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']
+        file_paths = [
+            './examples/sequences/dummy_EcoRI.fasta',
+            './test_files/example.ape',
+            './test_files/gateway_manual_cloning/pcr_product-attP1_1-attP2_1.dna',
         ]
-        sources = [UploadedFileSource.model_validate(s) for s in payload['sources']]
+        for file_path in file_paths:
+            with open(file_path, 'rb') as f:
+                response = client.post('/read_from_file?circularize=True', files={'file': f})
 
-        self.assertEqual(len(sources), 1)
-        self.assertEqual(len(resulting_sequences), 1)
-        self.assertTrue(sources[0].circularize)
-        self.assertTrue(resulting_sequences[0].circular)
+            self.assertEqual(response.status_code, 200)
+            payload = response.json()
 
-        # If the file format is different it raises an error
-        with open('./examples/sequences/dummy_EcoRI.fasta', 'rb') as f:
-            response = client.post('/read_from_file?circularize=True&sequence_file_format=genbank', files={'file': f})
+            resulting_sequences = [
+                read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']
+            ]
+            sources = [UploadedFileSource.model_validate(s) for s in payload['sources']]
 
-        self.assertEqual(response.status_code, 400)
-
-        # Also when guessing from a gb file
-        with open('./examples/sequences/pFA6a-hphMX6.gb', 'rb') as f:
-            response = client.post('/read_from_file?circularize=True', files={'file': f})
-
-        self.assertEqual(response.status_code, 400)
+            self.assertEqual(len(sources), 1)
+            self.assertEqual(len(resulting_sequences), 1)
+            self.assertTrue(sources[0].circularize)
+            self.assertTrue(resulting_sequences[0].circular)
 
 
 class GenBankTest(unittest.TestCase):

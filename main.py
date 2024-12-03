@@ -241,7 +241,7 @@ async def read_from_file(
     ),
     circularize: bool = Query(
         False,
-        description='circularize the sequence read (for FASTA files)',
+        description='circularize the sequence read (for GenBank or Snapgene files, it will override the topology indicated in the file)',
     ),
     output_name: str | None = Query(
         None,
@@ -271,8 +271,6 @@ async def read_from_file(
         sequence_file_format = SequenceFileFormat(extension_dict[extension])
 
     dseqs = list()
-    if sequence_file_format != 'fasta' and circularize is True:
-        raise HTTPException(400, 'circularize is only supported for fasta files.')
 
     file_content = await file.read()
     if sequence_file_format == 'snapgene':
