@@ -88,6 +88,15 @@ gateway_sites_conservative = {
     for k, v in raw_gateway_sites_conservative.items()
 }
 
+# From snapgene - ask Valerie
+primer_design_attB = {
+    'attB1': 'ACAAGTTTGTACAAAAAAGCAGGCT',
+    'attB2': 'ACCACTTTGTACAAGAAAGCTGGGT',
+    'attB3': 'ACAACTTTGTATAATAAAGTTGTA',
+    'attB4': 'ACAACTTTGTATAGAAAAGTTGTA',
+    'attB5': 'ACAACTTTGTATACAAAAGTTGTA',
+}
+
 
 def gateway_overlap(seqx: _Dseqrecord, seqy: _Dseqrecord, reaction: str, greedy: bool) -> list[tuple[int, int, int]]:
     """Find gateway overlaps"""

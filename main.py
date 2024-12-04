@@ -73,7 +73,11 @@ import ncbi_requests
 import os
 from record_stub_route import RecordStubRoute
 from starlette.responses import RedirectResponse
-from primer_design import homologous_recombination_primers, gibson_assembly_primers, simple_pair_primers
+from primer_design import (
+    homologous_recombination_primers,
+    gibson_assembly_primers,
+    simple_pair_primers,
+)
 import asyncio
 import re
 import warnings
@@ -1171,10 +1175,10 @@ async def gateway(
     return resp
 
 
-@router.post(
-    '/primer_design/homologous_recombination',
-    response_model=create_model('HomologousRecombinationPrimerDesignResponse', primers=(list[PrimerModel], ...)),
-)
+PrimerDesignResponse = create_model('PrimerDesignResponse', primers=(list[PrimerModel], ...))
+
+
+@router.post('/primer_design/homologous_recombination', response_model=PrimerDesignResponse)
 async def primer_design_homologous_recombination(
     pcr_template: PrimerDesignQuery,
     homologous_recombination_target: PrimerDesignQuery,
@@ -1223,21 +1227,7 @@ async def primer_design_homologous_recombination(
     return {'primers': [forward_primer, reverse_primer]}
 
 
-# A primer design endpoint for Gibson assembly
-# This is how the request data will look like from javascript code:
-# const requestData = {
-#       queries: templateEntities.map((e, index) => ({
-#         sequence: e,
-#         location: selectedRegion2SequenceLocation(amplifyRegions[index]),
-#         orientation: fragmentOrientations[index],
-#       })),
-#     };
-
-
-@router.post(
-    '/primer_design/gibson_assembly',
-    response_model=create_model('GibsonAssemblyPrimerDesignResponse', primers=(list[PrimerModel], ...)),
-)
+@router.post('/primer_design/gibson_assembly', response_model=PrimerDesignResponse)
 async def primer_design_gibson_assembly(
     pcr_templates: list[PrimerDesignQuery],
     spacers: list[str] | None = Body(
@@ -1277,11 +1267,7 @@ async def primer_design_gibson_assembly(
     return {'primers': primers}
 
 
-@router.post(
-    '/primer_design/simple_pair',
-    response_model=create_model('SimplePairPrimerDesignResponse', primers=(list[PrimerModel], ...)),
-    summary='Design primers for PCR, you can also include restriction enzyme sites with filler bases.',
-)
+@router.post('/primer_design/simple_pair', response_model=PrimerDesignResponse)
 async def primer_design_simple_pair(
     pcr_template: PrimerDesignQuery,
     spacers: list[str] | None = Body(
@@ -1372,6 +1358,41 @@ if PLANNOTATE_URL is not None:
         return {'sources': [source], 'sequences': [format_sequence_genbank(seqr, source.output_name)]}
 
 
+# @router.post('/primer_design/gateway_attB', response_model=PrimerDesignResponse)
+# async def primer_design_gateway_attB(
+#     template: PrimerDesignQuery,
+#     left_site: str = Query(..., description='The left attB site to recombine.', regex=r'^attB[1-5]$'),
+#     right_site: str = Query(..., description='The right attB site to recombine.', regex=r'^attB[1-5]$'),
+#     spacers: list[str] | None = Body(None, description='Spacers to add between the attB site and the primer.'),
+#     filler_bases: str = Query(
+#         'GGGG',
+#         description='These bases are added to the 5\' end of the primer to ensure proper restriction enzyme digestion.',
+#     ),
+#     minimal_hybridization_length: int = Query(
+#         ..., description='The minimal length of the hybridization region in bps.'
+#     ),
+#     target_tm: float = Query(
+#         ..., description='The desired melting temperature for the hybridization part of the primer.'
+#     ),
+# ):
+#     """Design primers for Gateway attB"""
+#     dseqr = read_dsrecord_from_json(template.sequence)
+#     location = template.location.to_biopython_location(dseqr.circular, len(dseqr))
+#     template = location.extract(dseqr)
+#     if not template.forward_orientation:
+#         template = template.reverse_complement()
+#     template.name = dseqr.name
+#     template.id = dseqr.id
+#     try:
+#         primers = gateway_attB_primers(
+#             template, minimal_hybridization_length, target_tm, (left_site, right_site), spacers, filler_bases
+#         )
+#     except ValueError as e:
+#         raise HTTPException(400, *e.args)
+
+#     return {'primers': primers}
+
+
 @router.post(
     '/validate',
     summary='Validate a cloning strategy',
@@ -1391,6 +1412,20 @@ async def rename_sequence(
     """Rename a sequence"""
     dseqr = read_dsrecord_from_json(sequence)
     return format_sequence_genbank(dseqr, name)
+
+
+@router.post('/annotation/get_gateway_sites', response_model=dict[str, list[str]])
+async def get_gateway_sites(
+    sequence: TextFileSequence, greedy: bool = Query(False, description='Whether to use the greedy algorithm.')
+) -> dict[str, list[str]]:
+    """
+    Get a dictionary with the names of the gateway sites present in the sequence and their locations as strings.
+    """
+    dseqr = read_dsrecord_from_json(sequence)
+    sites_dict = find_gateway_sites(dseqr, greedy)
+    for site in sites_dict:
+        sites_dict[site] = [str(loc) for loc in sites_dict[site]]
+    return sites_dict
 
 
 if not SERVE_FRONTEND:

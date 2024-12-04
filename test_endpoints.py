@@ -2687,5 +2687,32 @@ class PlannotateTest(unittest.TestCase):
         self.assertEqual(e.code, 400)
 
 
+class AnnotationTest(unittest.TestCase):
+
+    attB1 = 'ACAACTTTGTACAAAAAAGCAGAAG'
+    attB2 = 'ACAACTTTGTACAAGAAAGCTGGGC'
+    greedy_attP1 = 'CAAATAATGATTTTATTTTGACTGATAGTGACCTGTTCGTTGCAACAAATTGATAAGCAATGCTTTTTTATAATGCCAACTTTGTACAAAAAAGCTGAACGAGAAACGTAAAATGATATAAATATCAATATATTAAATTAGATTTTGCATAAAAAACAGACTACATAATACTGTAAAACACAACATATCCAGTCA'
+
+    def test_get_gateway_sites(self):
+        seq = Dseqrecord('aaa' + self.attB1 + 'ccc' + self.attB2 + 'ccc' + self.greedy_attP1)
+        response = client.post('/annotation/get_gateway_sites', json=format_sequence_genbank(seq).model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn('attB1', payload)
+        self.assertIn('attB2', payload)
+        self.assertNotIn('attP1', payload)
+
+        response = client.post(
+            '/annotation/get_gateway_sites',
+            json=format_sequence_genbank(seq).model_dump(),
+            params={'greedy': True},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn('attB1', payload)
+        self.assertIn('attB2', payload)
+        self.assertIn('attP1', payload)
+
+
 if __name__ == '__main__':
     unittest.main()
