@@ -77,7 +77,6 @@ from primer_design import (
     homologous_recombination_primers,
     gibson_assembly_primers,
     simple_pair_primers,
-    gateway_attB_primers,
 )
 import asyncio
 import re
@@ -1359,39 +1358,39 @@ if PLANNOTATE_URL is not None:
         return {'sources': [source], 'sequences': [format_sequence_genbank(seqr, source.output_name)]}
 
 
-@router.post('/primer_design/gateway_attB', response_model=PrimerDesignResponse)
-async def primer_design_gateway_attB(
-    template: PrimerDesignQuery,
-    left_site: str = Query(..., description='The left attB site to recombine.', regex=r'^attB[1-5]$'),
-    right_site: str = Query(..., description='The right attB site to recombine.', regex=r'^attB[1-5]$'),
-    spacers: list[str] | None = Body(None, description='Spacers to add between the attB site and the primer.'),
-    filler_bases: str = Query(
-        'GGGG',
-        description='These bases are added to the 5\' end of the primer to ensure proper restriction enzyme digestion.',
-    ),
-    minimal_hybridization_length: int = Query(
-        ..., description='The minimal length of the hybridization region in bps.'
-    ),
-    target_tm: float = Query(
-        ..., description='The desired melting temperature for the hybridization part of the primer.'
-    ),
-):
-    """Design primers for Gateway attB"""
-    dseqr = read_dsrecord_from_json(template.sequence)
-    location = template.location.to_biopython_location(dseqr.circular, len(dseqr))
-    template = location.extract(dseqr)
-    if not template.forward_orientation:
-        template = template.reverse_complement()
-    template.name = dseqr.name
-    template.id = dseqr.id
-    try:
-        primers = gateway_attB_primers(
-            template, minimal_hybridization_length, target_tm, (left_site, right_site), spacers, filler_bases
-        )
-    except ValueError as e:
-        raise HTTPException(400, *e.args)
+# @router.post('/primer_design/gateway_attB', response_model=PrimerDesignResponse)
+# async def primer_design_gateway_attB(
+#     template: PrimerDesignQuery,
+#     left_site: str = Query(..., description='The left attB site to recombine.', regex=r'^attB[1-5]$'),
+#     right_site: str = Query(..., description='The right attB site to recombine.', regex=r'^attB[1-5]$'),
+#     spacers: list[str] | None = Body(None, description='Spacers to add between the attB site and the primer.'),
+#     filler_bases: str = Query(
+#         'GGGG',
+#         description='These bases are added to the 5\' end of the primer to ensure proper restriction enzyme digestion.',
+#     ),
+#     minimal_hybridization_length: int = Query(
+#         ..., description='The minimal length of the hybridization region in bps.'
+#     ),
+#     target_tm: float = Query(
+#         ..., description='The desired melting temperature for the hybridization part of the primer.'
+#     ),
+# ):
+#     """Design primers for Gateway attB"""
+#     dseqr = read_dsrecord_from_json(template.sequence)
+#     location = template.location.to_biopython_location(dseqr.circular, len(dseqr))
+#     template = location.extract(dseqr)
+#     if not template.forward_orientation:
+#         template = template.reverse_complement()
+#     template.name = dseqr.name
+#     template.id = dseqr.id
+#     try:
+#         primers = gateway_attB_primers(
+#             template, minimal_hybridization_length, target_tm, (left_site, right_site), spacers, filler_bases
+#         )
+#     except ValueError as e:
+#         raise HTTPException(400, *e.args)
 
-    return {'primers': primers}
+#     return {'primers': primers}
 
 
 @router.post(

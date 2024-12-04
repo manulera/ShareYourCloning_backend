@@ -7,7 +7,6 @@ from pydantic_models import PrimerModel
 from Bio.Seq import reverse_complement
 from Bio.Restriction.Restriction import RestrictionType
 from Bio.Data.IUPACData import ambiguous_dna_values as _ambiguous_dna_values
-from gateway import primer_design_attB
 
 ambiguous_dna_values = _ambiguous_dna_values.copy()
 # Remove acgt
@@ -167,38 +166,38 @@ def simple_pair_primers(
     )
 
 
-def gateway_attB_primers(
-    template: Dseqrecord,
-    minimal_hybridization_length: int,
-    target_tm: float,
-    sites: tuple[str, str],
-    spacers: tuple[str, str],
-    filler_bases: str = 'GGGG',
-) -> tuple[PrimerModel, PrimerModel]:
-    if spacers is None:
-        spacers = ['', '']
+# def gateway_attB_primers(
+#     template: Dseqrecord,
+#     minimal_hybridization_length: int,
+#     target_tm: float,
+#     sites: tuple[str, str],
+#     spacers: tuple[str, str],
+#     filler_bases: str = 'GGGG',
+# ) -> tuple[PrimerModel, PrimerModel]:
+#     if spacers is None:
+#         spacers = ['', '']
 
-    if len(spacers) != 2:
-        raise ValueError("The 'spacers' list must contain exactly two elements.")
+#     if len(spacers) != 2:
+#         raise ValueError("The 'spacers' list must contain exactly two elements.")
 
-    if sites[0] not in primer_design_attB or sites[1] not in primer_design_attB:
-        raise ValueError('Invalid attB site.')
+#     if sites[0] not in primer_design_attB or sites[1] not in primer_design_attB:
+#         raise ValueError('Invalid attB site.')
 
-    amplicon = primer_design(template, limit=minimal_hybridization_length, target_tm=target_tm)
-    fwd_primer, rvs_primer = amplicon.primers()
+#     amplicon = primer_design(template, limit=minimal_hybridization_length, target_tm=target_tm)
+#     fwd_primer, rvs_primer = amplicon.primers()
 
-    if fwd_primer is None or rvs_primer is None:
-        raise ValueError('Primers could not be designed, try changing settings.')
+#     if fwd_primer is None or rvs_primer is None:
+#         raise ValueError('Primers could not be designed, try changing settings.')
 
-    template_name = template.name if template.name != 'name' else f'seq_{template.id}'
+#     template_name = template.name if template.name != 'name' else f'seq_{template.id}'
 
-    left_site = primer_design_attB[sites[0]]
-    right_site = primer_design_attB[sites[1]]
+#     left_site = primer_design_attB[sites[0]]
+#     right_site = primer_design_attB[sites[1]]
 
-    fwd_primer_seq = filler_bases + left_site + spacers[0] + fwd_primer.seq
-    rvs_primer_seq = filler_bases + right_site + reverse_complement(spacers[1]) + rvs_primer.seq
+#     fwd_primer_seq = filler_bases + left_site + spacers[0] + fwd_primer.seq
+#     rvs_primer_seq = filler_bases + right_site + reverse_complement(spacers[1]) + rvs_primer.seq
 
-    return (
-        PrimerModel(id=0, name=f'{template_name}_{sites[0]}_fwd', sequence=str(fwd_primer_seq)),
-        PrimerModel(id=0, name=f'{template_name}_{sites[1]}_rvs', sequence=str(rvs_primer_seq)),
-    )
+#     return (
+#         PrimerModel(id=0, name=f'{template_name}_{sites[0]}_fwd', sequence=str(fwd_primer_seq)),
+#         PrimerModel(id=0, name=f'{template_name}_{sites[1]}_rvs', sequence=str(rvs_primer_seq)),
+#     )
