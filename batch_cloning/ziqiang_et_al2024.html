@@ -59,6 +59,10 @@ GCTGGCTAACCGTGAGGGGA
 CCGTGTACTGTAGTTACAGT
 TGTGGTTCCCCGGCCGTCTT
 ATACTCTAGTCCTCAACGCC</textarea>
+        <div style="margin: 10px auto; text-align: center;">
+            <input type="checkbox" id="bpOnly" name="bpOnly">
+            <label for="bpOnly">Generate only entry clone (stop after BP)</label>
+        </div>
         <br>
         <div id="error" class="error">
         </div>
@@ -80,7 +84,10 @@ ATACTCTAGTCCTCAACGCC</textarea>
             if (valid) {
                 // Submit the form data via fetch
                 try {
-                    const response = await fetch(window.location.href, {
+                    const bpOnly = document.getElementById('bpOnly').checked;
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('until_bp', bpOnly);
+                    const response = await fetch(url, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
