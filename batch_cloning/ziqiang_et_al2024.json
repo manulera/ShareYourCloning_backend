@@ -54,7 +54,7 @@
       "sequence_file_format": "genbank",
       "overhang_crick_3prime": 0,
       "overhang_watson_3prime": 0,
-      "file_content": "LOCUS       name                     465 bp    DNA     linear   UNK 01-JAN-1980\nDEFINITION  description.\nACCESSION   id\nVERSION     id\nKEYWORDS    .\nSOURCE      .\n  ORGANISM  .\n            .\nFEATURES             Location/Qualifiers\nORIGIN\n        1 ggggacagct ttcttgtaca aagtggaacg acttgccttc cgcacaatac atcatttctt\n       61 cttagctttt tttcttcttc ttcgttcata cagttttttt ttgtttatca gcttacattt\n      121 tcttgaaccg tagctttcgt tttcttcttt ttaactttcc attcggagtt tttgtatctt\n      181 gtttcatagt ttgtcccagg attagaatga ttaggcatcg aaccttcaag aatttgattg\n      241 aataaaacat cttcattctt aagatatgaa gataatcttc aaaaggcccc tgggaatctg\n      301 aaagaagaga agcaggccca tttatatggg aaagaacaat agtatttctt atataggccc\n      361 atttaagttg aaaacaatct tcaaaagtcc cacatcgctt agataagaaa acgaagctga\n      421 gtttatatac agctagagtc gaagtagtga ttaacatgag accat\n//"
+      "file_content": "LOCUS       U6-26_promoter           465 bp    DNA     linear   UNK 01-JAN-1980\nDEFINITION  description.\nACCESSION   14\nVERSION     14\nKEYWORDS    .\nSOURCE      \n  ORGANISM  .\n            .\nFEATURES             Location/Qualifiers\nORIGIN\n        1 ggggacagct ttcttgtaca aagtggaacg acttgccttc cgcacaatac atcatttctt\n       61 cttagctttt tttcttcttc ttcgttcata cagttttttt ttgtttatca gcttacattt\n      121 tcttgaaccg tagctttcgt tttcttcttt ttaactttcc attcggagtt tttgtatctt\n      181 gtttcatagt ttgtcccagg attagaatga ttaggcatcg aaccttcaag aatttgattg\n      241 aataaaacat cttcattctt aagatatgaa gataatcttc aaaaggcccc tgggaatctg\n      301 aaagaagaga agcaggccca tttatatggg aaagaacaat agtatttctt atataggccc\n      361 atttaagttg aaaacaatct tcaaaagtcc cacatcgctt agataagaaa acgaagctga\n      421 gtttatatac agctagagtc gaagtagtga ttaacatgag accat\n//"
     },
     {
       "id": 16,
@@ -62,7 +62,7 @@
       "sequence_file_format": "genbank",
       "overhang_crick_3prime": 0,
       "overhang_watson_3prime": 0,
-      "file_content": "LOCUS       name                     230 bp    DNA     linear   UNK 01-JAN-1980\nDEFINITION  description.\nACCESSION   id\nVERSION     id\nKEYWORDS    .\nSOURCE      .\n  ORGANISM  .\n            .\nFEATURES             Location/Qualifiers\nORIGIN\n        1 taggtctccg cttttttttg caaaattttc cagatcgatt tcttcttcct ctgttcttcg\n       61 gcgttcaatt tctggggttt tctcttcgtt ttctgtaact gaaacctaaa atttgaccta\n      121 aaaaaaatct caaataatat gattcagtgg ttttgtactt ttcagttagt tgagttttgc\n      181 agttccgatg agataaacca atatcaactt tattatacaa agttgtcccc\n//"
+      "file_content": "LOCUS       U6-26_term               230 bp    DNA     linear   UNK 01-JAN-1980\nDEFINITION  description.\nACCESSION   16\nVERSION     16\nKEYWORDS    .\nSOURCE      \n  ORGANISM  .\n            .\nFEATURES             Location/Qualifiers\nORIGIN\n        1 taggtctccg cttttttttg caaaattttc cagatcgatt tcttcttcct ctgttcttcg\n       61 gcgttcaatt tctggggttt tctcttcgtt ttctgtaact gaaacctaaa atttgaccta\n      121 aaaaaaatct caaataatat gattcagtgg ttttgtactt ttcagttagt tgagttttgc\n      181 agttccgatg agataaacca atatcaactt tattatacaa agttgtcccc\n//"
     },
     {
       "id": 18,
@@ -145,7 +145,7 @@
       ],
       "output": 14,
       "type": "PCRSource",
-      "output_name": null,
+      "output_name": "U6-26_promoter",
       "circular": false,
       "assembly": [
         {
@@ -192,7 +192,7 @@
       ],
       "output": 16,
       "type": "PCRSource",
-      "output_name": null,
+      "output_name": "U6-26_term",
       "circular": false,
       "assembly": [
         {

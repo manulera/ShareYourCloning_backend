@@ -1553,7 +1553,7 @@ else:
 
 
 @router.post('/batch_cloning/ziqiang_et_al2024', response_model=BaseCloningStrategy)
-async def ziqiang_et_al2024_post(protospacers: list[str]):
+async def ziqiang_et_al2024_post(protospacers: list[str], until_bp: bool = Query(False)):
     try:
         validate_protospacers(protospacers)
     except ValueError as e:
@@ -1577,7 +1577,14 @@ async def ziqiang_et_al2024_post(protospacers: list[str]):
 
     template_sequence = next(s for s in template.sequences if s.id == 18)
     for i, (fwd_primer_id, rvs_primer_id) in enumerate(zip(primer_ids_for_pcrs[::2], primer_ids_for_pcrs[1::2])):
-        pcr_source = PCRSource(id=next_node_id, output_name=f"pcr_protospacer_{i + 1}")
+        if i == 0:
+            name = 'start_ps1'
+        elif i == (len(primer_ids_for_pcrs) // 2) - 1:
+            name = f'end_ps{i}'
+        else:
+            name = f'end_ps{i}_start_ps{i + 1}'
+
+        pcr_source = PCRSource(id=next_node_id, output_name=name)
         fwd_primer = next(p for p in template.primers if p.id == fwd_primer_id)
         rvs_primer = next(p for p in template.primers if p.id == rvs_primer_id)
 
@@ -1628,6 +1635,13 @@ async def ziqiang_et_al2024_post(protospacers: list[str]):
 
     template.sequences.append(gateway_product)
     template.sources.append(gateway_source)
+
+    if until_bp:
+        # Delete sources and sequences left
+        ids2delete = list(range(5, 11))
+        template.sources = [s for s in template.sources if s.id not in ids2delete]
+        template.sequences = [s for s in template.sequences if s.id not in ids2delete]
+        return template
 
     # Now we want to do a Gateway with everything, so we need to find all sequences that are not input of anything
     all_input_ids = sum([s.input for s in template.sources], [])
