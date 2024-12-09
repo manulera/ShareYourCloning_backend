@@ -131,6 +131,8 @@ def simple_pair_primers(
     right_enzyme: RestrictionType,
     filler_bases: str,
     spacers: list[str] | None = None,
+    left_enzyme_inverted: bool = False,
+    right_enzyme_inverted: bool = False,
 ) -> tuple[PrimerModel, PrimerModel]:
     """
     Design primers to amplify a DNA fragment, if left_enzyme or right_enzyme are set, the primers will be designed
@@ -151,8 +153,16 @@ def simple_pair_primers(
 
     template_name = template.name if template.name != 'name' else f'seq_{template.id}'
 
-    left_site = '' if left_enzyme is None else filler_bases + sanitize_enzyme_site(left_enzyme.site)
-    right_site = '' if right_enzyme is None else filler_bases + sanitize_enzyme_site(right_enzyme.site)
+    left_site = '' if left_enzyme is None else sanitize_enzyme_site(left_enzyme.site)
+    right_site = '' if right_enzyme is None else sanitize_enzyme_site(right_enzyme.site)
+
+    if left_enzyme_inverted:
+        left_site = reverse_complement(left_site)
+    if right_enzyme_inverted:
+        right_site = reverse_complement(right_site)
+
+    left_site = filler_bases + left_site
+    right_site = filler_bases + right_site
 
     fwd_primer_seq = left_site + spacers[0] + fwd_primer.seq
     rvs_primer_seq = right_site + reverse_complement(spacers[1]) + rvs_primer.seq

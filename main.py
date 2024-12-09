@@ -1288,6 +1288,8 @@ async def primer_design_simple_pair(
     ),
     left_enzyme: str | None = Query(None, description='The restriction enzyme for the left side of the sequence.'),
     right_enzyme: str | None = Query(None, description='The restriction enzyme for the right side of the sequence.'),
+    left_enzyme_inverted: bool = Query(False, description='Whether the left enzyme site is inverted.'),
+    right_enzyme_inverted: bool = Query(False, description='Whether the right enzyme site is inverted.'),
     filler_bases: str = Query(
         'TTT',
         description='These bases are added to the 5\' end of the primer to ensure proper restriction enzyme digestion.',
@@ -1325,6 +1327,8 @@ async def primer_design_simple_pair(
             rb.format(right_enzyme) if right_enzyme is not None else None,
             filler_bases,
             spacers,
+            left_enzyme_inverted,
+            right_enzyme_inverted,
         )
     except ValueError as e:
         raise HTTPException(400, *e.args)
