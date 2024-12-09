@@ -160,9 +160,10 @@ def simple_pair_primers(
         left_site = reverse_complement(left_site)
     if right_enzyme_inverted:
         right_site = reverse_complement(right_site)
-
-    left_site = filler_bases + left_site
-    right_site = filler_bases + right_site
+    if left_enzyme is not None:
+        left_site = filler_bases + left_site
+    if right_enzyme is not None:
+        right_site = filler_bases + right_site
 
     fwd_primer_seq = left_site + spacers[0] + fwd_primer.seq
     rvs_primer_seq = right_site + reverse_complement(spacers[1]) + rvs_primer.seq
