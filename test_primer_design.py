@@ -418,7 +418,7 @@ class TestSimplePairPrimers(TestCase):
         """
         Test the restriction_enzyme_primers function.
         """
-        from Bio.Restriction import EcoRI, BamHI, AflIII
+        from Bio.Restriction import EcoRI, BamHI, AflIII, BsaI
 
         template = Dseqrecord('ATGCATGCATGCATGCATGCATGC')
         minimal_hybridization_length = 10
@@ -498,6 +498,22 @@ class TestSimplePairPrimers(TestCase):
 
         self.assertTrue('GC' + str(left_enzyme.site) + 'ACGT' * 10 in fwd.sequence)
         self.assertTrue('GC' + str(right_enzyme.site) + 'ACGT' * 10 in rvs.sequence)
+
+        # Test with left_enzyme_inverted and right_enzyme_inverted
+        fwd, rvs = simple_pair_primers(
+            template,
+            minimal_hybridization_length,
+            target_tm,
+            BsaI,
+            BsaI,
+            filler_bases,
+            spacers=spacers,
+            left_enzyme_inverted=True,
+            right_enzyme_inverted=True,
+        )
+
+        self.assertTrue('GCGAGACC' + 'ACGT' * 10 in fwd.sequence)
+        self.assertTrue('GCGAGACC' + 'ACGT' * 10 in rvs.sequence)
 
     def test_without_restriction_enzymes(self):
         """
