@@ -2074,8 +2074,8 @@ docs = []
 [package.source]
 type = "git"
 url = "https://github.com/genestorian/ShareYourCloning_LinkML"
-reference = "05bc526e219bd68c123c5a794b774a6932529b7c"
-resolved_reference = "05bc526e219bd68c123c5a794b774a6932529b7c"
+reference = "52f9d9f4302dada44d2d5cdf50fac74bd2338f90"
+resolved_reference = "52f9d9f4302dada44d2d5cdf50fac74bd2338f90"
 
 [[package]]
 name = "six"
@@ -2373,4 +2373,4 @@ test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "91401311ea4f5d44700e9fbc416018eab685c12967426ab2c2e84053a2d7116f"
+content-hash = "9a55fe6cca1d08627fb0e99232103e17fc8b25b8e4edddeb8e949dcd276ae8e9"

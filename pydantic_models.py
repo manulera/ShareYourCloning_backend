@@ -135,8 +135,6 @@ class IGEMSource(SourceCommonClass, _IGEMSource):
     def validate_repository_id(self):
         file_name = self.sequence_file_url.split('/')[-1]
         assert file_name.endswith('.gb'), 'The sequence file must be a GenBank file'
-        part_name = file_name[:-3]
-        assert self.repository_id.startswith(part_name), 'The repository_id must start with the part_name'
         return self
 
 

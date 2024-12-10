@@ -2716,10 +2716,8 @@ class AnnotationTest(unittest.TestCase):
 
 
 class IGEMSourceTest(unittest.TestCase):
-    good_url = (
-        'https://raw.githubusercontent.com/manulera/annotated-igem-distribution/master/results/plasmids/BBa_C0062.gb'
-    )
-    no_gb_url = 'https://blah.com/BBa_C0062.txt'
+    good_url = 'https://raw.githubusercontent.com/manulera/annotated-igem-distribution/master/results/plasmids/1.gb'
+    no_gb_url = 'https://blah.com/1.txt'
     wrong_url = (
         'https://raw.githubusercontent.com/manulera/annotated-igem-distribution/master/results/plasmids/dummy.gb'
     )
@@ -2740,12 +2738,6 @@ class IGEMSourceTest(unittest.TestCase):
         source = IGEMSource(
             id=0, repository_name='igem', repository_id='BBa_C0062-dummy', sequence_file_url=self.good_url
         )
-
-        # We have to change it as json, otherwise pydantic fails
-        source_json = source.model_dump()
-        source_json['repository_id'] = 'dummy-test'
-        response = client.post('/repository_id/igem', json=source_json)
-        self.assertEqual(response.status_code, 422)
 
         # The url is not a GenBank file
         source_json = source.model_dump()
