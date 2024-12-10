@@ -40,6 +40,7 @@ from shareyourcloning_linkml.datamodel import (
     GatewaySource as _GatewaySource,
     InFusionSource as _InFusionSource,
     AnnotationSource as _AnnotationSource,
+    IGEMSource as _IGEMSource,
 )
 from pydna.utils import shift_location as _shift_location
 from assembly2 import edge_representation2subfragment_representation, subfragment_representation2edge_representation
@@ -126,6 +127,17 @@ class SnapGenePlasmidSource(SourceCommonClass, _SnapGenePlasmidSource):
 
 class EuroscarfSource(SourceCommonClass, _EuroscarfSource):
     pass
+
+
+class IGEMSource(SourceCommonClass, _IGEMSource):
+
+    @model_validator(mode='after')
+    def validate_repository_id(self):
+        file_name = self.sequence_file_url.split('/')[-1]
+        assert file_name.endswith('.gb'), 'The sequence file must be a GenBank file'
+        part_name = file_name[:-3]
+        assert self.repository_id.startswith(part_name), 'The repository_id must start with the part_name'
+        return self
 
 
 class GenomeCoordinatesSource(SourceCommonClass, _GenomeCoordinatesSource):
