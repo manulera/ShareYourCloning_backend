@@ -2058,24 +2058,17 @@ pydivsufsort = ["pydivsufsort (>=0.0.14,<0.0.15)"]
 
 [[package]]
 name = "shareyourcloning-linkml"
-version = "0.1.0"
+version = "0.1.11a0"
 description = "A LinkML data model for ShareYourCloning"
 optional = false
-python-versions = "^3.9"
-files = []
-develop = false
+python-versions = "<4.0,>=3.9"
+files = [
+    {file = "shareyourcloning_linkml-0.1.11a0-py3-none-any.whl", hash = "sha256:39c1c91eae7f666b568d12c04ba73ce94836a0a4aa3f41bf72592047c6ef0ecf"},
+    {file = "shareyourcloning_linkml-0.1.11a0.tar.gz", hash = "sha256:49edfeb178d0b2268ead0ba44be8afacba3ca876a0e894f1430bc1d313e64949"},
+]
 
 [package.dependencies]
-pydantic = "^2.7.1"
-
-[package.extras]
-docs = []
-
-[package.source]
-type = "git"
-url = "https://github.com/genestorian/ShareYourCloning_LinkML"
-reference = "52f9d9f4302dada44d2d5cdf50fac74bd2338f90"
-resolved_reference = "52f9d9f4302dada44d2d5cdf50fac74bd2338f90"
+pydantic = ">=2.7.1,<3.0.0"
 
 [[package]]
 name = "six"
@@ -2373,4 +2366,4 @@ test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "9a55fe6cca1d08627fb0e99232103e17fc8b25b8e4edddeb8e949dcd276ae8e9"
+content-hash = "bc22adaaeb9f66a13816d0a3ba4c70b50671aa7e3595cf0d5a1e777764fe9640"
