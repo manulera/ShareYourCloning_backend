@@ -49,6 +49,7 @@ from pydantic_models import (
     OverlapExtensionPCRLigationSource,
     GatewaySource,
     AnnotationSource,
+    IGEMSource,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from Bio.Restriction.Restriction import RestrictionBatch
@@ -472,6 +473,22 @@ async def get_from_repository_id_euroscarf(source: EuroscarfSource):
         return {'sequences': [format_sequence_genbank(dseq, source.output_name)], 'sources': [source]}
     except HTTPError as exception:
         repository_id_http_error_handler(exception, source)
+
+
+@router.post(
+    '/repository_id/igem',
+    response_model=create_model(
+        'IGEMResponse', sources=(list[IGEMSource], ...), sequences=(list[TextFileSequence], ...)
+    ),
+)
+async def get_from_repository_id_igem(source: IGEMSource):
+    try:
+        dseq = (await get_sequences_from_gb_file_url(source.sequence_file_url))[0]
+        return {'sequences': [format_sequence_genbank(dseq, source.output_name)], 'sources': [source]}
+    except HTTPError as exception:
+        repository_id_http_error_handler(exception, source)
+    except URLError as exception:
+        repository_id_url_error_handler(exception, source)
 
 
 @router.post(

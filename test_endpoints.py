@@ -29,6 +29,7 @@ from pydantic_models import (
     SnapGenePlasmidSource,
     GatewaySource,
     AnnotationSource,
+    IGEMSource,
 )
 from pydna.dseqrecord import Dseqrecord
 import unittest
@@ -2712,6 +2713,42 @@ class AnnotationTest(unittest.TestCase):
         self.assertIn('attB1', payload)
         self.assertIn('attB2', payload)
         self.assertIn('attP1', payload)
+
+
+class IGEMSourceTest(unittest.TestCase):
+    good_url = 'https://raw.githubusercontent.com/manulera/annotated-igem-distribution/master/results/plasmids/1.gb'
+    no_gb_url = 'https://blah.com/1.txt'
+    wrong_url = (
+        'https://raw.githubusercontent.com/manulera/annotated-igem-distribution/master/results/plasmids/dummy.gb'
+    )
+
+    def test_igem(self):
+        source = IGEMSource(
+            id=0, repository_name='igem', repository_id='BBa_C0062-dummy', sequence_file_url=self.good_url
+        )
+        response = client.post('/repository_id/igem', json=source.model_dump())
+        payload = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload['sources'][0]['repository_id'], 'BBa_C0062-dummy')
+        self.assertEqual(payload['sources'][0]['repository_name'], 'igem')
+
+    def test_errors(self):
+
+        # The repository_id does not start with the part_name, even if url is valid
+        source = IGEMSource(
+            id=0, repository_name='igem', repository_id='BBa_C0062-dummy', sequence_file_url=self.good_url
+        )
+
+        # The url is not a GenBank file
+        source_json = source.model_dump()
+        source_json['sequence_file_url'] = self.no_gb_url
+        response = client.post('/repository_id/igem', json=source_json)
+        self.assertEqual(response.status_code, 422)
+
+        # The url does not exist
+        source = IGEMSource(id=0, repository_name='igem', repository_id='dummy-test', sequence_file_url=self.wrong_url)
+        response = client.post('/repository_id/igem', json=source.model_dump())
+        self.assertEqual(response.status_code, 404)
 
 
 if __name__ == '__main__':
