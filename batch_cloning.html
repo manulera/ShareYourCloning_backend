@@ -42,7 +42,7 @@
 
 <body>
     <h1>Batch Cloning Gene List</h1>
-    <form action="/batch_cloning" method="post" enctype="multipart/form-data">
+    <form>
         <label for="gene_list">Enter your list of genes (one gene per line):</label><br>
         <textarea id="gene_list" name="gene_list" required>SPAPB1A10.09
 SPBC15D4.01c</textarea><br>
@@ -68,7 +68,7 @@ SPBC15D4.01c</textarea><br>
 
         <div id="addgene_input">
             <label for="addgene_id">AddGene Identifier:</label><br>
-            <input value="39296" type="text" id="addgene_id" name="addgene_id"><br><br>
+            <input value="19343" type="text" id="addgene_id" name="addgene_id"><br><br>
         </div>
 
         <div>
@@ -106,7 +106,10 @@ SPBC15D4.01c</textarea><br>
         </div>
 
         <br>
-        <input type="submit" value="Submit">
+        <input type="submit" value="Submit" id="submit-button">
+        <div id="loading-message" style="display: none;">
+            Processing request, please wait...
+        </div>
         <script>
             function togglePlasmidInput() {
                 var selectedOption = document.querySelector('input[name="plasmid_option"]:checked').value;
@@ -133,6 +136,53 @@ SPBC15D4.01c</textarea><br>
             window.onload = () => {
                 togglePrimerCheck();
                 togglePlasmidInput();
+
+                // Add form submit handler
+                document.querySelector('form').addEventListener('submit', async function (e) {
+                    e.preventDefault(); // Prevent default form submission
+
+                    document.getElementById('submit-button').style.display = 'none';
+                    document.getElementById('loading-message').style.display = 'block';
+
+                    try {
+                        const formData = new FormData(this);
+                        const response = await fetch('/batch_cloning', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (!response.ok) {
+                            throw new Error((await response.json()).detail);
+                        }
+
+                        // Get the filename from the Content-Disposition header if available
+                        const contentDisposition = response.headers.get('Content-Disposition');
+                        let filename = 'batch_cloning_results.zip';
+                        if (contentDisposition) {
+                            const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+                            if (filenameMatch) {
+                                filename = filenameMatch[1];
+                            }
+                        }
+
+                        // Convert the response to a blob and download it
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                    } catch (error) {
+                        console.error('Error:', error);
+                        alert(error.message);
+                    } finally {
+                        document.getElementById('submit-button').style.display = 'block';
+                        document.getElementById('loading-message').style.display = 'none';
+                    }
+                });
             }
         </script>
     </form>
