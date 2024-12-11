@@ -9,7 +9,7 @@ from pydna.crispr import cas9
 from pydantic import conlist, create_model
 import glob
 from pydna.genbank import Genbank
-from dna_functions import (
+from .dna_functions import (
     get_invalid_enzyme_names,
     format_sequence_genbank,
     read_dsrecord_from_json,
@@ -21,7 +21,7 @@ from dna_functions import (
     get_sequence_from_euroscarf_url,
     annotate_with_plannotate as _annotate_with_plannotate,
 )
-from pydantic_models import (
+from .pydantic_models import (
     PCRSource,
     PrimerModel,
     TextFileSequence,
@@ -56,7 +56,7 @@ from Bio.Restriction.Restriction import RestrictionBatch
 from urllib.error import HTTPError, URLError
 from fastapi.responses import HTMLResponse
 from Bio.Restriction.Restriction_Dictionary import rest_dict
-from assembly2 import (
+from .assembly2 import (
     Assembly,
     assemble,
     sticky_end_sub_strings,
@@ -69,12 +69,12 @@ from assembly2 import (
     combine_algorithms,
     annotate_primer_binding_sites,
 )
-import request_examples
-import ncbi_requests
+from . import request_examples
+from . import ncbi_requests
 import os
-from record_stub_route import RecordStubRoute
+from .record_stub_route import RecordStubRoute
 from starlette.responses import RedirectResponse
-from primer_design import (
+from .primer_design import (
     homologous_recombination_primers,
     gibson_assembly_primers,
     simple_pair_primers,
@@ -84,8 +84,8 @@ import re
 import warnings
 import io
 from Bio import BiopythonParserWarning
-from gateway import gateway_overlap, find_gateway_sites, annotate_gateway_sites
-from batch_cloning.ziqiang_et_al2024 import (
+from .gateway import gateway_overlap, find_gateway_sites, annotate_gateway_sites
+from .batch_cloning.ziqiang_et_al2024 import (
     router as ziqiang_et_al2024_router,
     validate_protospacers,
     design_primers as design_primers_ziqiang_et_al2024,
@@ -1583,7 +1583,7 @@ async def ziqiang_et_al2024_post(
         raise HTTPException(400, str(e))
     primers = design_primers_ziqiang_et_al2024(protospacers)
 
-    with open('batch_cloning/ziqiang_et_al2024.json', 'r') as f:
+    with open(os.path.join(os.path.dirname(__file__), 'batch_cloning/ziqiang_et_al2024.json'), 'r') as f:
         template = BaseCloningStrategy.model_validate(json.load(f))
 
     max_primer_id = max([primer.id for primer in template.primers], default=0)

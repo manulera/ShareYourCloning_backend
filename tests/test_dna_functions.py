@@ -1,7 +1,10 @@
-from dna_functions import find_sequence_regex, custom_file_parser
-from dna_utils import sum_is_sticky
+from shareyourcloning.dna_functions import find_sequence_regex, custom_file_parser
+from shareyourcloning.dna_utils import sum_is_sticky
 import unittest
 from pydna.dseq import Dseq
+import os
+
+test_files = os.path.join(os.path.dirname(__file__), 'test_files')
 
 
 # Tests for sum_is_sticky() in dna_functions.py
@@ -150,7 +153,7 @@ class SequenceRegexTest(unittest.TestCase):
 
 class TestPermisiveParserWithApe(unittest.TestCase):
     def test_permisive_parser_with_ape_circular(self):
-        with open('test_files/P2RP3.ape', 'r') as f:
+        with open(f'{test_files}/P2RP3.ape', 'r') as f:
             plasmid = custom_file_parser(f, 'genbank')[0]
             # Since APE files are not correctly gb formatted (as of 2024-11-27)
             # the Bio.SeqIO.parse may not recognize the topology of the plasmid
@@ -159,12 +162,12 @@ class TestPermisiveParserWithApe(unittest.TestCase):
             self.assertEqual(plasmid.circular, True)
 
     def test_permisive_parser_with_ape_linear(self):
-        with open('test_files/P2RP3_linear.ape', 'r') as f:
+        with open(f'{test_files}/P2RP3_linear.ape', 'r') as f:
             # I manually changed the topology of the plasmid to linear
             plasmid = custom_file_parser(f, 'genbank')[0]
             self.assertEqual(plasmid.circular, False)
 
     def test_permisive_parser_no_topology(self):
-        with open('test_files/ase1_no_topology.gb', 'r') as f:
+        with open(f'{test_files}/ase1_no_topology.gb', 'r') as f:
             plasmid = custom_file_parser(f, 'genbank')[0]
             self.assertEqual(plasmid.circular, False)

@@ -2,10 +2,10 @@ from fastapi.testclient import TestClient
 import unittest
 import shutil
 import os
-from pydantic_models import ManuallyTypedSource, RestrictionEnzymeDigestionSource
+from shareyourcloning.pydantic_models import ManuallyTypedSource, RestrictionEnzymeDigestionSource
 from pytest import MonkeyPatch
 from importlib import reload
-from dna_functions import format_sequence_genbank
+from shareyourcloning.dna_functions import format_sequence_genbank
 from pydna.dseqrecord import Dseqrecord
 
 
@@ -14,7 +14,7 @@ class StubRouteTest(unittest.TestCase):
     def setUp(self):
         # Has to be imported here to get the right environment variable
         MonkeyPatch().setenv('RECORD_STUBS', '1')
-        import main
+        import shareyourcloning.main as main
 
         reload(main)
         client = TestClient(main.app)
@@ -26,7 +26,7 @@ class StubRouteTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree('stubs', ignore_errors=True)
         MonkeyPatch().setenv('RECORD_STUBS', '0')
-        import main
+        import shareyourcloning.main as main
 
         reload(main)
 

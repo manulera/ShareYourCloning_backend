@@ -1,9 +1,12 @@
-from gateway import gateway_overlap, find_gateway_sites
-import assembly2 as assembly
+from shareyourcloning.gateway import gateway_overlap, find_gateway_sites
+import shareyourcloning.assembly2 as assembly
 import glob
-from dna_functions import custom_file_parser
+from shareyourcloning.dna_functions import custom_file_parser
 from pydna.dseqrecord import Dseqrecord
 from Bio.SeqFeature import SimpleLocation
+import os
+
+test_files = os.path.join(os.path.dirname(__file__), 'test_files')
 
 
 def algoBP(x, y, _):
@@ -16,7 +19,7 @@ def algoLR(x, y, _):
 
 def test_gateway_manual_cloning():
 
-    with open('test_files/gateway_manual_cloning/pairing.tsv') as f:
+    with open(os.path.join(test_files, 'gateway_manual_cloning/pairing.tsv')) as f:
         for line in f:
             line = line.strip().split('\t')
             if len(line) < 5:
@@ -26,11 +29,11 @@ def test_gateway_manual_cloning():
             else:
                 backbone, pcr_product, entry_vector, backbone_expression, expression = line
 
-            with open('test_files/gateway_manual_cloning/' + backbone, 'rb') as f:
+            with open(os.path.join(test_files, 'gateway_manual_cloning/' + backbone), 'rb') as f:
                 backbone = custom_file_parser(f, 'snapgene')[0]
-            with open('test_files/gateway_manual_cloning/' + pcr_product, 'rb') as f:
+            with open(os.path.join(test_files, 'gateway_manual_cloning/' + pcr_product), 'rb') as f:
                 pcr_product = custom_file_parser(f, 'snapgene')[0]
-            with open('test_files/gateway_manual_cloning/' + entry_vector, 'rb') as f:
+            with open(os.path.join(test_files, 'gateway_manual_cloning/' + entry_vector), 'rb') as f:
                 entry_vector = custom_file_parser(f, 'snapgene')[0]
 
             # Works with the right reaction
@@ -45,9 +48,9 @@ def test_gateway_manual_cloning():
             assert len(out) == 0
 
             if backbone_expression is not None and expression is not None and len(out):
-                with open('test_files/gateway_manual_cloning/' + backbone_expression, 'rb') as f:
+                with open(os.path.join(test_files, 'gateway_manual_cloning/' + backbone_expression), 'rb') as f:
                     backbone_expression = custom_file_parser(f, 'snapgene')[0]
-                with open('test_files/gateway_manual_cloning/' + expression, 'rb') as f:
+                with open(os.path.join(test_files, 'gateway_manual_cloning/' + expression), 'rb') as f:
                     expression = custom_file_parser(f, 'snapgene')[0]
 
                 # Works with the right reaction
@@ -63,7 +66,7 @@ def test_gateway_manual_cloning():
                 out = asm.assemble_circular()
                 assert len(out) == 0
 
-    example_valerie = glob.glob('test_files/gateway_manual_cloning/example_valerie/*.dna')
+    example_valerie = glob.glob(os.path.join(test_files, 'gateway_manual_cloning/example_valerie/*.dna'))
     inputs = list()
     for file in example_valerie:
         with open(file, 'rb') as f:

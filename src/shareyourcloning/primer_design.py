@@ -3,7 +3,7 @@ from pydna.design import primer_design, assembly_fragments
 from Bio.SeqFeature import SimpleLocation
 from pydna.utils import locations_overlap, shift_location, location_boundaries
 from pydna.amplicon import Amplicon
-from pydantic_models import PrimerModel
+from .pydantic_models import PrimerModel
 from Bio.Seq import reverse_complement
 from Bio.Restriction.Restriction import RestrictionType
 from Bio.Data.IUPACData import ambiguous_dna_values as _ambiguous_dna_values

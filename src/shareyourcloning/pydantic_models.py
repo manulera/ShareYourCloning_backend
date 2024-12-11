@@ -43,7 +43,7 @@ from shareyourcloning_linkml.datamodel import (
     IGEMSource as _IGEMSource,
 )
 from pydna.utils import shift_location as _shift_location
-from assembly2 import edge_representation2subfragment_representation, subfragment_representation2edge_representation
+from .assembly2 import edge_representation2subfragment_representation, subfragment_representation2edge_representation
 
 
 SequenceFileFormat = _SequenceFileFormat

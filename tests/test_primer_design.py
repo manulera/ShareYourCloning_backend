@@ -1,4 +1,4 @@
-from primer_design import (
+from shareyourcloning.primer_design import (
     homologous_recombination_primers,
     gibson_assembly_primers,
     simple_pair_primers,
@@ -6,9 +6,9 @@ from primer_design import (
 from Bio.SeqFeature import SimpleLocation, SeqFeature
 from unittest import TestCase
 from pydna.dseqrecord import Dseqrecord
-from pydantic_models import PrimerModel
+from shareyourcloning.pydantic_models import PrimerModel
 from pydna.amplify import pcr
-from assembly2 import Assembly, gibson_overlap
+from shareyourcloning.assembly2 import Assembly, gibson_overlap
 import pytest
 from Bio.Data.IUPACData import ambiguous_dna_values
 from Bio.Seq import reverse_complement

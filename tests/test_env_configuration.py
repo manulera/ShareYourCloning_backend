@@ -2,11 +2,13 @@ import unittest
 from pytest import MonkeyPatch
 from importlib import reload
 from fastapi.testclient import TestClient
-from utils import TemporaryFolderOverride
+from shareyourcloning.utils import TemporaryFolderOverride
 import shutil
 import glob
 import os
 import tempfile
+
+test_files = os.path.join(os.path.dirname(__file__), 'test_files')
 
 
 class TestTemporaryFolderOverride(unittest.TestCase):
@@ -41,7 +43,7 @@ class TestServeFrontend(unittest.TestCase):
         self.folder_override = TemporaryFolderOverride('frontend')
         self.folder_override.__enter__()
 
-        for f in glob.glob('test_files/dummy_frontend/*'):
+        for f in glob.glob(f'{test_files}/dummy_frontend/*'):
             print(f)
             if os.path.isdir(f):
                 shutil.copytree(f, f'./frontend/{f.split("/")[-1]}', dirs_exist_ok=True)
@@ -50,7 +52,7 @@ class TestServeFrontend(unittest.TestCase):
 
         # Has to be imported here to get the right environment variable
         MonkeyPatch().setenv('SERVE_FRONTEND', '1')
-        import main
+        import shareyourcloning.main as main
 
         reload(main)
         client = TestClient(main.app)
@@ -60,7 +62,7 @@ class TestServeFrontend(unittest.TestCase):
     def tearDown(self):
         self.folder_override.__exit__(None, None, None)
         MonkeyPatch().setenv('SERVE_FRONTEND', '0')
-        import main
+        import shareyourcloning.main as main
 
         reload(main)
 

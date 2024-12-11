@@ -5,7 +5,7 @@ from Bio.Restriction import AatII, AjiI, AgeI, EcoRV, ZraI, SalI, EcoRI, RgaI, B
 from pydna.amplify import pcr
 from pydna.dseq import Dseq
 from pydna.readers import read
-import assembly2 as assembly
+import shareyourcloning.assembly2 as assembly
 from Bio.SeqFeature import ExactPosition, FeatureLocation, SeqFeature, SimpleLocation
 from pydna.dseqrecord import Dseqrecord
 from pydna.parsers import parse
@@ -13,6 +13,9 @@ from pydna.utils import eq
 import pytest
 from Bio.Seq import reverse_complement
 from pydna.primer import Primer
+import os
+
+test_files = os.path.join(os.path.dirname(__file__), 'test_files')
 
 
 def test_built():
@@ -456,7 +459,7 @@ algorithm..: common_sub_strings"""
 def test_MXblaster1():
     """test MXblaster1"""
 
-    primer = parse('test_files/primers.fas', ds=False)
+    primer = parse(f'{test_files}/primers.fas', ds=False)
     primer = primer[::-1]
     primer = primer[37:]
 
@@ -464,18 +467,18 @@ def test_MXblaster1():
         assert int(p.id.split('_')[0]) == i
 
     """ These are PCRs to get the genes and the terminator-promoters """
-    AgTEFp = pcr(primer[524], primer[523], read('test_files/pAG25.gb'))
-    hph = pcr(primer[502], primer[501], read('test_files/pAG32.gb'))
-    KlLEU2tt = pcr(primer[520], primer[519], read('test_files/KlLEU2tt.gb'))
+    AgTEFp = pcr(primer[524], primer[523], read(f'{test_files}/pAG25.gb'))
+    hph = pcr(primer[502], primer[501], read(f'{test_files}/pAG32.gb'))
+    KlLEU2tt = pcr(primer[520], primer[519], read(f'{test_files}/KlLEU2tt.gb'))
 
     """ The Gal1 promoter-ISceI fragment is made in two steps """
-    gal1_ISceI_1 = pcr(primer[234], primer[316], read('test_files/pGSHU 7180bp.gb'))
+    gal1_ISceI_1 = pcr(primer[234], primer[316], read(f'{test_files}/pGSHU 7180bp.gb'))
     gal1_ISceI_2 = pcr(primer[562], primer[234], gal1_ISceI_1)
-    AgTEFt = pcr(primer[522], primer[521], read('test_files/pAG25.gb'))
+    AgTEFt = pcr(primer[522], primer[521], read(f'{test_files}/pAG25.gb'))
 
     """ load pCAPs and pCAPs-pSU0 sequences as Dseqrecord objects """
-    pCAPs = read('test_files/pCAPs-AjiI.gb')
-    pCAPs_pSU0 = read('test_files/pCAPs-pSU0.gb')
+    pCAPs = read(f'{test_files}/pCAPs-AjiI.gb')
+    pCAPs_pSU0 = read(f'{test_files}/pCAPs-pSU0.gb')
 
     # cut the pCAPs vectors for cloning
 
@@ -545,7 +548,7 @@ def test_MXblaster1():
 
     assert pCAPs_MX4blaster1.seguid() == 'cdseguid=bUl04KTp5LpAulZX3UHdejwnuIQ'
 
-    AX023560 = read('test_files/AX023560.gb')
+    AX023560 = read(f'{test_files}/AX023560.gb')
 
     GAL10prom_slice = slice(AX023560.features[1].location.start, AX023560.features[1].location.end)
 
@@ -553,7 +556,7 @@ def test_MXblaster1():
 
     assert GAL10prom.seq == AX023560.features[1].extract(AX023560).seq
 
-    GIN11M86 = read('test_files/GIN11M86.gb')
+    GIN11M86 = read(f'{test_files}/GIN11M86.gb')
 
     GAL_GIN = pcr(primer[592], primer[593], GAL10prom + GIN11M86)
 
@@ -590,7 +593,7 @@ def test_MXblaster1():
     pCAPs_MX4blaster2 = pCAPs_MX4blaster2.synced('tcgcgcgtttcggtgatgacggtgaaaacc')
 
     assert len(pCAPs_MX4blaster2) == 10566
-    pCAPs_MX4blaster2_old = read('test_files/pMX4blaster2_old.gb')
+    pCAPs_MX4blaster2_old = read(f'{test_files}/pMX4blaster2_old.gb')
 
     assert len(pCAPs_MX4blaster2_old) == 10566
     assert pCAPs_MX4blaster2_old.seguid() == 'cdseguid=c48cBUb3wF-Sdhzh0Tlprp-0CEg'
@@ -600,10 +603,10 @@ def test_MXblaster1():
 
 def test_assemble_pGUP1():
 
-    GUP1rec1sens = read('test_files/GUP1rec1sens.txt')
-    GUP1rec2AS = read('test_files/GUP1rec2AS.txt')
-    GUP1_locus = read('test_files/GUP1_locus.gb')
-    pGREG505 = read('test_files/pGREG505.gb')
+    GUP1rec1sens = read(f'{test_files}/GUP1rec1sens.txt')
+    GUP1rec2AS = read(f'{test_files}/GUP1rec2AS.txt')
+    GUP1_locus = read(f'{test_files}/GUP1_locus.gb')
+    pGREG505 = read(f'{test_files}/pGREG505.gb')
 
     insert = pcr(GUP1rec1sens, GUP1rec2AS, GUP1_locus)
 
@@ -615,7 +618,7 @@ def test_assemble_pGUP1():
 
     pGUP1 = pGUP1.synced(pGREG505.seq[:50])
 
-    pGUP1_correct = read('test_files/pGUP1_correct.gb')
+    pGUP1_correct = read(f'{test_files}/pGUP1_correct.gb')
 
     assert len(pGUP1_correct) == 9981
     assert len(pGUP1) == 9981
@@ -626,9 +629,9 @@ def test_assemble_pGUP1():
 
 def test_pYPK7_TDH3_GAL2_PGI1():
 
-    pMEC1142 = read('test_files/pYPK0_TDH3_GAL2_PGI1.gb')
+    pMEC1142 = read(f'{test_files}/pYPK0_TDH3_GAL2_PGI1.gb')
 
-    pYPKp7 = read('test_files/pYPKp7.gb')
+    pYPKp7 = read(f'{test_files}/pYPKp7.gb')
 
     pYPKp7_AatII = pYPKp7.linearize(AatII)
 
@@ -656,8 +659,8 @@ def test_marker_replacement_on_plasmid():
     """
     )
 
-    pAG32 = read('test_files/pAG32.gb')
-    pMEC1135 = read('test_files/pMEC1135.gb')
+    pAG32 = read(f'{test_files}/pAG32.gb')
+    pMEC1135 = read(f'{test_files}/pMEC1135.gb')
 
     hygromycin_product = pcr(f, r, pAG32)
     # This is an homologous recombination, so constrains should be applied

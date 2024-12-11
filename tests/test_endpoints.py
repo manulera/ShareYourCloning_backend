@@ -1,10 +1,10 @@
-from dna_functions import format_sequence_genbank, read_dsrecord_from_json, annotate_with_plannotate
-import main as _main
+from shareyourcloning.dna_functions import format_sequence_genbank, read_dsrecord_from_json, annotate_with_plannotate
+import shareyourcloning.main as _main
 from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
 from Bio.SeqFeature import SimpleLocation
-from pydantic_models import (
+from shareyourcloning.pydantic_models import (
     RepositoryIdSource,
     PCRSource,
     PrimerModel,
@@ -34,7 +34,7 @@ from pydantic_models import (
 from pydna.dseqrecord import Dseqrecord
 import unittest
 from pydna.dseq import Dseq
-import request_examples
+import shareyourcloning.request_examples as request_examples
 import copy
 import json
 import tempfile
@@ -45,6 +45,8 @@ from importlib import reload
 import respx
 import httpx
 from urllib.error import HTTPError
+
+test_files = os.path.join(os.path.dirname(__file__), 'test_files')
 
 
 def get_all_feature_labels(seq: Dseqrecord):
@@ -112,7 +114,7 @@ class ReadFileTest(unittest.TestCase):
             {'file': './examples/sequences/ase1.embl', 'format': 'embl', 'nb_sequences': 1},
             # Ape files as of 2024-10-30 did not have a properly formatted LOCUS line
             {
-                'file': './test_files/example.ape',
+                'file': f'{test_files}/example.ape',
                 'format': 'genbank',
                 'nb_sequences': 1,
                 'warning': True,
@@ -120,7 +122,7 @@ class ReadFileTest(unittest.TestCase):
             },
             # Euroscarf files as of 2024-10-30 did not have a properly formatted LOCUS line
             {
-                'file': './test_files/pKT128_euroscarf.gb',
+                'file': f'{test_files}/pKT128_euroscarf.gb',
                 'format': 'genbank',
                 'nb_sequences': 1,
                 'warning': True,
@@ -241,8 +243,8 @@ class ReadFileTest(unittest.TestCase):
         """Test that the circularize parameter works when reading from file"""
         file_paths = [
             './examples/sequences/dummy_EcoRI.fasta',
-            './test_files/example.ape',
-            './test_files/gateway_manual_cloning/pcr_product-attP1_1-attP2_1.dna',
+            f'{test_files}/example.ape',
+            f'{test_files}/gateway_manual_cloning/pcr_product-attP1_1-attP2_1.dna',
         ]
         for file_path in file_paths:
             with open(file_path, 'rb') as f:
@@ -1930,7 +1932,7 @@ class CrisprTest(unittest.TestCase):
 
 class ValidatorTest(unittest.TestCase):
     def test_validator(self):
-        with open('test_files/homologous_recombination.json') as ins:
+        with open(f'{test_files}/homologous_recombination.json') as ins:
             # Read it to json
             data = json.load(ins)
         BaseCloningStrategy.model_validate(data)
@@ -2253,7 +2255,7 @@ class PrimerDesignTest(unittest.TestCase):
 class ValidateEndPointTest(unittest.TestCase):
 
     def test_validate(self):
-        with open('test_files/homologous_recombination.json') as ins:
+        with open(f'{test_files}/homologous_recombination.json') as ins:
             # Read it to json
             data = json.load(ins)
         response = client.post('/validate', json=data)
@@ -2647,7 +2649,7 @@ class PlannotateTest(unittest.TestCase):
             'AAAAttgagatcctttttttctgcgcgtaatctgctgcttgcaaacaaaaaaaccaccgctaccagcggtggtttgtttgccggatcaagagctaccaactctttttccgaaggtaactggcttcagcagagcgcagataccaaatactgttcttctagtgtagccgtagttaggccaccacttcaagaactctgtagcaccgcctacatacctcgctctgctaatcctgttaccagtggctgctgccagtggcgataagtcgtgtcttaccgggttggactcaagacgatagttaccggataaggcgcagcggtcgggctgaacggggggttcgtgcacacagcccagcttggagcgaacgacctacaccgaactgagatacctacagcgtgagctatgagaaagcgccacgcttcccgaagggagaaaggcggacaggtatccggtaagcggcagggtcggaacaggagagcgcacgagggagcttccagggggaaacgcctggtatctttatagtcctgtcgggtttcgccacctctgacttgagcgtcgatttttgtgatgctcgtcaggggggcggagcctatggaaaAAAA'
         )
         seq = format_sequence_genbank(seq)
-        mock_response_success = json.load(open('test_files/planottate/mock_response_success.json'))
+        mock_response_success = json.load(open(f'{test_files}/planottate/mock_response_success.json'))
         # Mock the HTTPX GET request
         respx.post('http://dummy/url/annotate').respond(200, json=mock_response_success)
 

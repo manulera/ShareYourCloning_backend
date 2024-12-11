@@ -15,7 +15,7 @@ from pydna.seqrecord import SeqRecord as _SeqRecord
 import networkx as _nx
 import itertools as _itertools
 from Bio.SeqFeature import SimpleLocation, Location
-from dna_utils import sum_is_sticky
+from .dna_utils import sum_is_sticky
 from Bio.Seq import reverse_complement
 from Bio.Restriction.Restriction import RestrictionBatch, AbstractCut
 import regex

@@ -2,7 +2,7 @@
 Some extra tests that are not covered by the main endpoint tests
 """
 
-import ncbi_requests
+import shareyourcloning.ncbi_requests as ncbi_requests
 import pytest
 
 

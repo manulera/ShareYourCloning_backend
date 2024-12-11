@@ -1,6 +1,6 @@
 from unittest import TestCase
-from pydantic_models import AssemblySource, SimpleSequenceLocation
-from assembly2 import edge_representation2subfragment_representation
+from shareyourcloning.pydantic_models import AssemblySource, SimpleSequenceLocation
+from shareyourcloning.assembly2 import edge_representation2subfragment_representation
 from Bio.SeqFeature import SimpleLocation
 
 
