@@ -1,8 +1,11 @@
+import os
+import json
 from Bio.Seq import reverse_complement
 from fastapi.responses import FileResponse
-from ...get_router import get_router
 from typing import Annotated
 from fastapi import Body, Query, HTTPException
+
+from ...get_router import get_router
 from ...pydantic_models import (
     BaseCloningStrategy,
     PrimerModel,
@@ -11,10 +14,7 @@ from ...pydantic_models import (
     RestrictionAndLigationSource,
     GatewaySource,
 )
-
-from ...main import pcr, restriction_and_ligation, gateway
-import os
-import json
+from ...endpoints.assembly import pcr, restriction_and_ligation, gateway
 
 
 router = get_router()

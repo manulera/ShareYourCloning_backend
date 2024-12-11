@@ -1,5 +1,6 @@
 import os
-from ...main import genome_coordinates, get_from_repository_id_addgene, pcr, homologous_recombination, read_from_file
+from ...endpoints.external_import import genome_coordinates, get_from_repository_id_addgene, read_from_file
+from ...endpoints.assembly import pcr, homologous_recombination
 from ...pydantic_models import (
     GenomeCoordinatesSource,
     TextFileSequence,

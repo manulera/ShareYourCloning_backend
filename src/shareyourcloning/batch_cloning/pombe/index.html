@@ -146,7 +146,7 @@ SPBC15D4.01c</textarea><br>
 
                     try {
                         const formData = new FormData(this);
-                        const response = await fetch('/batch_cloning', {
+                        const response = await fetch(window.location.pathname, {
                             method: 'POST',
                             body: formData
                         });

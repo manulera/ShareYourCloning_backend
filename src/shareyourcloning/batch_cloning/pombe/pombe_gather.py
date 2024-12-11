@@ -33,7 +33,7 @@ def main(input_dir: str):
     # Primer summary table:
     primer_summary = list()
     primer_names = ['primer_fwd', 'primer_rvs', 'primer_fwd_check', 'primer_rvs_check']
-    for i, row in df.iterrows():
+    for _, row in df.iterrows():
         gene = row['gene']
         for primer_name in primer_names:
             primer_row = OrderedDict()
