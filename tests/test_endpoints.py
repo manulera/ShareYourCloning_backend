@@ -451,7 +451,7 @@ class LigationTest(unittest.TestCase):
         """Test whether assembly is executed when the order is provided"""
         # Load dummy sequence
 
-        initial_sequence = pydna_parse('examples/sequences/dummy_EcoRI.fasta')[0]
+        initial_sequence = pydna_parse(f'{test_files}/dummy_EcoRI.fasta')[0]
 
         # Restriction cut
         enzyme = CommOnly.format('EcoRI')
@@ -516,7 +516,7 @@ class LigationTest(unittest.TestCase):
         """Test that when order is not provided, no duplicate sequences are returned as options."""
 
         # Load Ase1 sequence
-        initial_sequence = pydna_parse('examples/sequences/dummy_EcoRI.fasta')[0]
+        initial_sequence = pydna_parse(f'{test_files}/dummy_EcoRI.fasta')[0]
 
         # Restriction cut
         enzyme = CommOnly.format('EcoRI')
@@ -546,7 +546,7 @@ class LigationTest(unittest.TestCase):
         self.assertEqual(resulting_sequences[0].seq, initial_sequence.seq)
 
     def test_circular_assembly_no_order(self):
-        initial_sequence = pydna_parse('examples/sequences/pFA6a-hphMX6.gb')[0]
+        initial_sequence = pydna_parse(f'{test_files}/pFA6a-hphMX6.gb')[0]
 
         # Restriction cut
         output_list: list[Dseqrecord] = initial_sequence.cut([CommOnly.format('AscI'), CommOnly.format('SacI')])
