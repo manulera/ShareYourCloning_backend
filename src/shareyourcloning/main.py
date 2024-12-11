@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, APIRouter, Form, Response
+from fastapi import FastAPI, UploadFile, File, Query, HTTPException, Request, Body, Response
 from typing import Annotated, Union, Literal, Callable
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -72,7 +72,6 @@ from .assembly2 import (
 from . import request_examples
 from . import ncbi_requests
 import os
-from .record_stub_route import RecordStubRoute
 from starlette.responses import RedirectResponse
 from .primer_design import (
     homologous_recombination_primers,
@@ -85,15 +84,12 @@ import warnings
 import io
 from Bio import BiopythonParserWarning
 from .gateway import gateway_overlap, find_gateway_sites, annotate_gateway_sites
-from .batch_cloning.ziqiang_et_al2024 import (
-    router as ziqiang_et_al2024_router,
-    validate_protospacers,
-    design_primers as design_primers_ziqiang_et_al2024,
-)
-import json
+from .batch_cloning.ziqiang_et_al2024 import router as ziqiang_et_al2024_router
+from .batch_cloning.pombe import router as pombe_router
+from .get_router import get_router
+from .utils import api_version
 
 # ENV variables ========================================
-RECORD_STUBS = os.environ['RECORD_STUBS'] == '1' if 'RECORD_STUBS' in os.environ else False
 SERVE_FRONTEND = os.environ['SERVE_FRONTEND'] == '1' if 'SERVE_FRONTEND' in os.environ else False
 PLANNOTATE_URL = os.environ['PLANNOTATE_URL'] if 'PLANNOTATE_URL' in os.environ else None
 PLANNOTATE_TIMEOUT = int(os.environ['PLANNOTATE_TIMEOUT']) if 'PLANNOTATE_TIMEOUT' in os.environ else 20
@@ -113,11 +109,8 @@ elif not SERVE_FRONTEND:
 
 # Instance of the API object
 app = FastAPI()
-if RECORD_STUBS:
-    router = APIRouter(route_class=RecordStubRoute)
-else:
-    router = APIRouter()
 
+router = get_router()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -205,15 +198,7 @@ async def custom_http_exception_handler(request: Request, exc: Exception):
 
 @router.get('/version')
 async def get_version():
-    version = None
-    commit_sha = None
-    if os.path.exists('version.txt'):
-        with open('version.txt', 'r') as f:
-            version = f.read().strip()
-    if os.path.exists('commit_sha.txt'):
-        with open('commit_sha.txt', 'r') as f:
-            commit_sha = f.read().strip()
-    return {'version': version, 'commit_sha': commit_sha}
+    return api_version()
 
 
 @router.post(
@@ -1474,83 +1459,6 @@ if not SERVE_FRONTEND:
             """
         return HTMLResponse(content=html_content, status_code=200)
 
-    @router.get('/batch_cloning')
-    async def get_batch_cloning_page(request: Request):
-        return FileResponse(os.path.join(os.path.dirname(__file__), 'batch_cloning.html'))
-
-    @router.post('/batch_cloning')
-    async def post_batch_cloning(
-        gene_list: str = Form(...),
-        plasmid_file: UploadFile | None = File(None),
-        addgene_id: str | None = Form(None),
-        plasmid_option: Annotated[Literal['addgene', 'file'], Form(...)] = None,
-        checking_primer_forward: str = Form(..., pattern=r'^[ACGTacgt]+$', min_length=1),
-        checking_primer_reverse: str = Form(..., pattern=r'^[ACGTacgt]+$', min_length=1),
-    ):
-        from .pombe_get_primers import main as pombe_primers
-        from .pombe_clone import main as pombe_clone
-        from .pombe_summary import main as pombe_summary
-        from .pombe_gather import main as pombe_gather
-        from tempfile import TemporaryDirectory
-        import shutil
-        import traceback
-        import json
-
-        plasmid = plasmid_file if plasmid_option == 'file' else addgene_id
-        if plasmid is None:
-            raise HTTPException(status_code=400, detail='No plasmid provided')
-
-        genes = [gene.strip() for gene in gene_list.split() if gene.strip()]
-
-        if not genes:
-            raise HTTPException(status_code=400, detail='No valid genes provided')
-
-        with TemporaryDirectory() as temp_dir:
-            if plasmid_option == 'file':
-                # Write the plasmid to the temp dir
-                with open(os.path.join(temp_dir, plasmid_file.filename), 'wb') as f:
-                    shutil.copyfileobj(plasmid_file.file, f)
-
-            # Write the checking primers
-            with open(os.path.join(temp_dir, 'checking_primers.fa'), 'w') as f:
-                f.write(
-                    f'>common_insert_fwd\n{checking_primer_forward}\n>common_insert_rvs\n{checking_primer_reverse}'
-                )
-
-            for gene in genes:
-                try:
-                    await pombe_primers(gene, temp_dir)
-                except Exception:
-                    raise HTTPException(status_code=404, detail=f'Primers for {gene} not found')
-                try:
-                    if plasmid_option == 'file':
-                        with open(os.path.join(temp_dir, plasmid_file.filename), 'rb') as f:
-                            await pombe_clone(
-                                gene, 'GCF_000002945.2', temp_dir, UploadFile(file=f, filename=plasmid_file.filename)
-                            )
-                    else:
-                        await pombe_clone(gene, 'GCF_000002945.2', temp_dir, addgene_id)
-                except Exception:
-                    # Show the stack trace in console
-                    print(f'Error occurred while cloning {gene}:')
-                    traceback.print_exc()
-                    raise HTTPException(status_code=400, detail=f'Clone for {gene} failed')
-            try:
-                pombe_summary(temp_dir)
-                pombe_gather(temp_dir)
-            except Exception:
-                raise HTTPException(status_code=400, detail='Summary failed')
-
-            # Write the version
-            with open(os.path.join(temp_dir, 'version.json'), 'w') as f:
-                f.write(json.dumps(await get_version(), indent=2))
-
-            # zip the temp dir and return it
-            zip_filename = f'{temp_dir}_archive'
-            shutil.make_archive(zip_filename, 'zip', temp_dir)
-            zip_file = f'{zip_filename}.zip'
-            return FileResponse(zip_file, filename='batch_cloning_output.zip')
-
 else:
     app.mount('/assets', StaticFiles(directory='frontend/assets'), name='assets')
     app.mount('/examples', StaticFiles(directory='frontend/examples'), name='examples')
@@ -1575,118 +1483,6 @@ else:
         raise HTTPException(404)
 
 
-@router.post('/batch_cloning/ziqiang_et_al2024', response_model=BaseCloningStrategy)
-async def ziqiang_et_al2024_post(
-    protospacers: Annotated[list[str], Body(..., min_length=1)], until_bp: bool = Query(False)
-):
-    try:
-        validate_protospacers(protospacers)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    primers = design_primers_ziqiang_et_al2024(protospacers)
-
-    with open(os.path.join(os.path.dirname(__file__), 'batch_cloning/ziqiang_et_al2024.json'), 'r') as f:
-        template = BaseCloningStrategy.model_validate(json.load(f))
-
-    max_primer_id = max([primer.id for primer in template.primers], default=0)
-
-    for i, primer in enumerate(primers):
-        max_primer_id += 1
-        orientation = 'rvs' if i % 2 == 0 else 'fwd'
-        template.primers.append(
-            PrimerModel(id=max_primer_id, name=f"protospacer_{i // 2 + 1}_{orientation}", sequence=primer)
-        )
-
-    primer_ids_for_pcrs = [3, *[p.id for p in template.primers[-len(primers) :]], 12]
-    next_node_id = max([s.id for s in template.sequences] + [s.id for s in template.sources]) + 1
-
-    template_sequence = next(s for s in template.sequences if s.id == 18)
-    for i, (fwd_primer_id, rvs_primer_id) in enumerate(zip(primer_ids_for_pcrs[::2], primer_ids_for_pcrs[1::2])):
-        if i == 0:
-            name = 'start_ps1'
-        elif i == (len(primer_ids_for_pcrs) // 2) - 1:
-            name = f'end_ps{i}'
-        else:
-            name = f'end_ps{i}_start_ps{i + 1}'
-
-        pcr_source = PCRSource(id=next_node_id, output_name=name)
-        fwd_primer = next(p for p in template.primers if p.id == fwd_primer_id)
-        rvs_primer = next(p for p in template.primers if p.id == rvs_primer_id)
-
-        next_node_id += 1
-        resp = await pcr(pcr_source, [template_sequence], [fwd_primer, rvs_primer], 14, 0)
-        pcr_product: TextFileSequence = TextFileSequence.model_validate(resp['sequences'][0])
-        pcr_product.id = next_node_id
-        pcr_source: PCRSource = PCRSource.model_validate(resp['sources'][0])
-        pcr_source.output = next_node_id
-
-        template.sequences.append(pcr_product)
-        template.sources.append(pcr_source)
-
-        next_node_id += 1
-
-    # Find all PCR products
-    # (we use type instead of isinstance because the BaseCloningStrategy does not
-    #  have the newer source models with extra methods)
-    pcr_product_ids = [s.output for s in template.sources if s.type == 'PCRSource']
-
-    # Make all input of a Golden gate assembly
-    golden_gate_source = RestrictionAndLigationSource(
-        id=next_node_id, output_name='golden_gate_assembly', restriction_enzymes=['BsaI'], input=pcr_product_ids
-    )
-
-    next_node_id += 1
-    # Make them
-    input_sequences = [next(s for s in template.sequences if s.id == p) for p in pcr_product_ids]
-    resp = await restriction_and_ligation(golden_gate_source, input_sequences, False, False)
-    golden_gate_product: TextFileSequence = TextFileSequence.model_validate(resp['sequences'][0])
-    golden_gate_product.id = next_node_id
-    golden_gate_source: RestrictionAndLigationSource = RestrictionAndLigationSource.model_validate(resp['sources'][0])
-    golden_gate_source.output = next_node_id
-    next_node_id += 1
-
-    template.sequences.append(golden_gate_product)
-    template.sources.append(golden_gate_source)
-
-    bp_target = next(s for s in template.sequences if s.id == 12)
-    gateway_source = GatewaySource(id=next_node_id, output_name='entry_clone', reaction_type='BP', greedy=False)
-    next_node_id += 1
-    resp = await gateway(gateway_source, [golden_gate_product, bp_target], circular_only=True, only_multi_site=True)
-    gateway_product: TextFileSequence = TextFileSequence.model_validate(resp['sequences'][0])
-    gateway_product.id = next_node_id
-    gateway_source: GatewaySource = GatewaySource.model_validate(resp['sources'][0])
-    gateway_source.output = next_node_id
-    next_node_id += 1
-
-    template.sequences.append(gateway_product)
-    template.sources.append(gateway_source)
-
-    if until_bp:
-        # Delete sources and sequences left
-        ids2delete = list(range(5, 11))
-        template.sources = [s for s in template.sources if s.id not in ids2delete]
-        template.sequences = [s for s in template.sequences if s.id not in ids2delete]
-        return template
-
-    # Now we want to do a Gateway with everything, so we need to find all sequences that are not input of anything
-    all_input_ids = sum([s.input for s in template.sources], [])
-    sequences_to_clone = [s for s in template.sequences if s.id not in all_input_ids]
-
-    gateway_source = GatewaySource(id=next_node_id, output_name='expression_clone', reaction_type='LR', greedy=False)
-    next_node_id += 1
-    resp = await gateway(gateway_source, sequences_to_clone, circular_only=True, only_multi_site=True)
-    index_of_product = next(i for i, s in enumerate(resp['sequences']) if '/label="Cas9"' in s.file_content)
-    expression_clone: TextFileSequence = TextFileSequence.model_validate(resp['sequences'][index_of_product])
-    expression_clone.id = next_node_id
-    gateway_source: GatewaySource = GatewaySource.model_validate(resp['sources'][index_of_product])
-    gateway_source.output = next_node_id
-    next_node_id += 1
-
-    template.sequences.append(expression_clone)
-    template.sources.append(gateway_source)
-
-    return template
-
-
 app.include_router(router)
 app.include_router(ziqiang_et_al2024_router)
+app.include_router(pombe_router)

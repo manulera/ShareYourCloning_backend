@@ -1,4 +1,4 @@
-from .pydantic_models import BaseCloningStrategy, PrimerModel, PCRSource
+from ...pydantic_models import BaseCloningStrategy, PrimerModel, PCRSource
 from pydna.parsers import parse as pydna_parse
 import os
 import json
