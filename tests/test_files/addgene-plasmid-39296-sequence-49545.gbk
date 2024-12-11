@@ -6,9 +6,9 @@ KEYWORDS    pFA6a-kanMX6
 SOURCE      synthetic DNA construct
   ORGANISM  synthetic DNA construct
 REFERENCE   1  (bases 1 to 3938)
-  AUTHORS   Bahler J, Wu JQ, Longtine MS, Shah NG, McKenzie A 3rd, Steever AB, 
+  AUTHORS   Bahler J, Wu JQ, Longtine MS, Shah NG, McKenzie A 3rd, Steever AB,
             Wach A, Philippsen P, Pringle JR
-  TITLE     Heterologous modules for efficient and versatile PCR-based gene 
+  TITLE     Heterologous modules for efficient and versatile PCR-based gene
             targeting in Schizosaccharomyces pombe.
   JOURNAL   Yeast. 1998 Jul;14(10):943-51.
   PUBMED    9717240
@@ -23,7 +23,7 @@ FEATURES             Location/Qualifiers
                      /mol_type="other DNA"
      gene            115..1471
                      /label=kanMX
-                     /note="yeast selectable marker conferring kanamycin 
+                     /note="yeast selectable marker conferring kanamycin
                      resistance (Wach et al., 1994)"
      promoter        115..458
                      /label=TEF promoter
@@ -57,7 +57,7 @@ FEATURES             Location/Qualifiers
      rep_origin      complement(1852..2440)
                      /direction=LEFT
                      /label=ori
-                     /note="high-copy-number ColE1/pMB1/pBR322/pUC origin of 
+                     /note="high-copy-number ColE1/pMB1/pBR322/pUC origin of
                      replication"
      primer_bind     complement(1932..1951)
                      /label=pBR322ori-F
@@ -83,14 +83,14 @@ FEATURES             Location/Qualifiers
                      /label=AmpR promoter
      primer_bind     3644..3662
                      /label=pBRforEco
-                     /note="pBR322 vectors, upsteam of EcoRI site, forward 
+                     /note="pBR322 vectors, upsteam of EcoRI site, forward
                      primer"
      primer_bind     complement(3700..3722)
                      /label=pGEX 3'
                      /note="pGEX vectors, reverse primer"
      primer_bind     3822..3841
                      /label=pRS-marker
-                     /note="pRS vectors, use to sequence yeast selectable 
+                     /note="pRS vectors, use to sequence yeast selectable
                      marker"
      promoter        3922..2
                      /label=SP6 promoter

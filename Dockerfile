@@ -56,7 +56,6 @@ RUN echo "${VERSION}" > version.txt
 
 ENV VIRTUAL_ENV="/home/backend/venv"
 COPY --from=builder $VIRTUAL_ENV $VIRTUAL_ENV
-COPY . .
 
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # For example, ROOT_PATH="/syc"

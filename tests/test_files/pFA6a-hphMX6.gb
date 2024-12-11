@@ -1,5 +1,5 @@
 LOCUS       pFA6a-hphMX6                4157 bp ds-DNA     circular SYN 24-DEC-2013
-DEFINITION  Plasmid for yeast gene deletion using the hphMX6 selectable marker 
+DEFINITION  Plasmid for yeast gene deletion using the hphMX6 selectable marker
             conferring hygromycin resistance.
 ACCESSION   .
 VERSION     .
@@ -8,7 +8,7 @@ SOURCE      synthetic DNA construct
   ORGANISM  synthetic DNA construct
 REFERENCE   1  (bases 1 to 4157)
   AUTHORS   Hentges P, Van Driessche B, Tafforeau L, Vandenhaute J, Carr AM.
-  TITLE     Three novel antibiotic marker cassettes for gene disruption and 
+  TITLE     Three novel antibiotic marker cassettes for gene disruption and
             marker switching in Schizosaccharomyces pombe.
   JOURNAL   Yeast 2005;22:1013-9.
   PUBMED    16200533
@@ -17,7 +17,7 @@ REFERENCE   2  (bases 1 to 4157)
   TITLE     Direct Submission
   JOURNAL   Exported Thursday, Feb 4, 2021 from SnapGene 5.2.4
             https://www.snapgene.com
-COMMENT     SGRef: number: 1; type: "Journal Article"; journalName: "Yeast"; 
+COMMENT     SGRef: number: 1; type: "Journal Article"; journalName: "Yeast";
             date: "2005"; volume: "22"; pages: "1013-9"
 FEATURES             Location/Qualifiers
      source          1..4157
@@ -26,12 +26,12 @@ FEATURES             Location/Qualifiers
                      /mol_type="other DNA"
      primer_bind     40..59
                      /label=F1
-                     /note="Forward primer for gene deletion. This primer 
-                     includes a BamHI recognition sequence. A gene-specific 
+                     /note="Forward primer for gene deletion. This primer
+                     includes a BamHI recognition sequence. A gene-specific
                      sequence should be added at the 5' end of the primer."
      gene            113..1688
                      /label=hphMX6
-                     /note="yeast selectable marker conferring hygromycin 
+                     /note="yeast selectable marker conferring hygromycin
                      resistance"
      promoter        113..456
                      /label=TEF promoter
@@ -54,9 +54,9 @@ FEATURES             Location/Qualifiers
                      /note="Ashbya gossypii TEF terminator"
      primer_bind     complement(1719..1738)
                      /label=R1
-                     /note="Reverse primer for gene deletion or C-terminal 
-                     tagging. This primer includes an EcoRI recognition 
-                     sequence. A gene-specific sequence should be added at the 
+                     /note="Reverse primer for gene deletion or C-terminal
+                     tagging. This primer includes an EcoRI recognition
+                     sequence. A gene-specific sequence should be added at the
                      5' end of the primer."
      promoter        complement(1793..1811)
                      /label=T7 promoter
@@ -64,7 +64,7 @@ FEATURES             Location/Qualifiers
      rep_origin      complement(2069..2657)
                      /direction=LEFT
                      /label=ori
-                     /note="high-copy-number ColE1/pMB1/pBR322/pUC origin of 
+                     /note="high-copy-number ColE1/pMB1/pBR322/pUC origin of
                      replication"
      CDS             complement(2828..3688)
                      /codon_start=1

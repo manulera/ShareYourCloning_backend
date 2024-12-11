@@ -103,15 +103,15 @@ class ReadFileTest(unittest.TestCase):
         """Test that uploading files with single and multiple sequences works."""
 
         examples = [
-            {'file': './examples/sequences/pFA6a-hphMX6.gb', 'format': 'genbank', 'nb_sequences': 1},
-            {'file': './examples/sequences/dummy_EcoRI.fasta', 'format': 'fasta', 'nb_sequences': 1},
-            {'file': './examples/sequences/dummy_multi_fasta.fasta', 'format': 'fasta', 'nb_sequences': 2},
+            {'file': f'{test_files}/pFA6a-hphMX6.gb', 'format': 'genbank', 'nb_sequences': 1},
+            {'file': f'{test_files}/dummy_EcoRI.fasta', 'format': 'fasta', 'nb_sequences': 1},
+            {'file': f'{test_files}/dummy_multi_fasta.fasta', 'format': 'fasta', 'nb_sequences': 2},
             {
-                'file': './examples/sequences/addgene-plasmid-39296-sequence-49545.dna',
+                'file': f'{test_files}/addgene-plasmid-39296-sequence-49545.dna',
                 'format': 'snapgene',
                 'nb_sequences': 1,
             },
-            {'file': './examples/sequences/ase1.embl', 'format': 'embl', 'nb_sequences': 1},
+            {'file': f'{test_files}/ase1.embl', 'format': 'embl', 'nb_sequences': 1},
             # Ape files as of 2024-10-30 did not have a properly formatted LOCUS line
             {
                 'file': f'{test_files}/example.ape',
@@ -225,7 +225,7 @@ class ReadFileTest(unittest.TestCase):
     def test_file_index_known(self):
         """Test that if the index in file is specified it works."""
 
-        with open('./examples/sequences/dummy_multi_fasta.fasta', 'rb') as f:
+        with open(f'{test_files}/dummy_multi_fasta.fasta', 'rb') as f:
             response = client.post('/read_from_file?index_in_file=1', files={'file': f})
 
         self.assertEqual(response.status_code, 200)
@@ -242,7 +242,7 @@ class ReadFileTest(unittest.TestCase):
     def test_circularize_fasta_sequence(self):
         """Test that the circularize parameter works when reading from file"""
         file_paths = [
-            './examples/sequences/dummy_EcoRI.fasta',
+            f'{test_files}/dummy_EcoRI.fasta',
             f'{test_files}/example.ape',
             f'{test_files}/gateway_manual_cloning/pcr_product-attP1_1-attP2_1.dna',
         ]
