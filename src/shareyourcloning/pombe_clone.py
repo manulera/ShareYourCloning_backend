@@ -1,6 +1,6 @@
 import os
-from main import genome_coordinates, get_from_repository_id_addgene, pcr, homologous_recombination, read_from_file
-from pydantic_models import (
+from .main import genome_coordinates, get_from_repository_id_addgene, pcr, homologous_recombination, read_from_file
+from .pydantic_models import (
     GenomeCoordinatesSource,
     TextFileSequence,
     AddGeneIdSource,
@@ -11,7 +11,7 @@ from pydantic_models import (
     UploadedFileSource,
 )
 
-from ncbi_requests import get_annotations_from_query
+from .ncbi_requests import get_annotations_from_query
 import asyncio
 import json
 from Bio import SeqIO

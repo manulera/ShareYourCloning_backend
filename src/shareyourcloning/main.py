@@ -738,9 +738,11 @@ def generate_assemblies(
     circular_only: bool,
     algo: Callable,
     allow_insertion_assemblies: bool,
-    assembly_kwargs: dict = {},
+    assembly_kwargs: dict | None = None,
     product_callback: Callable[[Dseqrecord], Dseqrecord] = lambda x: x,
 ) -> dict[Literal['sources', 'sequences'], list[AssemblySource] | list[TextFileSequence]]:
+    if assembly_kwargs is None:
+        assembly_kwargs = {}
     try:
         out_sources = []
         if len(fragments) > 1:
@@ -1474,7 +1476,7 @@ if not SERVE_FRONTEND:
 
     @router.get('/batch_cloning')
     async def get_batch_cloning_page(request: Request):
-        return FileResponse('batch_cloning.html')
+        return FileResponse(os.path.join(os.path.dirname(__file__), 'batch_cloning.html'))
 
     @router.post('/batch_cloning')
     async def post_batch_cloning(
@@ -1485,10 +1487,10 @@ if not SERVE_FRONTEND:
         checking_primer_forward: str = Form(..., pattern=r'^[ACGTacgt]+$', min_length=1),
         checking_primer_reverse: str = Form(..., pattern=r'^[ACGTacgt]+$', min_length=1),
     ):
-        from pombe_get_primers import main as pombe_primers
-        from pombe_clone import main as pombe_clone
-        from pombe_summary import main as pombe_summary
-        from pombe_gather import main as pombe_gather
+        from .pombe_get_primers import main as pombe_primers
+        from .pombe_clone import main as pombe_clone
+        from .pombe_summary import main as pombe_summary
+        from .pombe_gather import main as pombe_gather
         from tempfile import TemporaryDirectory
         import shutil
         import traceback
