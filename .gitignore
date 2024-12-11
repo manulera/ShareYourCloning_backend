@@ -18,3 +18,6 @@ frontend/
 .env.secret
 
 batch_cloning_output/
+
+# poetry build
+dist/

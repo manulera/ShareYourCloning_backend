@@ -27,9 +27,13 @@ ENV PATH="$POETRY_HOME/bin:$VIRTUAL_ENV/bin:$PATH"
 
 RUN pip install --no-cache-dir poetry
 
+COPY ./src ./src
 COPY ./poetry.lock .
 COPY ./pyproject.toml .
-RUN poetry install --no-dev
+COPY ./README.md .
+
+RUN poetry build
+RUN pip install dist/shareyourcloning-*.whl
 
 # FINAL IMAGE
 FROM python:3.11-slim-bookworm
@@ -58,4 +62,4 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # For example, ROOT_PATH="/syc"
 ENV ROOT_PATH=""
 # Only add --root-path if ROOT_PATH is not empty, otherwise uvicorn will throw an error
-CMD uvicorn main:app --host 0.0.0.0 --port 8000 ${ROOT_PATH:+--root-path ${ROOT_PATH}}
+CMD uvicorn shareyourcloning.main:app --host 0.0.0.0 --port 8000 ${ROOT_PATH:+--root-path ${ROOT_PATH}}
