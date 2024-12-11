@@ -13,7 +13,7 @@ from .endpoints.other import router as other_router
 from .endpoints.annotation import router as annotation_router
 from .endpoints.assembly import router as assembly_router
 from .endpoints.no_assembly import router as no_assembly_router
-from .endpoints.noinput import router as noinput_router
+from .endpoints.no_input import router as no_input_router
 
 
 # ENV variables ========================================
@@ -126,7 +126,7 @@ app.include_router(other_router)
 app.include_router(annotation_router)
 app.include_router(assembly_router)
 app.include_router(no_assembly_router)
-app.include_router(noinput_router)
+app.include_router(no_input_router)
 
 if BATCH_CLONING:
     from .batch_cloning import router as batch_cloning_router
