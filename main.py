@@ -1574,7 +1574,9 @@ else:
 
 
 @router.post('/batch_cloning/ziqiang_et_al2024', response_model=BaseCloningStrategy)
-async def ziqiang_et_al2024_post(protospacers: list[str], until_bp: bool = Query(False)):
+async def ziqiang_et_al2024_post(
+    protospacers: Annotated[list[str], Body(..., min_length=1)], until_bp: bool = Query(False)
+):
     try:
         validate_protospacers(protospacers)
     except ValueError as e:
