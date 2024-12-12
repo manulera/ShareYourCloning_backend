@@ -7,6 +7,8 @@ import shutil
 import glob
 import os
 import tempfile
+import shareyourcloning.main as main
+
 
 test_files = os.path.join(os.path.dirname(__file__), 'test_files')
 
@@ -44,7 +46,6 @@ class TestServeFrontend(unittest.TestCase):
         self.folder_override.__enter__()
 
         for f in glob.glob(f'{test_files}/dummy_frontend/*'):
-            print(f)
             if os.path.isdir(f):
                 shutil.copytree(f, f'./frontend/{f.split("/")[-1]}', dirs_exist_ok=True)
             else:
@@ -52,7 +53,6 @@ class TestServeFrontend(unittest.TestCase):
 
         # Has to be imported here to get the right environment variable
         MonkeyPatch().setenv('SERVE_FRONTEND', '1')
-        import shareyourcloning.main as main
 
         reload(main)
         client = TestClient(main.app)
@@ -62,7 +62,6 @@ class TestServeFrontend(unittest.TestCase):
     def tearDown(self):
         self.folder_override.__exit__(None, None, None)
         MonkeyPatch().setenv('SERVE_FRONTEND', '0')
-        import shareyourcloning.main as main
 
         reload(main)
 

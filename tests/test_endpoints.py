@@ -1,4 +1,5 @@
 from shareyourcloning.dna_functions import format_sequence_genbank, read_dsrecord_from_json, annotate_with_plannotate
+import shareyourcloning.endpoints.annotation as annotation_endpoints
 import shareyourcloning.main as _main
 from fastapi.testclient import TestClient
 from pydna.parsers import parse as pydna_parse
@@ -2636,11 +2637,13 @@ class PlannotateTest(unittest.TestCase):
         # Has to be imported here to get the right environment variable
         pytest.MonkeyPatch().setenv('PLANNOTATE_URL', 'http://dummy/url')
 
+        reload(annotation_endpoints)
         reload(_main)
         self.client = TestClient(_main.app)
 
     def tearDown(self):
         pytest.MonkeyPatch().setenv('PLANNOTATE_URL', '')
+        reload(annotation_endpoints)
         reload(_main)
 
     @respx.mock

@@ -119,7 +119,6 @@ else:
         raise HTTPException(404)
 
 
-app.include_router(router)
 app.include_router(primer_design_router)
 app.include_router(import_router)
 app.include_router(other_router)
@@ -136,3 +135,11 @@ if BATCH_CLONING:
     app.include_router(batch_cloning_router)
     app.include_router(ziqiang_et_al2024_router)
     app.include_router(pombe_router)
+
+
+# This router must be added last because when SERVE_FRONTEND is True,
+# it contains a catch-all route. The catch-all route '/{name:path}' matches any URL path, so if this
+# section were placed earlier, it would intercept all requests before they could reach their intended
+# API endpoints. For example, requests to '/docs' or '/version' would incorrectly return 404 errors
+# instead of reaching their proper handlers.
+app.include_router(router)
