@@ -41,7 +41,7 @@ Now you should be able to run the api by running:
 
 ```bash
 # The --reload argument will reload the API if you make changes to the code
-uvicorn main:app --reload --reload-exclude='.venv'
+uvicorn shareyourcloning.main:app --reload --reload-exclude='.venv'
 ```
 
 Then you should be able to open the API docs at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) to know that your API is working.
@@ -69,12 +69,12 @@ The api will be running at `http://localhost:8000`, so you should be able to acc
 
 ### Connecting to the frontend
 
-If you want to receive requests from the [frontend](https://github.com/manulera/ShareYourCloning_frontend), or from another web application you may have to include the url of the frontend application in the CORS exceptions. By default, if you run the dev server with `uvicorn main:app --reload --reload-exclude='.venv'`, the backend will accept requests coming from `http://localhost:3000`, which is the default address of the frontend dev server (ran with `yarn start`).
+If you want to receive requests from the [frontend](https://github.com/manulera/ShareYourCloning_frontend), or from another web application you may have to include the url of the frontend application in the CORS exceptions. By default, if you run the dev server with `uvicorn shareyourcloning.main:app --reload --reload-exclude='.venv'`, the backend will accept requests coming from `http://localhost:3000`, which is the default address of the frontend dev server (ran with `yarn start`).
 
 If you want to change the allowed origins, you can do so via env variables (comma-separated). e.g.:
 
 ```
-ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001 uvicorn main:app --reload --reload-exclude='.venv'
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001 uvicorn shareyourcloning.main:app --reload --reload-exclude='.venv'
 ```
 
 Similarly, the frontend should be configured to send requests to the backend address, [see here](https://github.com/manulera/ShareYourCloning_frontend#connecting-to-the-backend).
@@ -117,5 +117,5 @@ For the frontend, it may be useful to produce stubs (I use them for writing the 
 by looking at the `RecordStubRoute` class in `record_stub_route.py`. To run the dev server and record stubs:
 
 ```bash
-RECORD_STUBS=1 uvicorn main:app --reload --reload-exclude='.venv'
+RECORD_STUBS=1 uvicorn shareyourcloning.main:app --reload --reload-exclude='.venv'
 ```

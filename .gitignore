@@ -18,3 +18,7 @@ frontend/
 .env.secret
 
 batch_cloning_output/
+.pytest_cache/
+
+# poetry build
+dist/

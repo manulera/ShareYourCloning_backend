@@ -1,3 +1,2 @@
-ignore:
-  - "test_*.py"
-  - "pombe_*.py"
+exclude:
+  - "tests/**/*"

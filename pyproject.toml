@@ -1,10 +1,12 @@
 [tool.poetry]
-authors = ["Your Name <you@example.com>"]
+authors = ["Manuel Lera-Ramirez <manulera14@gmail.com>"]
 description = "Backend of ShareYourCloning, a web application to generate molecular cloning strategies in json format, and share them with others."
 license = "MIT"
-name = "shareyourcloning_backend"
+name = "shareyourcloning"
 version = "0.1.0"
-package-mode = false
+package-mode = true
+readme = "README.md"
+repository = "https://github.com/manulera/shareyourcloning_backend"
 
 [tool.poetry.dependencies]
 beautifulsoup4 = "^4.11.1"
