@@ -1,4 +1,6 @@
 [![Python tests](https://github.com/manulera/ShareYourCloning_backend/actions/workflows/ci.yml/badge.svg)](https://github.com/manulera/ShareYourCloning_backend/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/manulera/ShareYourCloning_backend/graph/badge.svg?token=CFIB2H6WMO)](https://codecov.io/gh/manulera/ShareYourCloning_backend)
+
 # ShareYourCloning Backend API
 
 This API is part of a bigger application, before going further, please go to the [main project readme](https://github.com/manulera/ShareYourCloning), where you can find an introduction.
