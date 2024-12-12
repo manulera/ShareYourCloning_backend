@@ -5,8 +5,13 @@ import os
 from shareyourcloning.pydantic_models import ManuallyTypedSource, RestrictionEnzymeDigestionSource
 from pytest import MonkeyPatch
 from importlib import reload
-from shareyourcloning.dna_functions import format_sequence_genbank
 from pydna.dseqrecord import Dseqrecord
+
+from shareyourcloning.dna_functions import format_sequence_genbank
+import shareyourcloning.get_router as get_router
+import shareyourcloning.endpoints.no_input as no_input_endpoints
+import shareyourcloning.endpoints.no_assembly as no_assembly_endpoints
+import shareyourcloning.main as main
 
 
 class StubRouteTest(unittest.TestCase):
@@ -14,9 +19,12 @@ class StubRouteTest(unittest.TestCase):
     def setUp(self):
         # Has to be imported here to get the right environment variable
         MonkeyPatch().setenv('RECORD_STUBS', '1')
-        import shareyourcloning.main as main
 
+        reload(get_router)
+        reload(no_input_endpoints)
+        reload(no_assembly_endpoints)
         reload(main)
+
         client = TestClient(main.app)
         self.client = client
         # remove the stubs folder
@@ -26,8 +34,10 @@ class StubRouteTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree('stubs', ignore_errors=True)
         MonkeyPatch().setenv('RECORD_STUBS', '0')
-        import shareyourcloning.main as main
 
+        reload(get_router)
+        reload(no_input_endpoints)
+        reload(no_assembly_endpoints)
         reload(main)
 
     def test_stub_route(self):
