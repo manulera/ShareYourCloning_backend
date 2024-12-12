@@ -15,9 +15,24 @@ This API provides a series of entry points. The API documentation can be accesse
 
 If you want to quickly set up a local instance of the frontend and backend of the application, check [getting started in 5 minutes](https://github.com/manulera/ShareYourCloning#timer_clock-getting-started-in-5-minutes) in the main repository.
 
-### Local installation
+### Running locally
 
-You should have python 3.9 installed in your machine. For the management of the dependencies `poetry` is used, if you don't have it, visit https://python-poetry.org/.
+You can install this as a python package:
+
+```bash
+# Create a virtual environment
+python -m venv .venv
+# Activate the virtual environment
+source .venv/bin/activate
+# Install the package from github (will be in pypi at some point)
+pip install git+https://github.com/manulera/ShareYourCloning_backend
+# Run the API (uvicorn should be installed in the virtual environment)
+uvicorn shareyourcloning.main:app
+```
+
+### Running locally if you want to contribute
+
+For the management of the dependencies `poetry` is used, if you don't have it, visit https://python-poetry.org/.
 
 In the project directory:
 
@@ -25,9 +40,7 @@ In the project directory:
 # This should install the dependencies and create a virtual environment
 poetry install
 
-# If you want to develop: poetry install --with dev --with test
-
-# If you want to commit to the repo, install the pre-commit hooks (needs poetry install --with dev)
+# Install the pre-commit hooks
 pre-commit install
 
 # Activate the virtual environment
@@ -35,7 +48,7 @@ poetry shell
 
 ```
 
-The virtual environment is install in the project folder. This is convenient if you are using an IDE for development. For settings of vscode see the folder `.vscode`.
+The virtual environment is installed in the project folder. This is convenient if you are using an IDE for development. For settings of vscode see the folder `.vscode`.
 
 Now you should be able to run the api by running:
 
@@ -50,7 +63,7 @@ Then you should be able to open the API docs at [http://127.0.0.1:8000/docs](htt
 
 If you want to serve the full site (backend and frontend) with docker, check [getting started in 5 minutes](https://github.com/manulera/ShareYourCloning#timer_clock-getting-started-in-5-minutes) in the main repository.
 
-If you want to serve only the frontend from a docker container, an image is available at [manulera/shareyourcloningbackend](https://hub.docker.com/r/manulera/shareyourcloningbackend). The image is built from the Dockerfile in the root of this repository and exposes the port 3000. To run it:
+If you want to serve only the backend from a docker container, an image is available at [manulera/shareyourcloningbackend](https://hub.docker.com/r/manulera/shareyourcloningbackend). The image is built from the Dockerfile in the root of this repository and exposes the port 3000. To run it:
 
 ```bash
 docker build -t manulera/shareyourcloningbackend .
@@ -95,12 +108,12 @@ You can see how this is done in this [docker image](https://github.com/manulera/
 Check [contribution guidelines in the main repository](https://github.com/manulera/ShareYourCloning/blob/master/CONTRIBUTING.md) for general guidelines.
 
 For more specific tasks:
-* Creating a new type of source: follow the [new source issue template](.github/ISSUE_TEMPLATE/new-source.md). You can create an issue like that [here](
+* Creating a new type of source: follow the [new source issue template](.github/ISSUE_TEMPLATE/new-source.md). You can create an issue like that [here](https://github.com/manulera/ShareYourCloning_backend/issues/new?assignees=&labels=new-source&projects=&template=new-source.md&title=New+source%3A+%3Cname-of-source%3E).
 
 ## Running the tests locally
 
 ```
-pytest -v
+pytest -v -ks
 ```
 
 ## Notes
@@ -119,3 +132,5 @@ by looking at the `RecordStubRoute` class in `record_stub_route.py`. To run the 
 ```bash
 RECORD_STUBS=1 uvicorn shareyourcloning.main:app --reload --reload-exclude='.venv'
 ```
+
+This will record the stubs (requests and responses) in the `stubs` folder.
