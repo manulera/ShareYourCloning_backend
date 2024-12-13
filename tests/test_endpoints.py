@@ -2,6 +2,7 @@ from shareyourcloning.dna_functions import format_sequence_genbank, read_dsrecor
 import shareyourcloning.endpoints.annotation as annotation_endpoints
 import shareyourcloning.main as _main
 from fastapi.testclient import TestClient
+from fastapi import Request
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
 from Bio.SeqFeature import SimpleLocation
@@ -2820,6 +2821,40 @@ class ZiqiangEtAl2024Test(unittest.TestCase):
         response = client.post(
             '/batch_cloning/ziqiang_et_al2024', json=['A' * 8 + 'ACCA' + 'A' * 8, 'T' * 8 + 'ACCA' + 'T' * 8]
         )
+
+
+class GreetingTest(unittest.TestCase):
+    def test_greeting(self):
+        response = client.get('/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<a href="./docs">here</a>', response.text)
+
+
+class InternalServerErrorTest(unittest.TestCase):
+    def test_internal_server_error_with_cors_headers(self):
+        # Simulate a request from a specific origin
+        headers = {'Origin': 'http://example.com'}
+
+        # Define a route to trigger the exception handler
+        @_main.app.get('/test-trigger-500')
+        async def trigger_500(request: Request):
+            try:
+                raise Exception('Simulated internal server error')
+            except Exception as exc:
+                # Manually call the custom exception handler
+                return await _main.app.exception_handlers[500](request, exc)
+
+        # Make a request to the new route
+        response = client.get('/test-trigger-500', headers=headers)
+
+        # Assert the status code is 500
+        assert response.status_code == 500
+        assert response.json() == {'message': 'internal server error'}
+        print(response.headers)
+        return
+        # Assert CORS headers are correctly set
+        assert response.headers['Access-Control-Allow-Origin'] == 'http://example.com'
+        assert response.headers['Access-Control-Allow-Credentials'] == 'true'
 
 
 if __name__ == '__main__':

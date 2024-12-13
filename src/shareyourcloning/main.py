@@ -64,6 +64,8 @@ async def custom_http_exception_handler(request: Request, exc: Exception):
         response.headers.update(cors.simple_headers)
         has_cookie = 'cookie' in request.headers
 
+        print('>>', cors.simple_headers)
+
         # If request includes any cookie headers, then we must respond
         # with the specific origin instead of '*'.
         if cors.allow_all_origins and has_cookie:
@@ -74,6 +76,10 @@ async def custom_http_exception_handler(request: Request, exc: Exception):
         elif not cors.allow_all_origins and cors.is_allowed_origin(origin=origin):
             response.headers['Access-Control-Allow-Origin'] = origin
             response.headers.add_vary_header('Origin')
+
+    print(response.headers)
+    print(response.body)
+    print(response)
 
     return response
 
