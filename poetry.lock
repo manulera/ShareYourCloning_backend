@@ -1541,12 +1541,14 @@ wheel = "*"
 
 [[package]]
 name = "pydna"
-version = "6.0.0-a.24.post.17+b7b559bd66"
+version = "5.3.0"
 description = "Representing double stranded DNA and functions for simulating cloning and homologous recombination between DNA molecules."
 optional = false
-python-versions = ">=3.8,<4.0"
-files = []
-develop = false
+python-versions = "<4.0,>=3.8"
+files = [
+    {file = "pydna-5.3.0-py3-none-any.whl", hash = "sha256:97572c15250c1a51e2facee5b85d85f80e519bd5368f46604ca0227a1000d060"},
+    {file = "pydna-5.3.0.tar.gz", hash = "sha256:84c4847753fd8d22e6cf5e6a6d973ea4a96cf99fee1007d12e53129418fc34dd"},
+]
 
 [package.dependencies]
 appdirs = ">=1.4.4"
@@ -1563,12 +1565,6 @@ clipboard = ["pyperclip (>=1.8.2)"]
 download = ["pyparsing (>=2.4.7)", "requests (>=2.26.0)"]
 express = ["cai2 (>=1.0.5)"]
 gel = ["matplotlib (>=3.4.3)", "pillow (>=8.4.0)", "scipy (>=1.11.3)", "scipy (>=1.9.3)"]
-
-[package.source]
-type = "git"
-url = "https://github.com/BjornFJohansson/pydna"
-reference = "9d112d715341948855455be67dcbe6adbc5c958e"
-resolved_reference = "9d112d715341948855455be67dcbe6adbc5c958e"
 
 [[package]]
 name = "pyfiglet"
@@ -2366,4 +2362,4 @@ test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "66657fb5dddb9c6d5f65ea135a78ba096d3dbab15ee0db9f9cb509a64de72d97"
+content-hash = "ea5f031148bef4740f01ecce63537ad65b779c309fd8d6a475ee610dbb249cd2"

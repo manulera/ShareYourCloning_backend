@@ -25,7 +25,7 @@ python -m venv .venv
 # Activate the virtual environment
 source .venv/bin/activate
 # Install the package from github (will be in pypi at some point)
-pip install git+https://github.com/manulera/ShareYourCloning_backend
+pip install shareyourcloning
 # Run the API (uvicorn should be installed in the virtual environment)
 uvicorn shareyourcloning.main:app
 ```
