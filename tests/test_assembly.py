@@ -1972,3 +1972,15 @@ def test_assembly_str():
 
     st = assembly.assembly2str_tuple([(1, 2, loc1_a, loc2_a), (2, 1, loc2_b, loc1_b)])
     assert st, "((1, 2, '[2:6]', '[0:4]'), (2, 1, '[6:10]', '[8:12]'))"
+
+
+def test_assembly_has_mismatches():
+
+    seq = Dseqrecord('AAAcccGGG', circular=True)
+    seq.add_feature(0, 3)
+    seq.add_feature(6, 9)
+    seq2 = Dseqrecord('cAAAtttGGGc', circular=True)
+    seq2.add_feature(1, 4)
+    seq2.add_feature(7, 10)
+
+    # TODO: finish this test
