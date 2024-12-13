@@ -869,6 +869,26 @@ def test_pcr_assembly_uracil():
     assert asm.assemble_linear()[0].seq == 'ATAUUAggccggTTAAAT'
 
 
+def test_pcr_with_mistmaches():
+    primer1 = Primer('atcTtcagacgtgtattt')
+    primer2 = Primer(reverse_complement('ccaagtgcctccGtttta'))
+
+    seq = Dseqrecord('atcatcagacgtgtatttcacaagccagaagtgcatttggatccaagtgcctccatttta')
+
+    # Works for 1 and 2 mismatches
+    for i in [1, 2]:
+        asm = assembly.PCRAssembly([primer1, seq, primer2], limit=14, mismatches=i)
+
+        prods = asm.assemble_linear()
+
+        assert len(prods) == 1
+        assert str(prods[0].seq) == 'atcTtcagacgtgtatttcacaagccagaagtgcatttggatccaagtgcctccGtttta'
+
+    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=14, mismatches=0)
+    prods = asm.assemble_linear()
+    assert len(prods) == 0
+
+
 def test_pcrs_with_overlapping_primers_circular_templates():
 
     seq = Dseqrecord(Dseq('ACGTTCGTGCGTTTTGC', circular=True))
@@ -1939,3 +1959,16 @@ def test_too_many_assemblies():
 
     with pytest.raises(ValueError):
         asm.get_insertion_assemblies()
+
+
+def test_assembly_str():
+    loc1_a = SimpleLocation(2, 6)
+    loc1_b = SimpleLocation(8, 12)
+    loc2_a = SimpleLocation(0, 4)
+    loc2_b = SimpleLocation(6, 10)
+
+    st = assembly.assembly2str([(1, 2, loc1_a, loc2_a), (2, 1, loc2_b, loc1_b)])
+    assert st, "('1[2:6]:2[0:4]', '2[6:10]:1[8:12]')"
+
+    st = assembly.assembly2str_tuple([(1, 2, loc1_a, loc2_a), (2, 1, loc2_b, loc1_b)])
+    assert st, "((1, 2, '[2:6]', '[0:4]'), (2, 1, '[6:10]', '[8:12]'))"
