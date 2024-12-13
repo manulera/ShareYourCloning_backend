@@ -1,11 +1,12 @@
 import glob
 import os
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from .get_router import get_router
+from .api_config_utils import custom_http_exception_handler as _custom_http_exception_handler
 
 from .endpoints.primer_design import router as primer_design_router
 from .endpoints.external_import import router as import_router
@@ -43,45 +44,9 @@ app.add_middleware(
 )
 
 
-# Workaround for internal server errors: https://github.com/tiangolo/fastapi/discussions/7847#discussioncomment-5144709
 @app.exception_handler(500)
 async def custom_http_exception_handler(request: Request, exc: Exception):
-
-    response = JSONResponse(content={'message': 'internal server error'}, status_code=500)
-
-    origin = request.headers.get('origin')
-
-    if origin:
-        # Have the middleware do the heavy lifting for us to parse
-        # all the config, then update our response headers
-        cors = CORSMiddleware(
-            app=app, allow_origins=origins, allow_credentials=True, allow_methods=['*'], allow_headers=['*']
-        )
-
-        # Logic directly from Starlette's CORSMiddleware:
-        # https://github.com/encode/starlette/blob/master/starlette/middleware/cors.py#L152
-
-        response.headers.update(cors.simple_headers)
-        has_cookie = 'cookie' in request.headers
-
-        print('>>', cors.simple_headers)
-
-        # If request includes any cookie headers, then we must respond
-        # with the specific origin instead of '*'.
-        if cors.allow_all_origins and has_cookie:
-            response.headers['Access-Control-Allow-Origin'] = origin
-
-        # If we only allow specific origins, then we have to mirror back
-        # the Origin header in the response.
-        elif not cors.allow_all_origins and cors.is_allowed_origin(origin=origin):
-            response.headers['Access-Control-Allow-Origin'] = origin
-            response.headers.add_vary_header('Origin')
-
-    print(response.headers)
-    print(response.body)
-    print(response)
-
-    return response
+    return await _custom_http_exception_handler(request, exc, app, origins)
 
 
 if not SERVE_FRONTEND:

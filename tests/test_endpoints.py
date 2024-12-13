@@ -47,6 +47,9 @@ from importlib import reload
 import respx
 import httpx
 from urllib.error import HTTPError
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from shareyourcloning.api_config_utils import custom_http_exception_handler
 
 test_files = os.path.join(os.path.dirname(__file__), 'test_files')
 
@@ -2831,30 +2834,82 @@ class GreetingTest(unittest.TestCase):
 
 
 class InternalServerErrorTest(unittest.TestCase):
-    def test_internal_server_error_with_cors_headers(self):
-        # Simulate a request from a specific origin
-        headers = {'Origin': 'http://example.com'}
+
+    @pytest.mark.asyncio
+    async def test_internal_server_error(self):
+        request = Request(scope={'type': 'http', 'headers': [(b'origin', b'http://localhost:3000')]})
+        print('>>>>>>>>>')
+        response = await _main.app.exception_handlers[500](request, None)
+        print('---------')
+        print(response.headers)
+        print('---------')
+        self.assertNotIn('access-control-allow-origin', response.headers)
+
+
+class CustomHttpExceptionHandlerTest(unittest.TestCase):
+    def create_dummy_client(self, allow_origins):
+        dummy_app = FastAPI()
+        dummy_app.add_middleware(
+            CORSMiddleware,
+            allow_origins=allow_origins,
+            allow_credentials=True,
+            allow_methods=['*'],
+            allow_headers=['*'],
+            expose_headers=['x-warning'],
+        )
+
+        dummy_app.exception_handlers[500] = lambda a, b: custom_http_exception_handler(a, b, dummy_app, allow_origins)
 
         # Define a route to trigger the exception handler
-        @_main.app.get('/test-trigger-500')
+        @dummy_app.get('/test-trigger-500')
         async def trigger_500(request: Request):
             try:
                 raise Exception('Simulated internal server error')
             except Exception as exc:
                 # Manually call the custom exception handler
-                return await _main.app.exception_handlers[500](request, exc)
+                return await dummy_app.exception_handlers[500](request, exc)
 
-        # Make a request to the new route
-        response = client.get('/test-trigger-500', headers=headers)
+        return TestClient(dummy_app)
 
-        # Assert the status code is 500
-        assert response.status_code == 500
-        assert response.json() == {'message': 'internal server error'}
-        print(response.headers)
-        return
-        # Assert CORS headers are correctly set
-        assert response.headers['Access-Control-Allow-Origin'] == 'http://example.com'
-        assert response.headers['Access-Control-Allow-Credentials'] == 'true'
+    def test_internal_server_error_with_cors_headers(self):
+        # Simulate a request from a specific origin
+        headers = {'Origin': 'http://example.com'}
+
+        # Origin is not allowed, access-control-allow-origin is not set
+        dummy_client = self.create_dummy_client(['http://localhost:3000', 'http://localhost:5173'])
+        response = dummy_client.get('/test-trigger-500', headers=headers)
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {'message': 'internal server error'})
+        self.assertEqual(response.headers['access-control-allow-credentials'], 'true')
+        self.assertNotIn('access-control-allow-origin', response.headers)
+
+        # All origins allowed, it's set to *
+        dummy_client = self.create_dummy_client(['*'])
+        response = dummy_client.get('/test-trigger-500', headers=headers)
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {'message': 'internal server error'})
+        self.assertEqual(response.headers['access-control-allow-credentials'], 'true')
+        self.assertEqual(response.headers['access-control-allow-origin'], '*')
+
+        headers = {'Origin': 'http://localhost:3000'}
+
+        # Origin allowed, return that origin
+        dummy_client = self.create_dummy_client(['http://localhost:3000', 'http://localhost:5173'])
+        response = dummy_client.get('/test-trigger-500', headers=headers)
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {'message': 'internal server error'})
+        self.assertEqual(response.headers['access-control-allow-credentials'], 'true')
+        self.assertEqual(response.headers['access-control-allow-origin'], 'http://localhost:3000')
+
+        headers = {'Origin': 'http://localhost:3000'}
+
+        # With cookies, origin returned even it all allowed
+        dummy_client = self.create_dummy_client(['*'])
+        response = dummy_client.get('/test-trigger-500', headers=headers, cookies={'session': 'abc123'})
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {'message': 'internal server error'})
+        self.assertEqual(response.headers['access-control-allow-credentials'], 'true')
+        self.assertEqual(response.headers['access-control-allow-origin'], 'http://localhost:3000')
 
 
 if __name__ == '__main__':
