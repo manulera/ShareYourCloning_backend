@@ -2833,9 +2833,8 @@ class GreetingTest(unittest.TestCase):
         self.assertIn('<a href="./docs">here</a>', response.text)
 
 
-class InternalServerErrorTest(unittest.TestCase):
+class InternalServerErrorTest(unittest.IsolatedAsyncioTestCase):
 
-    @pytest.mark.asyncio
     async def test_internal_server_error(self):
         request = Request(scope={'type': 'http', 'headers': [(b'origin', b'http://localhost:3000')]})
         print('>>>>>>>>>')
