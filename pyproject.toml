@@ -32,7 +32,7 @@ pre-commit = "^3.6.2"
 watchfiles = "^0.21.0"
 
 [tool.poetry.group.test.dependencies]
-pytest = "^7.4.3"
+pytest = "8.3.4"
 pre-commit = "^3.6.2"
 pytest-cov = "^4.1.0"
 pytest-rerunfailures = "^14.0"

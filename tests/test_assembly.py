@@ -869,6 +869,26 @@ def test_pcr_assembly_uracil():
     assert asm.assemble_linear()[0].seq == 'ATAUUAggccggTTAAAT'
 
 
+def test_pcr_with_mistmaches():
+    primer1 = Primer('atcTtcagacgtgtattt')
+    primer2 = Primer(reverse_complement('ccaagtgcctccGtttta'))
+
+    seq = Dseqrecord('atcatcagacgtgtatttcacaagccagaagtgcatttggatccaagtgcctccatttta')
+
+    # Works for 1 and 2 mismatches
+    for i in [1, 2]:
+        asm = assembly.PCRAssembly([primer1, seq, primer2], limit=14, mismatches=i)
+
+        prods = asm.assemble_linear()
+
+        assert len(prods) == 1
+        assert str(prods[0].seq) == 'atcTtcagacgtgtatttcacaagccagaagtgcatttggatccaagtgcctccGtttta'
+
+    asm = assembly.PCRAssembly([primer1, seq, primer2], limit=14, mismatches=0)
+    prods = asm.assemble_linear()
+    assert len(prods) == 0
+
+
 def test_pcrs_with_overlapping_primers_circular_templates():
 
     seq = Dseqrecord(Dseq('ACGTTCGTGCGTTTTGC', circular=True))
@@ -1087,6 +1107,9 @@ def test_ends_from_cutsite():
     cut = a.get_cutsites([BsrI])[0]
     a1, a2 = a.cut([BsrI])
     assert assembly.ends_from_cutsite(cut, a) == (a1.three_prime_end(), a2.five_prime_end())
+
+    with pytest.raises(ValueError):
+        assembly.ends_from_cutsite(None, Dseq('ATCG'))
 
 
 def test_restriction_ligation_assembly():
@@ -1603,6 +1626,13 @@ def test_assembly_is_valid():
             # Does not really belong here, but
             assert str(assembly.assemble(fragments, assembly_plan).seq) == 'ccTTTAAACCCg'
 
+    # is_circular must be set
+    assert not assembly.Assembly.assembly_is_valid(fragments, assembly_plan, None, True)
+
+    # In a circular assembly, first and last fragment must be the same
+    assembly_plan[0] = (1, 2, SimpleLocation(0, 3), SimpleLocation(0, 3))
+    assert not assembly.Assembly.assembly_is_valid(fragments, assembly_plan, True, True)
+
 
 def test_extract_subfragment():
     def find_feature_by_id(f: Dseqrecord, id: str) -> SeqFeature:
@@ -1939,3 +1969,61 @@ def test_too_many_assemblies():
 
     with pytest.raises(ValueError):
         asm.get_insertion_assemblies()
+
+
+def test_assembly_str():
+    loc1_a = SimpleLocation(2, 6)
+    loc1_b = SimpleLocation(8, 12)
+    loc2_a = SimpleLocation(0, 4)
+    loc2_b = SimpleLocation(6, 10)
+
+    st = assembly.assembly2str([(1, 2, loc1_a, loc2_a), (2, 1, loc2_b, loc1_b)])
+    assert st, "('1[2:6]:2[0:4]', '2[6:10]:1[8:12]')"
+
+    st = assembly.assembly2str_tuple([(1, 2, loc1_a, loc2_a), (2, 1, loc2_b, loc1_b)])
+    assert st, "((1, 2, '[2:6]', '[0:4]'), (2, 1, '[6:10]', '[8:12]'))"
+
+
+def test_assembly_has_mismatches():
+    fragments = [
+        Dseqrecord('AAGAATTCTTGAATTCCC', circular=True),
+        Dseqrecord('TCCCTTGAATTCCC', circular=True),
+    ]
+
+    for i in range(2):
+        fragments[0].features = []
+        fragments[1].features = []
+        fragments[0].add_feature(14 - i, 18)
+        fragments[1].add_feature(0, 4 + i)
+
+        for shift in range(len(fragments[0])):
+            seq1 = fragments[0].shifted(shift)
+            for shift2 in range(len(fragments[1])):
+                seq2 = fragments[1].shifted(shift2)
+                asm = [(1, 2, seq1.features[0].location, seq2.features[0].location)]
+                if i == 0:
+                    assert not assembly.assembly_has_mismatches([seq1, seq2], asm)
+                else:
+                    assert assembly.assembly_has_mismatches([seq1, seq2], asm)
+
+
+def test_single_fragment_assembly_error():
+    fragments = [Dseqrecord('AAGAATTCTTGA'), Dseqrecord('TCCCTTGAATTCCC', circular=True)]
+    with pytest.raises(ValueError):
+        assembly.SingleFragmentAssembly(fragments, algorithm=assembly.alignment_sub_strings, limit=False)
+
+    def algo(x, y, _l):
+        return assembly.restriction_ligation_overlap(x, y, [EcoRI], False)
+
+    f1 = Dseqrecord('aaGAATTCtttGAATTCaa', circular=False)
+    f = assembly.SingleFragmentAssembly([f1], algorithm=algo)
+    with pytest.raises(NotImplementedError):
+        f.get_insertion_assemblies(only_adjacent_edges=True)
+    with pytest.raises(NotImplementedError):
+        f.get_linear_assemblies()
+
+    f1 = Dseqrecord('GAATTCcatGAATTC', circular=False)
+    f = assembly.SingleFragmentAssembly([f1], limit=5)
+
+    assert len(f.assemble_insertion()) == 0
+    assert len(f.assemble_circular()) == 1

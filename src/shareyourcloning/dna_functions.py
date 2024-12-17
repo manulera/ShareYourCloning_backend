@@ -194,17 +194,6 @@ def find_sequence_regex(pattern: str, seq: str, is_circular: bool) -> list[Locat
     )
 
 
-def get_homologous_recombination_locations(
-    template: Dseqrecord, insert: Dseqrecord, minimal_homology
-) -> list[Location]:
-    """Return the locations of the possible homologous recombination sites."""
-    template_seq = str(template.seq)
-    insert_seq = str(insert.seq)
-    regex_pattern = insert_seq[:minimal_homology] + '.*' + insert_seq[-minimal_homology:]
-    locations = find_sequence_regex(regex_pattern, template_seq, template.circular)
-    return locations
-
-
 # Could be useful at some point
 # def seq_overlap_length(dseq: Dseq) -> int:
 #     return len(dseq) - abs(dseq.ovhg) - abs(dseq.watson_ovhg())
@@ -276,7 +265,7 @@ def custom_file_parser(
 
         except ValueError as e:
             # If not locus-related error, raise
-            if 'LOCUS' not in str(e):
+            if 'LOCUS line does not contain' not in str(e):
                 raise e
 
             # If the error is about the LOCUS line, we try to parse with regex
@@ -285,17 +274,13 @@ def custom_file_parser(
                 stacklevel=2,
             )
             # Reset the file handle position to the start since we consumed it in the first attempt
-            if 'LOCUS line does not contain' in str(e):
-                handle.seek(0)
-                out = list()
-                for parsed_seq in MyGenBankIterator(handle):
-                    circularize = circularize or (
-                        'topology' in parsed_seq.annotations.keys()
-                        and parsed_seq.annotations['topology'] == 'circular'
-                    )
-                    out.append(Dseqrecord(parsed_seq, circular=circularize))
-            else:
-                raise e
+            handle.seek(0)
+            out = list()
+            for parsed_seq in MyGenBankIterator(handle):
+                circularize = circularize or (
+                    'topology' in parsed_seq.annotations.keys() and parsed_seq.annotations['topology'] == 'circular'
+                )
+                out.append(Dseqrecord(parsed_seq, circular=circularize))
 
     return out
 
@@ -303,12 +288,18 @@ def custom_file_parser(
 async def get_sequence_from_euroscarf_url(plasmid_id: str) -> Dseqrecord:
     url = f'http://www.euroscarf.de/plasmid_details.php?accno={plasmid_id}'
     async with httpx.AsyncClient() as client:
-        resp = await client.get(url)
+        try:
+            resp = await client.get(url)
+        except httpx.ConnectError as e:
+            raise HTTPError(url, 504, 'could not connect to euroscarf', 'could not connect to euroscarf', None) from e
+    # I don't think this ever happens
     if resp.status_code != 200:
-        raise HTTPError(url, resp.status_code, 'invalid euroscarf id', 'invalid euroscarf id', None)
+        raise HTTPError(
+            url, resp.status_code, 'could not connect to euroscarf', 'could not connect to euroscarf', None
+        )
     # Use beautifulsoup to parse the html
     soup = BeautifulSoup(resp.text, 'html.parser')
-    # Identify if it's an error
+    # Identify if it's an error (seems to be a php error log without a body tag)
     body_tag = soup.find('body')
     if body_tag is None:
         if 'Call to a member function getName()' in resp.text:

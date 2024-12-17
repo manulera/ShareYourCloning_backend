@@ -2,6 +2,7 @@ from shareyourcloning.dna_functions import format_sequence_genbank, read_dsrecor
 import shareyourcloning.endpoints.annotation as annotation_endpoints
 import shareyourcloning.main as _main
 from fastapi.testclient import TestClient
+from fastapi import Request
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
 from Bio.SeqFeature import SimpleLocation
@@ -46,6 +47,9 @@ from importlib import reload
 import respx
 import httpx
 from urllib.error import HTTPError
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from shareyourcloning.api_config_utils import custom_http_exception_handler
 
 test_files = os.path.join(os.path.dirname(__file__), 'test_files')
 
@@ -290,6 +294,49 @@ class GenBankTest(unittest.TestCase):
         )
         response = client.post('/repository_id/genbank', json=source.model_dump())
         self.assertEqual(response.status_code, 404)
+
+    # Extremely unlikely case where the request that checks for the length
+    # succeeds, but the request that gets the sequence fails
+    @respx.mock
+    def test_request_wrong_id2(self):
+        respx.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi').mock(
+            return_value=httpx.Response(200, json={'result': {'uids': ['1'], '1': {'slen': 1000}}})
+        )
+        # 400 is the error code for a wrong sequence accession :_)
+        respx.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi').respond(400, text='')
+        source = RepositoryIdSource(
+            id=1,
+            repository_name='genbank',
+            repository_id='wrong_id',
+        )
+        response = client.post('/repository_id/genbank', json=source.model_dump())
+        self.assertEqual(response.status_code, 404)
+
+    @respx.mock
+    def test_eutils_down(self):
+        """Test that the request fails if the NCBI is down"""
+
+        # First request fails
+        respx.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi').mock(
+            side_effect=httpx.ConnectError('Connection error')
+        )
+        source = RepositoryIdSource(
+            id=1,
+            repository_name='genbank',
+            repository_id='NM_001018957.2',
+        )
+        response = client.post('/repository_id/genbank', json=source.model_dump())
+        self.assertEqual(response.status_code, 504)
+
+        # Second request fails
+        respx.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi').mock(
+            return_value=httpx.Response(200, json={'result': {'uids': ['1'], '1': {'slen': 1000}}})
+        )
+        respx.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi').mock(
+            side_effect=httpx.ConnectError('Connection error')
+        )
+        response = client.post('/repository_id/genbank', json=source.model_dump())
+        self.assertEqual(response.status_code, 504)
 
     def test_redirect(self):
         """The repository_id endpoint should redirect based on repository_name value"""
@@ -2426,6 +2473,23 @@ class EuroscarfSourceTest(unittest.TestCase):
         response = client.post('/repository_id/euroscarf', json=source_dict)
         self.assertEqual(response.status_code, 422)
 
+    @respx.mock
+    def test_circularize_plasmid(self):
+        # We mock a request in which we would get a linear plasmid
+        source = EuroscarfSource(id=0, repository_id='P9999999999999', repository_name='euroscarf')
+        respx.get('http://www.euroscarf.de/plasmid_details.php').respond(
+            200, text='<html><body><a href="files/dna/test.gb">Download</a></body></html>'
+        )
+        with open(f'{test_files}/ase1.gb', 'r') as f:
+            str_content = f.read()
+
+        respx.get('http://www.euroscarf.de/files/dna/test.gb').respond(200, text=str_content)
+        response = client.post('/repository_id/euroscarf', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        seq = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertEqual(seq.circular, True)
+
 
 class GatewaySourceTest(unittest.TestCase):
 
@@ -2683,14 +2747,26 @@ class PlannotateTest(unittest.TestCase):
         self.assertEqual(response.status_code, 500)
 
     @respx.mock
+    def test_plannotate_timeout(self):
+        respx.post('http://dummy/url/annotate').mock(side_effect=httpx.TimeoutException('Timeout error'))
+        seq = Dseqrecord('aaa')
+        seq = format_sequence_genbank(seq)
+        source = AnnotationSource(id=0, annotation_tool='plannotate')
+        response = self.client.post(
+            '/annotate/plannotate', json={'sequence': seq.model_dump(), 'source': source.model_dump()}
+        )
+        self.assertEqual(response.status_code, 504)
+
+
+class PlannotateAsyncTest(unittest.IsolatedAsyncioTestCase):
+    @respx.mock
     async def test_plannotate_other_error(self):
         # This is tested here because it's impossible to send a malformed request from the backend
         respx.post('http://dummy/url/annotate').respond(400, json={'error': 'bad request'})
 
         with pytest.raises(HTTPError) as e:
             await annotate_with_plannotate('hello', 'hello.blah', 'http://dummy/url/annotate')
-
-        self.assertEqual(e.code, 400)
+        self.assertEqual(e.value.code, 400)
 
 
 class AnnotationTest(unittest.TestCase):
@@ -2820,6 +2896,88 @@ class ZiqiangEtAl2024Test(unittest.TestCase):
         response = client.post(
             '/batch_cloning/ziqiang_et_al2024', json=['A' * 8 + 'ACCA' + 'A' * 8, 'T' * 8 + 'ACCA' + 'T' * 8]
         )
+
+
+class GreetingTest(unittest.TestCase):
+    def test_greeting(self):
+        response = client.get('/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<a href="./docs">here</a>', response.text)
+
+
+class InternalServerErrorTest(unittest.IsolatedAsyncioTestCase):
+
+    async def test_internal_server_error(self):
+        request = Request(scope={'type': 'http', 'headers': [(b'origin', b'http://localhost:3000')]})
+        response = await _main.app.exception_handlers[500](request, None)
+        self.assertEqual(response.headers['access-control-allow-credentials'], 'true')
+        self.assertEqual(response.headers['access-control-allow-origin'], 'http://localhost:3000')
+
+
+class CustomHttpExceptionHandlerTest(unittest.TestCase):
+    def create_dummy_client(self, allow_origins):
+        dummy_app = FastAPI()
+        dummy_app.add_middleware(
+            CORSMiddleware,
+            allow_origins=allow_origins,
+            allow_credentials=True,
+            allow_methods=['*'],
+            allow_headers=['*'],
+            expose_headers=['x-warning'],
+        )
+
+        dummy_app.exception_handlers[500] = lambda a, b: custom_http_exception_handler(a, b, dummy_app, allow_origins)
+
+        # Define a route to trigger the exception handler
+        @dummy_app.get('/test-trigger-500')
+        async def trigger_500(request: Request):
+            try:
+                raise Exception('Simulated internal server error')
+            except Exception as exc:
+                # Manually call the custom exception handler
+                return await dummy_app.exception_handlers[500](request, exc)
+
+        return TestClient(dummy_app)
+
+    def test_internal_server_error_with_cors_headers(self):
+        # Simulate a request from a specific origin
+        headers = {'Origin': 'http://example.com'}
+
+        # Origin is not allowed, access-control-allow-origin is not set
+        dummy_client = self.create_dummy_client(['http://localhost:3000', 'http://localhost:5173'])
+        response = dummy_client.get('/test-trigger-500', headers=headers)
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {'message': 'internal server error'})
+        self.assertEqual(response.headers['access-control-allow-credentials'], 'true')
+        self.assertNotIn('access-control-allow-origin', response.headers)
+
+        # All origins allowed, it's set to *
+        dummy_client = self.create_dummy_client(['*'])
+        response = dummy_client.get('/test-trigger-500', headers=headers)
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {'message': 'internal server error'})
+        self.assertEqual(response.headers['access-control-allow-credentials'], 'true')
+        self.assertEqual(response.headers['access-control-allow-origin'], '*')
+
+        headers = {'Origin': 'http://localhost:3000'}
+
+        # Origin allowed, return that origin
+        dummy_client = self.create_dummy_client(['http://localhost:3000', 'http://localhost:5173'])
+        response = dummy_client.get('/test-trigger-500', headers=headers)
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {'message': 'internal server error'})
+        self.assertEqual(response.headers['access-control-allow-credentials'], 'true')
+        self.assertEqual(response.headers['access-control-allow-origin'], 'http://localhost:3000')
+
+        headers = {'Origin': 'http://localhost:3000'}
+
+        # With cookies, origin returned even it all allowed
+        dummy_client = self.create_dummy_client(['*'])
+        response = dummy_client.get('/test-trigger-500', headers=headers, cookies={'session': 'abc123'})
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json(), {'message': 'internal server error'})
+        self.assertEqual(response.headers['access-control-allow-credentials'], 'true')
+        self.assertEqual(response.headers['access-control-allow-origin'], 'http://localhost:3000')
 
 
 if __name__ == '__main__':

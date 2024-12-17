@@ -1,14 +1,23 @@
-from shareyourcloning.dna_functions import find_sequence_regex, custom_file_parser
+from shareyourcloning.dna_functions import (
+    find_sequence_regex,
+    custom_file_parser,
+    correct_name,
+    MyGenBankScanner,
+    get_sequence_from_euroscarf_url,
+)
 from shareyourcloning.dna_utils import sum_is_sticky
+from urllib.error import HTTPError
 import unittest
 from pydna.dseq import Dseq
 import os
+import respx
+import httpx
 
 test_files = os.path.join(os.path.dirname(__file__), 'test_files')
 
 
 # Tests for sum_is_sticky() in dna_functions.py
-class TestPartialSticky(unittest.TestCase):
+class PartialStickyTest(unittest.TestCase):
     # General test functions
     def expectTrue(self, seq_left, seq_right, partial):
         with self.subTest():
@@ -19,7 +28,7 @@ class TestPartialSticky(unittest.TestCase):
             self.assertFalse(sum_is_sticky(seq_left.three_prime_end(), seq_right.five_prime_end(), partial))
 
 
-class MultiTestPartialSticky(TestPartialSticky):
+class MultiTestPartialStickyTest(PartialStickyTest):
     # Specific cases
     def test_blunt_ends(self):
         for partial in [False, True]:
@@ -151,7 +160,7 @@ class SequenceRegexTest(unittest.TestCase):
         self.assertEqual(features[2].extract(template_seq), 'AAGGTTCC')
 
 
-class TestPermisiveParserWithApe(unittest.TestCase):
+class PermisiveParserWithApeTest(unittest.TestCase):
     def test_permisive_parser_with_ape_circular(self):
         with open(f'{test_files}/P2RP3.ape', 'r') as f:
             plasmid = custom_file_parser(f, 'genbank')[0]
@@ -171,3 +180,56 @@ class TestPermisiveParserWithApe(unittest.TestCase):
         with open(f'{test_files}/ase1_no_topology.gb', 'r') as f:
             plasmid = custom_file_parser(f, 'genbank')[0]
             self.assertEqual(plasmid.circular, False)
+
+    def test_custom_file_parser_body_error(self):
+        with open(f'{test_files}/ase1_body_error.gb', 'r') as f:
+            with self.assertRaises(ValueError):
+                custom_file_parser(f, 'genbank')
+
+
+class MinorFunctionsTest(unittest.TestCase):
+    def test_correct_name(self):
+        file = f'{test_files}/addgene-plasmid-39296-sequence-49545.gbk'
+        with open(file, 'r') as f:
+            dseq = custom_file_parser(f, 'genbank')[0]
+        correct_name(dseq)
+        self.assertEqual(dseq.name, 'pFA6a-kanMX6')
+
+    def test_error_on_genbank_scanner(self):
+
+        with self.assertRaises(ValueError):
+            MyGenBankScanner(debug=0)._feed_first_line(None, 'LOCUS hello bye')
+
+
+class MinorFunctionsAsyncTest(unittest.IsolatedAsyncioTestCase):
+    @respx.mock
+    async def test_error_euroscarf(self):
+
+        # Connection error
+        respx.get('http://www.euroscarf.de/plasmid_details.php').mock(
+            side_effect=httpx.ConnectError('Connection error')
+        )
+        with self.assertRaises(HTTPError) as e:
+            await get_sequence_from_euroscarf_url('blah')
+        self.assertEqual(e.exception.code, 504)
+        self.assertIn('could not connect to euroscarf', str(e.exception))
+
+        # As far as I can tell, this never happens (it always returns a 200 even if the page is missing)
+        respx.get('http://www.euroscarf.de/plasmid_details.php').respond(503, text='')
+        with self.assertRaises(HTTPError) as e:
+            await get_sequence_from_euroscarf_url('blah')
+        self.assertEqual(e.exception.code, 503)
+        self.assertIn('could not connect to euroscarf', str(e.exception))
+
+        # If the format of the page would change, these errors should be raised
+        respx.get('http://www.euroscarf.de/plasmid_details.php').respond(200, text='')
+        with self.assertRaises(HTTPError) as e:
+            await get_sequence_from_euroscarf_url('blah')
+        self.assertEqual(e.exception.code, 503)
+        self.assertIn('Could not retrieve plasmid details', str(e.exception))
+
+        respx.get('http://www.euroscarf.de/plasmid_details.php').respond(200, text='<body>missing other</body>')
+        with self.assertRaises(HTTPError) as e:
+            await get_sequence_from_euroscarf_url('blah')
+        self.assertEqual(e.exception.code, 503)
+        self.assertIn('Could not retrieve plasmid details', str(e.exception))
