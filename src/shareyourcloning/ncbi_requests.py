@@ -96,8 +96,8 @@ async def get_sequence_length_from_sequence_accession(sequence_accession: str) -
     return data['result'][sequence_id]['slen']
 
 
-async def get_genbank_sequence_subset(sequence_accession, start, end, strand):
-    gb_strand = 1 if strand == 1 else 2
+async def get_genbank_sequence(sequence_accession, start=None, end=None, strand=None):
+    gb_strand = 1 if strand == 1 or strand is None else 2
     url = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi'
     params = {
         'db': 'nuccore',

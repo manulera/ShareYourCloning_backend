@@ -295,6 +295,48 @@ class GenBankTest(unittest.TestCase):
         response = client.post('/repository_id/genbank', json=source.model_dump())
         self.assertEqual(response.status_code, 404)
 
+    # Extremely unlikely case where the request that checks for the length
+    # succeeds, but the request that gets the sequence fails
+    @respx.mock
+    def test_request_wrong_id2(self):
+        respx.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi').mock(
+            return_value=httpx.Response(200, json={'result': {'uids': ['1'], '1': {'slen': 1000}}})
+        )
+        respx.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi').respond(404, text='')
+        source = RepositoryIdSource(
+            id=1,
+            repository_name='genbank',
+            repository_id='wrong_id',
+        )
+        response = client.post('/repository_id/genbank', json=source.model_dump())
+        self.assertEqual(response.status_code, 404)
+
+    @respx.mock
+    def test_eutils_down(self):
+        """Test that the request fails if the NCBI is down"""
+
+        # First request fails
+        respx.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi').mock(
+            side_effect=httpx.ConnectError('Connection error')
+        )
+        source = RepositoryIdSource(
+            id=1,
+            repository_name='genbank',
+            repository_id='NM_001018957.2',
+        )
+        response = client.post('/repository_id/genbank', json=source.model_dump())
+        self.assertEqual(response.status_code, 504)
+
+        # Second request fails
+        respx.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi').mock(
+            return_value=httpx.Response(200, json={'result': {'uids': ['1'], '1': {'slen': 1000}}})
+        )
+        respx.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi').mock(
+            side_effect=httpx.ConnectError('Connection error')
+        )
+        response = client.post('/repository_id/genbank', json=source.model_dump())
+        self.assertEqual(response.status_code, 504)
+
     def test_redirect(self):
         """The repository_id endpoint should redirect based on repository_name value"""
         source = RepositoryIdSource(
@@ -2685,6 +2727,17 @@ class PlannotateTest(unittest.TestCase):
             '/annotate/plannotate', json={'sequence': seq.model_dump(), 'source': source.model_dump()}
         )
         self.assertEqual(response.status_code, 500)
+
+    @respx.mock
+    def test_plannotate_timeout(self):
+        respx.post('http://dummy/url/annotate').mock(side_effect=httpx.TimeoutException('Timeout error'))
+        seq = Dseqrecord('aaa')
+        seq = format_sequence_genbank(seq)
+        source = AnnotationSource(id=0, annotation_tool='plannotate')
+        response = self.client.post(
+            '/annotate/plannotate', json={'sequence': seq.model_dump(), 'source': source.model_dump()}
+        )
+        self.assertEqual(response.status_code, 504)
 
 
 class PlannotateAsyncTest(unittest.IsolatedAsyncioTestCase):

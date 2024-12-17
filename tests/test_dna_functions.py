@@ -11,6 +11,7 @@ import unittest
 from pydna.dseq import Dseq
 import os
 import respx
+import httpx
 
 test_files = os.path.join(os.path.dirname(__file__), 'test_files')
 
@@ -203,9 +204,32 @@ class MinorFunctionsTest(unittest.TestCase):
 class MinorFunctionsAsyncTest(unittest.IsolatedAsyncioTestCase):
     @respx.mock
     async def test_error_euroscarf(self):
-        respx.get('http://www.euroscarf.de/plasmid_details.php').respond(503, text='')
 
+        # Connection error
+        respx.get('http://www.euroscarf.de/plasmid_details.php').mock(
+            side_effect=httpx.ConnectError('Connection error')
+        )
+        with self.assertRaises(HTTPError) as e:
+            await get_sequence_from_euroscarf_url('blah')
+        self.assertEqual(e.exception.code, 504)
+        self.assertIn('could not connect to euroscarf', str(e.exception))
+
+        # As far as I can tell, this never happens (it always returns a 200 even if the page is missing)
+        respx.get('http://www.euroscarf.de/plasmid_details.php').respond(503, text='')
         with self.assertRaises(HTTPError) as e:
             await get_sequence_from_euroscarf_url('blah')
         self.assertEqual(e.exception.code, 503)
         self.assertIn('could not connect to euroscarf', str(e.exception))
+
+        # If the format of the page would change, these errors should be raised
+        respx.get('http://www.euroscarf.de/plasmid_details.php').respond(200, text='')
+        with self.assertRaises(HTTPError) as e:
+            await get_sequence_from_euroscarf_url('blah')
+        self.assertEqual(e.exception.code, 503)
+        self.assertIn('Could not retrieve plasmid details', str(e.exception))
+
+        respx.get('http://www.euroscarf.de/plasmid_details.php').respond(200, text='<body>missing other</body>')
+        with self.assertRaises(HTTPError) as e:
+            await get_sequence_from_euroscarf_url('blah')
+        self.assertEqual(e.exception.code, 503)
+        self.assertIn('Could not retrieve plasmid details', str(e.exception))

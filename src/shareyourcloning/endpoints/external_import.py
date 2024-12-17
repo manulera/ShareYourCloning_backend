@@ -3,12 +3,11 @@ from pydantic import create_model
 import io
 import warnings
 import asyncio
+import httpx
 from starlette.responses import RedirectResponse
 from Bio import BiopythonParserWarning
 from typing import Annotated
 from urllib.error import HTTPError, URLError
-from pydna.genbank import Genbank
-from pydna.dseqrecord import Dseqrecord
 from ..get_router import get_router
 from ..pydantic_models import (
     TextFileSequence,
@@ -203,15 +202,13 @@ async def get_from_repository_id(
 )
 async def get_from_repository_id_genbank(source: RepositoryIdSource):
     try:
-        gb = Genbank('example@gmail.com')
+        # This request already fails if the sequence does not exist
         seq_length = await ncbi_requests.get_sequence_length_from_sequence_accession(source.repository_id)
         if seq_length > 100000:
             raise HTTPException(400, 'sequence is too long (max 100000 bp)')
-        seq = Dseqrecord(gb.nucleotide(source.repository_id))
-    except HTTPError as exception:
-        repository_id_http_error_handler(exception, source)
-    except URLError as exception:
-        repository_id_url_error_handler(exception, source)
+        seq = await ncbi_requests.get_genbank_sequence(source.repository_id)
+    except httpx.ConnectError as exception:
+        raise HTTPException(504, f'Unable to connect to NCBI: {exception}')
 
     return {'sequences': [format_sequence_genbank(seq, source.output_name)], 'sources': [source.model_copy()]}
 
@@ -371,7 +368,7 @@ async def genome_coordinates(
                 )
 
     async def get_sequence_task():
-        return await ncbi_requests.get_genbank_sequence_subset(
+        return await ncbi_requests.get_genbank_sequence(
             source.sequence_accession, source.start, source.end, source.strand
         )
 

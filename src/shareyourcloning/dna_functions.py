@@ -288,14 +288,18 @@ def custom_file_parser(
 async def get_sequence_from_euroscarf_url(plasmid_id: str) -> Dseqrecord:
     url = f'http://www.euroscarf.de/plasmid_details.php?accno={plasmid_id}'
     async with httpx.AsyncClient() as client:
-        resp = await client.get(url)
+        try:
+            resp = await client.get(url)
+        except httpx.ConnectError as e:
+            raise HTTPError(url, 504, 'could not connect to euroscarf', 'could not connect to euroscarf', None) from e
+    # I don't think this ever happens
     if resp.status_code != 200:
         raise HTTPError(
             url, resp.status_code, 'could not connect to euroscarf', 'could not connect to euroscarf', None
         )
     # Use beautifulsoup to parse the html
     soup = BeautifulSoup(resp.text, 'html.parser')
-    # Identify if it's an error
+    # Identify if it's an error (seems to be a php error log without a body tag)
     body_tag = soup.find('body')
     if body_tag is None:
         if 'Call to a member function getName()' in resp.text:
