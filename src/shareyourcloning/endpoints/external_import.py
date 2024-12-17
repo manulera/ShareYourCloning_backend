@@ -224,8 +224,6 @@ async def get_from_repository_id_addgene(source: AddGeneIdSource):
         dseq, out_source = await request_from_addgene(source)
     except HTTPError as exception:
         repository_id_http_error_handler(exception, source)
-    except URLError as exception:
-        repository_id_url_error_handler(exception, source)
 
     return {'sequences': [format_sequence_genbank(dseq, source.output_name)], 'sources': [out_source]}
 
@@ -306,8 +304,6 @@ async def get_from_repository_id_igem(source: IGEMSource):
         return {'sequences': [format_sequence_genbank(dseq, source.output_name)], 'sources': [source]}
     except HTTPError as exception:
         repository_id_http_error_handler(exception, source)
-    except URLError as exception:
-        repository_id_url_error_handler(exception, source)
 
 
 @router.post(

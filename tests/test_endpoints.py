@@ -302,7 +302,8 @@ class GenBankTest(unittest.TestCase):
         respx.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi').mock(
             return_value=httpx.Response(200, json={'result': {'uids': ['1'], '1': {'slen': 1000}}})
         )
-        respx.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi').respond(404, text='')
+        # 400 is the error code for a wrong sequence accession :_)
+        respx.get('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi').respond(400, text='')
         source = RepositoryIdSource(
             id=1,
             repository_name='genbank',
@@ -2471,6 +2472,23 @@ class EuroscarfSourceTest(unittest.TestCase):
         source_dict['repository_id'] = 'hello'
         response = client.post('/repository_id/euroscarf', json=source_dict)
         self.assertEqual(response.status_code, 422)
+
+    @respx.mock
+    def test_circularize_plasmid(self):
+        # We mock a request in which we would get a linear plasmid
+        source = EuroscarfSource(id=0, repository_id='P9999999999999', repository_name='euroscarf')
+        respx.get('http://www.euroscarf.de/plasmid_details.php').respond(
+            200, text='<html><body><a href="files/dna/test.gb">Download</a></body></html>'
+        )
+        with open(f'{test_files}/ase1.gb', 'r') as f:
+            str_content = f.read()
+
+        respx.get('http://www.euroscarf.de/files/dna/test.gb').respond(200, text=str_content)
+        response = client.post('/repository_id/euroscarf', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        seq = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertEqual(seq.circular, True)
 
 
 class GatewaySourceTest(unittest.TestCase):
