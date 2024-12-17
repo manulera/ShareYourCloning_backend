@@ -2693,8 +2693,9 @@ class PlannotateAsyncTest(unittest.IsolatedAsyncioTestCase):
         # This is tested here because it's impossible to send a malformed request from the backend
         respx.post('http://dummy/url/annotate').respond(400, json={'error': 'bad request'})
 
-        with pytest.raises(HTTPError):
+        with pytest.raises(HTTPError) as e:
             await annotate_with_plannotate('hello', 'hello.blah', 'http://dummy/url/annotate')
+        self.assertEqual(e.value.code, 400)
 
 
 class AnnotationTest(unittest.TestCase):
