@@ -73,7 +73,7 @@ async def get_annotations_from_query(query: str, assembly_accession: str) -> lis
 
     data = resp.json()
     if 'reports' not in data:
-        raise HTTPException(404, 'wrong locus_tag')
+        raise HTTPException(404, f'query "{query}" gave no results')
 
     if len(data['reports']) > 1:
         raise HTTPException(400, 'multiple matches for query')

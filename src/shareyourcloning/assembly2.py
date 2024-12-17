@@ -300,9 +300,6 @@ def alignment_sub_strings(seqx: _Dseqrecord | _Primer, seqy: _Dseqrecord | _Prim
 
     if len(primer) < limit:
         return []
-    # Edge case, in circular sequences the primer could align with 2 * template
-    if len(template) < len(primer):
-        return []
 
     subject = seqrecord2str_for_alignment(template)
     query = (
@@ -1312,7 +1309,7 @@ class SingleFragmentAssembly(Assembly):
             # We don't want the same location twice
             if x[0][2] == x[0][3]:
                 return False
-            # We don't want to get the same fragment again
+            # We don't want to get overlap only (e.g. GAATTCcatGAATTC giving GAATTC)
             left_start, _ = _location_boundaries(x[0][2])
             _, right_end = _location_boundaries(x[0][3])
             if left_start == 0 and right_end == len(self.fragments[0]):

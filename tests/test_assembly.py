@@ -1108,6 +1108,9 @@ def test_ends_from_cutsite():
     a1, a2 = a.cut([BsrI])
     assert assembly.ends_from_cutsite(cut, a) == (a1.three_prime_end(), a2.five_prime_end())
 
+    with pytest.raises(ValueError):
+        assembly.ends_from_cutsite(None, Dseq('ATCG'))
+
 
 def test_restriction_ligation_assembly():
 
@@ -1623,6 +1626,13 @@ def test_assembly_is_valid():
             # Does not really belong here, but
             assert str(assembly.assemble(fragments, assembly_plan).seq) == 'ccTTTAAACCCg'
 
+    # is_circular must be set
+    assert not assembly.Assembly.assembly_is_valid(fragments, assembly_plan, None, True)
+
+    # In a circular assembly, first and last fragment must be the same
+    assembly_plan[0] = (1, 2, SimpleLocation(0, 3), SimpleLocation(0, 3))
+    assert not assembly.Assembly.assembly_is_valid(fragments, assembly_plan, True, True)
+
 
 def test_extract_subfragment():
     def find_feature_by_id(f: Dseqrecord, id: str) -> SeqFeature:
@@ -1975,12 +1985,45 @@ def test_assembly_str():
 
 
 def test_assembly_has_mismatches():
+    fragments = [
+        Dseqrecord('AAGAATTCTTGAATTCCC', circular=True),
+        Dseqrecord('TCCCTTGAATTCCC', circular=True),
+    ]
 
-    seq = Dseqrecord('AAAcccGGG', circular=True)
-    seq.add_feature(0, 3)
-    seq.add_feature(6, 9)
-    seq2 = Dseqrecord('cAAAtttGGGc', circular=True)
-    seq2.add_feature(1, 4)
-    seq2.add_feature(7, 10)
+    for i in range(2):
+        fragments[0].features = []
+        fragments[1].features = []
+        fragments[0].add_feature(14 - i, 18)
+        fragments[1].add_feature(0, 4 + i)
 
-    # TODO: finish this test
+        for shift in range(len(fragments[0])):
+            seq1 = fragments[0].shifted(shift)
+            for shift2 in range(len(fragments[1])):
+                seq2 = fragments[1].shifted(shift2)
+                asm = [(1, 2, seq1.features[0].location, seq2.features[0].location)]
+                if i == 0:
+                    assert not assembly.assembly_has_mismatches([seq1, seq2], asm)
+                else:
+                    assert assembly.assembly_has_mismatches([seq1, seq2], asm)
+
+
+def test_single_fragment_assembly_error():
+    fragments = [Dseqrecord('AAGAATTCTTGA'), Dseqrecord('TCCCTTGAATTCCC', circular=True)]
+    with pytest.raises(ValueError):
+        assembly.SingleFragmentAssembly(fragments, algorithm=assembly.alignment_sub_strings, limit=False)
+
+    def algo(x, y, _l):
+        return assembly.restriction_ligation_overlap(x, y, [EcoRI], False)
+
+    f1 = Dseqrecord('aaGAATTCtttGAATTCaa', circular=False)
+    f = assembly.SingleFragmentAssembly([f1], algorithm=algo)
+    with pytest.raises(NotImplementedError):
+        f.get_insertion_assemblies(only_adjacent_edges=True)
+    with pytest.raises(NotImplementedError):
+        f.get_linear_assemblies()
+
+    f1 = Dseqrecord('GAATTCcatGAATTC', circular=False)
+    f = assembly.SingleFragmentAssembly([f1], limit=5)
+
+    assert len(f.assemble_insertion()) == 0
+    assert len(f.assemble_circular()) == 1
