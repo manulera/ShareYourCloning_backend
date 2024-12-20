@@ -7,7 +7,7 @@ import httpx
 from starlette.responses import RedirectResponse
 from Bio import BiopythonParserWarning
 from typing import Annotated
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from ..get_router import get_router
 from ..pydantic_models import (
     TextFileSequence,
@@ -123,11 +123,7 @@ async def read_from_file(
             response.headers['x-warning'] = '; '.join(warning_messages)
 
     except ValueError as e:
-        if 'LOCUS' in str(e):
-            raise HTTPException(422, str(e))
-        else:
-            print('error >>', e)
-            raise HTTPException(422, 'Biopython cannot process this file.')
+        raise HTTPException(422, f'Biopython cannot process this file: {e}.')
 
     # This happens when textfiles are empty or contain something else, or when reading a text file as snapgene file,
     # since StringIO does not raise an error when "Unexpected end of packet" is found
@@ -170,10 +166,6 @@ def repository_id_http_error_handler(exception: HTTPError, source: RepositoryIdS
             404,
             f'{source.repository_name} returned: {exception} - Likely you inserted a wrong {source.repository_name} id',
         )
-
-
-def repository_id_url_error_handler(exception: URLError, source: RepositoryIdSource):
-    raise HTTPException(504, f'Unable to connect to {source.repository_name}: {exception}')
 
 
 # Redirect to the right repository

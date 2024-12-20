@@ -246,6 +246,12 @@ class ReadFileTest(unittest.TestCase):
         self.assertEqual(len(sources), 1)
         self.assertEqual(len(resulting_sequences), 1)
 
+        # If the index is outside the range, it should raise an error
+        with open(f'{test_files}/dummy_multi_fasta.fasta', 'rb') as f:
+            response = client.post('/read_from_file?index_in_file=2', files={'file': f})
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()['detail'], 'The index_in_file is out of range.')
+
     def test_circularize_fasta_sequence(self):
         """Test that the circularize parameter works when reading from file"""
         file_paths = [
