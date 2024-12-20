@@ -128,9 +128,9 @@ async def crispr(
         raise HTTPException(
             400, 'A Cas9 cutsite was found, and a homologous recombination region, but they do not overlap.'
         )
-    elif len(valid_assemblies) != len(possible_assemblies):
-        # TODO: warning that some assemblies were discarded
-        pass
+    # elif len(valid_assemblies) != len(possible_assemblies):
+    #     # TODO: warning that some assemblies were discarded
+    #     pass
 
     # TODO: double check that this works for circular DNA -> for now get_insertion_assemblies() is only
     # meant for linear DNA

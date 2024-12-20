@@ -12,6 +12,7 @@ import shareyourcloning.get_router as get_router
 import shareyourcloning.endpoints.no_input as no_input_endpoints
 import shareyourcloning.endpoints.no_assembly as no_assembly_endpoints
 import shareyourcloning.main as main
+import shareyourcloning.app_settings as app_settings
 
 
 class StubRouteTest(unittest.TestCase):
@@ -19,7 +20,7 @@ class StubRouteTest(unittest.TestCase):
     def setUp(self):
         # Has to be imported here to get the right environment variable
         MonkeyPatch().setenv('RECORD_STUBS', '1')
-
+        reload(app_settings)
         reload(get_router)
         reload(no_input_endpoints)
         reload(no_assembly_endpoints)
@@ -35,6 +36,7 @@ class StubRouteTest(unittest.TestCase):
         shutil.rmtree('stubs', ignore_errors=True)
         MonkeyPatch().setenv('RECORD_STUBS', '0')
 
+        reload(app_settings)
         reload(get_router)
         reload(no_input_endpoints)
         reload(no_assembly_endpoints)

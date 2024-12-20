@@ -1,5 +1,4 @@
 import glob
-import os
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,18 +14,7 @@ from .endpoints.annotation import router as annotation_router
 from .endpoints.assembly import router as assembly_router
 from .endpoints.no_assembly import router as no_assembly_router
 from .endpoints.no_input import router as no_input_router
-
-
-# ENV variables ========================================
-SERVE_FRONTEND = os.environ['SERVE_FRONTEND'] == '1' if 'SERVE_FRONTEND' in os.environ else False
-BATCH_CLONING = os.environ['BATCH_CLONING'] == '1' if 'BATCH_CLONING' in os.environ else True
-
-origins = []
-if os.environ.get('ALLOWED_ORIGINS') is not None:
-    origins = os.environ['ALLOWED_ORIGINS'].split(',')
-elif not SERVE_FRONTEND:
-    # Default to the yarn start frontend url and the cypress testing
-    origins = ['http://localhost:3000', 'http://localhost:5173']
+from .app_settings import settings
 
 # =====================================================
 
@@ -36,7 +24,7 @@ app = FastAPI()
 router = get_router()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
@@ -46,10 +34,10 @@ app.add_middleware(
 
 @app.exception_handler(500)
 async def custom_http_exception_handler(request: Request, exc: Exception):
-    return await _custom_http_exception_handler(request, exc, app, origins)
+    return await _custom_http_exception_handler(request, exc, app, settings.ALLOWED_ORIGINS)
 
 
-if not SERVE_FRONTEND:
+if not settings.SERVE_FRONTEND:
 
     @router.get('/')
     async def greeting(request: Request):
@@ -98,7 +86,7 @@ app.include_router(assembly_router)
 app.include_router(no_assembly_router)
 app.include_router(no_input_router)
 
-if BATCH_CLONING:
+if settings.BATCH_CLONING:
     from .batch_cloning import router as batch_cloning_router
     from .batch_cloning.ziqiang_et_al2024 import router as ziqiang_et_al2024_router
     from .batch_cloning.pombe import router as pombe_router

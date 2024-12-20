@@ -8,6 +8,7 @@ import glob
 import os
 import tempfile
 import shareyourcloning.main as main
+import shareyourcloning.app_settings as app_settings
 
 
 test_files = os.path.join(os.path.dirname(__file__), 'test_files')
@@ -53,7 +54,7 @@ class TestServeFrontend(unittest.TestCase):
 
         # Has to be imported here to get the right environment variable
         MonkeyPatch().setenv('SERVE_FRONTEND', '1')
-
+        reload(app_settings)
         reload(main)
         client = TestClient(main.app)
         self.client = client
@@ -62,21 +63,25 @@ class TestServeFrontend(unittest.TestCase):
     def tearDown(self):
         self.folder_override.__exit__(None, None, None)
         MonkeyPatch().setenv('SERVE_FRONTEND', '0')
-
+        reload(app_settings)
         reload(main)
 
     def test_serve_frontend(self):
         # The index is served at the root
         response = self.client.get('/')
-        assert response.status_code == 200
-        assert '<noscript>You need to enable JavaScript to run this app.</noscript>' in response.text
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<noscript>You need to enable JavaScript to run this app.</noscript>', response.text)
 
         # The rest of files can be accessed:
         for file in ['config.json', 'favicon.ico', 'robots.txt', 'logo192.png', 'logo512.png', 'manifest.json']:
             response = self.client.get(f'/{file}')
-            assert response.status_code == 200
+            self.assertEqual(response.status_code, 200)
 
         # Can still make a normal request (e.g. enzymes)
         response = self.client.get('/restriction_enzyme_list')
-        assert response.status_code == 200
-        assert 'EcoRI' in response.text
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('EcoRI', response.text)
+
+        # If requesting a file that does not exist, it should return a 404
+        response = self.client.get('/dummy_file.json')
+        self.assertEqual(response.status_code, 404)

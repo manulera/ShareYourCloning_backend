@@ -1,11 +1,29 @@
-from shareyourcloning.dna_functions import format_sequence_genbank, read_dsrecord_from_json, annotate_with_plannotate
-import shareyourcloning.endpoints.annotation as annotation_endpoints
-import shareyourcloning.main as _main
 from fastapi.testclient import TestClient
 from fastapi import Request
 from pydna.parsers import parse as pydna_parse
 from Bio.Restriction.Restriction import CommOnly
 from Bio.SeqFeature import SimpleLocation
+from pydna.dseqrecord import Dseqrecord
+import unittest
+from pydna.dseq import Dseq
+import copy
+import json
+import tempfile
+import pytest
+from Bio.Seq import reverse_complement
+import os
+from importlib import reload
+import respx
+import httpx
+from urllib.error import HTTPError
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+import shareyourcloning.request_examples as request_examples
+from shareyourcloning.dna_functions import format_sequence_genbank, read_dsrecord_from_json, annotate_with_plannotate
+import shareyourcloning.app_settings as app_settings
+import shareyourcloning.endpoints.annotation as annotation_endpoints
+import shareyourcloning.main as _main
 from shareyourcloning.pydantic_models import (
     RepositoryIdSource,
     PCRSource,
@@ -33,22 +51,6 @@ from shareyourcloning.pydantic_models import (
     AnnotationSource,
     IGEMSource,
 )
-from pydna.dseqrecord import Dseqrecord
-import unittest
-from pydna.dseq import Dseq
-import shareyourcloning.request_examples as request_examples
-import copy
-import json
-import tempfile
-import pytest
-from Bio.Seq import reverse_complement
-import os
-from importlib import reload
-import respx
-import httpx
-from urllib.error import HTTPError
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from shareyourcloning.api_config_utils import custom_http_exception_handler
 
 test_files = os.path.join(os.path.dirname(__file__), 'test_files')
@@ -559,6 +561,15 @@ class LigationTest(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         data = response.json()
         self.assertEqual(data['detail'], 'The provided assembly is not valid.')
+
+        # Check no ligation
+        source = LigationSource(id=0)
+        inputs = [format_sequence_genbank(seq).model_dump() for seq in [Dseqrecord('ATCG'), Dseqrecord('ATCG')]]
+        data = {'source': source.model_dump(), 'sequences': inputs}
+        response = client.post('/ligation', json=data)
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertEqual(data['detail'], 'No ligations were found.')
 
     def test_linear_assembly_no_order(self):
         """Test that when order is not provided, no duplicate sequences are returned as options."""
@@ -1884,6 +1895,63 @@ class CrisprTest(unittest.TestCase):
 
         self.assertEqual(str(resulting_sequences[0].seq), 'aaccggttAAAAAAAAAttcaaagcac'.upper())
 
+        # Multi outputs
+        template = Dseqrecord('aaccggttcaatgcaaacagtaatgatggatgacattcaaagcaccgtttatcagtattcaaagcac')
+        json_template = format_sequence_genbank(template)
+        json_template.id = 1
+
+        insert = Dseqrecord('aaccggttAAAAAAAAAttcaaagcac')
+        json_insert = format_sequence_genbank(insert)
+        json_insert.id = 2
+
+        guide = PrimerModel(sequence='ttcaatgcaaacagtaatga', id=3, name='guide_1')
+        source = CRISPRSource(
+            id=0,
+            guides=[3],
+        )
+        data = {
+            'source': source.model_dump(),
+            'sequences': [json_template.model_dump(), json_insert.model_dump()],
+            'guides': [guide.model_dump()],
+        }
+        params = {'minimal_homology': 8}
+
+        response = client.post('/crispr', json=data, params=params)
+
+        payload = response.json()
+        self.assertEqual(response.status_code, 200)
+        resulting_sequences = [
+            read_dsrecord_from_json(TextFileSequence.model_validate(s)) for s in payload['sequences']
+        ]
+        sources = [CRISPRSource.model_validate(s) for s in payload['sources']]
+
+        self.assertEqual(len(resulting_sequences), 2)
+        self.assertEqual(len(sources), 2)
+
+        output_seqs = set([str(s.seq) for s in resulting_sequences])
+        self.assertEqual(
+            output_seqs,
+            {
+                'aaccggttAAAAAAAAAttcaaagcac'.upper(),
+                'aaccggttAAAAAAAAAttcaaagcaccgtttatcagtattcaaagcac'.upper(),
+            },
+        )
+
+        # Submit a known source
+
+        data = {
+            'source': sources[0].model_dump(),
+            'sequences': [json_template.model_dump(), json_insert.model_dump()],
+            'guides': [guide.model_dump()],
+        }
+        response = client.post('/crispr', json=data, params=params)
+
+        payload = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(payload['sources']), 1)
+        self.assertEqual(len(payload['sequences']), 1)
+        self.assertEqual(payload['sources'][0], sources[0].model_dump())
+
     def test_errors(self):
 
         # Wrong guide
@@ -2701,12 +2769,14 @@ class PlannotateTest(unittest.TestCase):
         # Has to be imported here to get the right environment variable
         pytest.MonkeyPatch().setenv('PLANNOTATE_URL', 'http://dummy/url')
 
+        reload(app_settings)
         reload(annotation_endpoints)
         reload(_main)
         self.client = TestClient(_main.app)
 
     def tearDown(self):
         pytest.MonkeyPatch().setenv('PLANNOTATE_URL', '')
+        reload(app_settings)
         reload(annotation_endpoints)
         reload(_main)
 
@@ -2803,6 +2873,7 @@ class IGEMSourceTest(unittest.TestCase):
         'https://raw.githubusercontent.com/manulera/annotated-igem-distribution/master/results/plasmids/dummy.gb'
     )
 
+    @pytest.mark.flaky(reruns=3, reruns_delay=2)
     def test_igem(self):
         source = IGEMSource(
             id=0, repository_name='igem', repository_id='BBa_C0062-dummy', sequence_file_url=self.good_url
@@ -2909,6 +2980,7 @@ class InternalServerErrorTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_internal_server_error(self):
         request = Request(scope={'type': 'http', 'headers': [(b'origin', b'http://localhost:3000')]})
+        print(_main.settings.ALLOWED_ORIGINS)
         response = await _main.app.exception_handlers[500](request, None)
         self.assertEqual(response.headers['access-control-allow-credentials'], 'true')
         self.assertEqual(response.headers['access-control-allow-origin'], 'http://localhost:3000')

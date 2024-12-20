@@ -1,15 +1,11 @@
 import requests
 from fastapi import HTTPException
 from pydna.parsers import parse as pydna_parse
-import os
 from httpx import AsyncClient, Response
 
-NCBI_API_KEY = os.environ.get('NCBI_API_KEY')
+from .app_settings import settings
 
-if NCBI_API_KEY is None:
-    headers = None  # pragma: no cover
-else:
-    headers = {'api_key': NCBI_API_KEY}
+headers = None if settings.NCBI_API_KEY is None else {'api_key': settings.NCBI_API_KEY}
 
 
 async def async_get(url, headers, params=None) -> Response:
