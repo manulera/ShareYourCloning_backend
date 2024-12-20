@@ -3,12 +3,11 @@ from pydantic import create_model
 import io
 import warnings
 import asyncio
+import httpx
 from starlette.responses import RedirectResponse
 from Bio import BiopythonParserWarning
 from typing import Annotated
-from urllib.error import HTTPError, URLError
-from pydna.genbank import Genbank
-from pydna.dseqrecord import Dseqrecord
+from urllib.error import HTTPError
 from ..get_router import get_router
 from ..pydantic_models import (
     TextFileSequence,
@@ -124,11 +123,7 @@ async def read_from_file(
             response.headers['x-warning'] = '; '.join(warning_messages)
 
     except ValueError as e:
-        if 'LOCUS' in str(e):
-            raise HTTPException(422, str(e))
-        else:
-            print('error >>', e)
-            raise HTTPException(422, 'Biopython cannot process this file.')
+        raise HTTPException(422, f'Biopython cannot process this file: {e}.')
 
     # This happens when textfiles are empty or contain something else, or when reading a text file as snapgene file,
     # since StringIO does not raise an error when "Unexpected end of packet" is found
@@ -173,10 +168,6 @@ def repository_id_http_error_handler(exception: HTTPError, source: RepositoryIdS
         )
 
 
-def repository_id_url_error_handler(exception: URLError, source: RepositoryIdSource):
-    raise HTTPException(504, f'Unable to connect to {source.repository_name}: {exception}')
-
-
 # Redirect to the right repository
 @router.post(
     '/repository_id',
@@ -203,15 +194,13 @@ async def get_from_repository_id(
 )
 async def get_from_repository_id_genbank(source: RepositoryIdSource):
     try:
-        gb = Genbank('example@gmail.com')
+        # This request already fails if the sequence does not exist
         seq_length = await ncbi_requests.get_sequence_length_from_sequence_accession(source.repository_id)
         if seq_length > 100000:
             raise HTTPException(400, 'sequence is too long (max 100000 bp)')
-        seq = Dseqrecord(gb.nucleotide(source.repository_id))
-    except HTTPError as exception:
-        repository_id_http_error_handler(exception, source)
-    except URLError as exception:
-        repository_id_url_error_handler(exception, source)
+        seq = await ncbi_requests.get_genbank_sequence(source.repository_id)
+    except httpx.ConnectError as exception:
+        raise HTTPException(504, f'Unable to connect to NCBI: {exception}')
 
     return {'sequences': [format_sequence_genbank(seq, source.output_name)], 'sources': [source.model_copy()]}
 
@@ -227,8 +216,6 @@ async def get_from_repository_id_addgene(source: AddGeneIdSource):
         dseq, out_source = await request_from_addgene(source)
     except HTTPError as exception:
         repository_id_http_error_handler(exception, source)
-    except URLError as exception:
-        repository_id_url_error_handler(exception, source)
 
     return {'sequences': [format_sequence_genbank(dseq, source.output_name)], 'sources': [out_source]}
 
@@ -309,8 +296,6 @@ async def get_from_repository_id_igem(source: IGEMSource):
         return {'sequences': [format_sequence_genbank(dseq, source.output_name)], 'sources': [source]}
     except HTTPError as exception:
         repository_id_http_error_handler(exception, source)
-    except URLError as exception:
-        repository_id_url_error_handler(exception, source)
 
 
 @router.post(
@@ -371,7 +356,7 @@ async def genome_coordinates(
                 )
 
     async def get_sequence_task():
-        return await ncbi_requests.get_genbank_sequence_subset(
+        return await ncbi_requests.get_genbank_sequence(
             source.sequence_accession, source.start, source.end, source.strand
         )
 

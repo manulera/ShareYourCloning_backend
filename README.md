@@ -129,7 +129,7 @@ poetry add git+https://github.com/BjornFJohansson/pydna#4fd760d075f77cceeb27969e
 ### Generating API stubs
 
 For the frontend, it may be useful to produce stubs (I use them for writing the tests). See how this is implemented
-by looking at the `RecordStubRoute` class in `record_stub_route.py`. To run the dev server and record stubs:
+by looking at the `RecordStubRoute` class in `api_config_utils.py`. To run the dev server and record stubs:
 
 ```bash
 RECORD_STUBS=1 uvicorn shareyourcloning.main:app --reload --reload-exclude='.venv'

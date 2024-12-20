@@ -1,7 +1,8 @@
 from unittest import TestCase
-from shareyourcloning.pydantic_models import AssemblySource, SimpleSequenceLocation
+from shareyourcloning.pydantic_models import AssemblySource, SimpleSequenceLocation as SimpleSequenceLocationModel
 from shareyourcloning.assembly2 import edge_representation2subfragment_representation
 from Bio.SeqFeature import SimpleLocation
+from pydna.utils import shift_location
 
 
 class DummyFragment:
@@ -36,13 +37,19 @@ class AssemblySourceTest(TestCase):
                 self.assertEqual(assembly_source.assembly[0].sequence, 4)
                 self.assertEqual(assembly_source.assembly[0].reverse_complemented, False)
                 self.assertEqual(assembly_source.assembly[0].left_location, None)
-                self.assertEqual(assembly_source.assembly[0].right_location, SimpleSequenceLocation(start=0, end=10))
+                self.assertEqual(
+                    assembly_source.assembly[0].right_location, SimpleSequenceLocationModel(start=0, end=10)
+                )
 
                 # Check second fragment
                 self.assertEqual(assembly_source.assembly[1].sequence, 5)
                 self.assertEqual(assembly_source.assembly[1].reverse_complemented, False)
-                self.assertEqual(assembly_source.assembly[1].left_location, SimpleSequenceLocation(start=10, end=20))
-                self.assertEqual(assembly_source.assembly[1].right_location, SimpleSequenceLocation(start=0, end=10))
+                self.assertEqual(
+                    assembly_source.assembly[1].left_location, SimpleSequenceLocationModel(start=10, end=20)
+                )
+                self.assertEqual(
+                    assembly_source.assembly[1].right_location, SimpleSequenceLocationModel(start=0, end=10)
+                )
 
                 # Check other fields
                 self.assertEqual(assembly_source.input, [4, 5, 6])
@@ -75,3 +82,18 @@ class AssemblySourceTest(TestCase):
         assembly_source = AssemblySource.from_assembly(assembly=assembly, fragments=fragments, id=0, circular=True)
         assembly_plan = assembly_source.get_assembly_plan(fragments)
         self.assertEqual(assembly_plan, assembly)
+
+
+class SimpleSequenceLocationTest(TestCase):
+    def test_methods(self):
+
+        for strand in [1, -1, None]:
+            self.assertEqual(
+                SimpleSequenceLocationModel.from_simple_location(SimpleLocation(100, 200, strand)),
+                SimpleSequenceLocationModel(start=100, end=200, strand=strand),
+            )
+            loc = SimpleSequenceLocationModel(start=20, end=12, strand=strand)
+            self.assertEqual(
+                loc.to_biopython_location(circular=True, seq_len=25),
+                shift_location(SimpleLocation(20, 37, strand), 0, 25),
+            )

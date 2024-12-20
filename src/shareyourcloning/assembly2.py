@@ -68,14 +68,14 @@ def gather_overlapping_locations(locs: list[Location], fragment_length: int):
     return groups
 
 
-def assembly_checksum(G: _nx.MultiDiGraph, edge_list):
-    """Calculate a checksum for an assembly, from a list of edges in the form (u, v, key)."""
-    checksum_list = list()
-    for edge in edge_list:
-        u, v, key = edge
-        checksum_list.append(G.get_edge_data(u, v, key)['uid'])
+# def assembly_checksum(G: _nx.MultiDiGraph, edge_list):
+#     """Calculate a checksum for an assembly, from a list of edges in the form (u, v, key)."""
+#     checksum_list = list()
+#     for edge in edge_list:
+#         u, v, key = edge
+#         checksum_list.append(G.get_edge_data(u, v, key)['uid'])
 
-    return min('-'.join(checksum_list), '-'.join(checksum_list[::-1]))
+#     return min('-'.join(checksum_list), '-'.join(checksum_list[::-1]))
 
 
 def ends_from_cutsite(cutsite: tuple[tuple[int, int], AbstractCut], seq: _Dseq):
@@ -300,9 +300,6 @@ def alignment_sub_strings(seqx: _Dseqrecord | _Primer, seqy: _Dseqrecord | _Prim
 
     if len(primer) < limit:
         return []
-    # Edge case, in circular sequences the primer could align with 2 * template
-    if len(template) < len(primer):
-        return []
 
     subject = seqrecord2str_for_alignment(template)
     query = (
@@ -447,15 +444,6 @@ def assembly_has_mismatches(fragments, assembly):
     return False
 
 
-def assemble_mismatch_PCR(subfragments, subfragment_representation):
-    """Special version of assemble for PCR. It uses the primer sequences in their entirety, in case
-    there are mismatches or Uracils.
-    """
-
-    fw_primer, template, rv_primer = subfragments
-    temp_loc_left, temp_loc_right = subfragment_representation[1]
-
-
 def assembly_is_circular(assembly, fragments):
     """
     Note: This does not work for insertion assemblies, that's why assemble takes the optional argument is_insertion.
@@ -480,11 +468,6 @@ def assemble(fragments, assembly, is_insertion=False):
     # We transform into Dseqrecords (for primers)
     dseqr_fragments = [f if isinstance(f, _Dseqrecord) else _Dseqrecord(f) for f in fragments]
     subfragments = get_assembly_subfragments(dseqr_fragments, subfragment_representation)
-
-    # if assembly_has_mismatches(fragments, assembly):
-    #     if is_circular or len(assembly) != 2:
-    #         raise NotImplementedError('Only PCRs with mismatches are supported')
-    #     return assemble_mismatch_PCR(subfragments, subfragment_representation)
 
     # Length of the overlaps between consecutive assembly fragments
     fragment_overlaps = [len(e[-1]) for e in assembly]
@@ -1326,7 +1309,7 @@ class SingleFragmentAssembly(Assembly):
             # We don't want the same location twice
             if x[0][2] == x[0][3]:
                 return False
-            # We don't want to get the same fragment again
+            # We don't want to get overlap only (e.g. GAATTCcatGAATTC giving GAATTC)
             left_start, _ = _location_boundaries(x[0][2])
             _, right_end = _location_boundaries(x[0][3])
             if left_start == 0 and right_end == len(self.fragments[0]):
