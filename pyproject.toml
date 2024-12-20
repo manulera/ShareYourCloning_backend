@@ -23,6 +23,7 @@ shareyourcloning-linkml = "0.1.12a0"
 pandas = "^2.2.3"
 openpyxl = "^3.1.5"
 pyyaml = "^6.0.2"
+primer3-py = "^2.0.3"
 
 [tool.poetry.group.dev.dependencies]
 autopep8 = "^2.0.4"

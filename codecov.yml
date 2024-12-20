@@ -1,3 +1,4 @@
 ignore:
   - "tests/**"
   - "src/shareyourcloning/batch_cloning/pombe"
+  - "src/shareyourcloning/batch_cloning/EBIC"
