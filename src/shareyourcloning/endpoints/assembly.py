@@ -344,9 +344,6 @@ async def homologous_recombination(
 
     template, insert = [read_dsrecord_from_json(seq) for seq in sequences]
 
-    if template.circular:
-        raise HTTPException(400, 'The template and the insert must be linear.')
-
     # If an assembly is provided, we ignore minimal_homology
     if len(source.assembly):
         minimal_homology = source.minimal_overlap()
@@ -355,7 +352,11 @@ async def homologous_recombination(
 
     # The condition is that the first and last fragments are the template
     try:
-        possible_assemblies = [a for a in asm.get_insertion_assemblies() if a[0][0] == 1]
+        if not template.circular:
+            possible_assemblies = [a for a in asm.get_insertion_assemblies() if a[0][0] == 1]
+        else:
+            possible_assemblies = [a for a in asm.get_circular_assemblies()]
+
     except ValueError as e:
         raise HTTPException(400, *e.args)
 
