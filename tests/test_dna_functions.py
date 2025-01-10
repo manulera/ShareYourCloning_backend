@@ -1,3 +1,9 @@
+from urllib.error import HTTPError
+import unittest
+import os
+import respx
+import httpx
+
 from shareyourcloning.dna_functions import (
     find_sequence_regex,
     custom_file_parser,
@@ -5,82 +11,8 @@ from shareyourcloning.dna_functions import (
     MyGenBankScanner,
     get_sequence_from_euroscarf_url,
 )
-from shareyourcloning.dna_utils import sum_is_sticky
-from urllib.error import HTTPError
-import unittest
-from pydna.dseq import Dseq
-import os
-import respx
-import httpx
 
 test_files = os.path.join(os.path.dirname(__file__), 'test_files')
-
-
-# Tests for sum_is_sticky() in dna_functions.py
-class PartialStickyTest(unittest.TestCase):
-    # General test functions
-    def expectTrue(self, seq_left, seq_right, partial):
-        with self.subTest():
-            self.assertTrue(sum_is_sticky(seq_left.three_prime_end(), seq_right.five_prime_end(), partial))
-
-    def expectFalse(self, seq_left, seq_right, partial):
-        with self.subTest():
-            self.assertFalse(sum_is_sticky(seq_left.three_prime_end(), seq_right.five_prime_end(), partial))
-
-
-class MultiTestPartialStickyTest(PartialStickyTest):
-    # Specific cases
-    def test_blunt_ends(self):
-        for partial in [False, True]:
-            self.expectFalse(Dseq('ACGT'), Dseq('ACGT'), partial)
-
-    def test_sticky_ends_full_overlap_3(self):
-        seq1 = Dseq('ACGTAAA', 'ACGT', ovhg=0)
-        seq2 = Dseq('ACGT', 'ACGTTTT', ovhg=3)
-
-        for partial in [False, True]:
-            self.expectTrue(seq1, seq2, partial)
-
-    def test_sticky_ends_full_overlap_5(self):
-        seq1 = Dseq('ACGT', 'TTTACGT', ovhg=0)
-        seq2 = Dseq('AAAACGT', 'ACGT', ovhg=-3)
-
-        for partial in [False, True]:
-            self.expectTrue(seq1, seq2, partial)
-
-    def test_sticky_ends_partial_overlap_3(self):
-        seq1 = Dseq('ACGTAA', 'ACGT', ovhg=0)
-        seq2 = Dseq('ACGT', 'ACGTTTT', ovhg=3)
-
-        self.expectTrue(seq1, seq2, True)
-        self.expectFalse(seq1, seq2, False)
-
-        seq3 = Dseq('ACGTAAA', 'ACGT', ovhg=0)
-        seq4 = Dseq('ACGT', 'ACGTTT', ovhg=2)
-
-        self.expectTrue(seq3, seq4, True)
-        self.expectFalse(seq3, seq4, False)
-
-    def test_sticky_ends_partial_overlap_5(self):
-        seq1 = Dseq('ACGT', 'TTACGT', ovhg=0)
-        seq2 = Dseq('AAAACGT', 'ACGT', ovhg=-3)
-
-        self.expectTrue(seq1, seq2, True)
-        self.expectFalse(seq1, seq2, False)
-
-        seq3 = Dseq('ACGT', 'TTTACGT', ovhg=0)
-        seq4 = Dseq('AAACGT', 'ACGT', ovhg=-2)
-
-        self.expectTrue(seq3, seq4, True)
-        self.expectFalse(seq3, seq4, False)
-
-    def test_sticky_ends_max_len(self):
-        # Ensures that all possible overlapping lengths are covered
-        seq1 = Dseq('ACGT', 'GTACGT', ovhg=0)
-        seq2 = Dseq('ACAACGT', 'ACGT', ovhg=-3)
-
-        self.expectTrue(seq1, seq2, True)
-        self.expectFalse(seq1, seq2, False)
 
 
 class SequenceRegexTest(unittest.TestCase):
