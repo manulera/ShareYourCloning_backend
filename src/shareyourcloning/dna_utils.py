@@ -55,19 +55,12 @@ def get_alignment_shift(alignment: Dseq, shift: int) -> int:
 
     nucleotides_shifted = 0
     positions_shifted = 0
-    shift_sign = 1 if shift >= 0 else -1
+    corrected_shift = shift if shift >= 0 else len(alignment) + shift
     alignment_str = str(alignment)
 
-    # If the shift is negative, we start from the last position
-    if shift_sign == -1:
-        positions_shifted = -1
-
-    while nucleotides_shifted != shift:
+    while nucleotides_shifted != corrected_shift:
         if alignment_str[positions_shifted] != '-':
-            nucleotides_shifted += shift_sign
-        positions_shifted += shift_sign
-
-    if shift_sign == -1:
+            nucleotides_shifted += 1
         positions_shifted += 1
 
     return positions_shifted
