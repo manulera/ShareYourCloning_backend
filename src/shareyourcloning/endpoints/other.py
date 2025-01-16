@@ -1,4 +1,4 @@
-from fastapi import Query, Body
+from fastapi import Query
 from Bio.Restriction.Restriction_Dictionary import rest_dict
 
 
@@ -53,9 +53,9 @@ async def rename_sequence(
 @router.post('/align_sanger', response_model=list[str])
 async def align_sequences(
     sequence: TextFileSequence,
-    trace: str = Body(..., embed=True),
+    traces: list[str],
 ):
     """Align a list of sequences"""
 
     dseqr = read_dsrecord_from_json(sequence)
-    return align_sanger_traces(dseqr, trace)
+    return align_sanger_traces(dseqr, traces)
