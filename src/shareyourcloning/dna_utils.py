@@ -4,7 +4,6 @@ Utility functions moved here to avoid circular imports.
 
 from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
-from pydivsufsort import min_rotation
 from pydna.dseq import Dseq
 import tempfile
 import subprocess
@@ -81,8 +80,8 @@ def align_sanger_track(dseqr: Dseqrecord, sanger: str) -> (str, str):
 
         # Write sequences to FASTA file
         with open(fasta_path, 'w') as f:
-            f.write(f">seq2\n{sanger}\n")
             f.write(f">seq1\n{dseqr.seq}\n")
+            f.write(f">seq2\n{sanger}\n")
 
         # If the sequence is circular, use MARS to permutate it
         if dseqr.circular:
@@ -91,22 +90,8 @@ def align_sanger_track(dseqr: Dseqrecord, sanger: str) -> (str, str):
                 raise RuntimeError(f'MARS failed:\n{result.stderr}')
             aln_input = permuted_fasta_path
 
-            # Find the rotation performed by MARS
-            with open(permuted_fasta_path, 'r') as f:
-                rotated_seq = f.read().splitlines()[3]
-
-            rotation = min_rotation(str(dseqr.seq)) - min_rotation(rotated_seq)
-
         else:
             aln_input = fasta_path
-
-        # We need to invert the order of the sequences again, for mafft to work
-        # for reverse complement traces
-        with open(aln_input, 'r') as f:
-            lines = f.readlines()
-        lines = lines[2:] + lines[:2]
-        with open(aln_input, 'w') as f:
-            f.writelines(lines)
 
         # Run alignment
         result = subprocess.run(['mafft', '--nuc', '--adjustdirection', aln_input], capture_output=True, text=True)
@@ -118,12 +103,4 @@ def align_sanger_track(dseqr: Dseqrecord, sanger: str) -> (str, str):
         # Read the file and return the sequences
         records = parse(aln_path, 'fasta')
 
-        if dseqr.circular:
-            alignment_shift = get_alignment_shift(records[0].seq.looped(), -rotation)
-
-            return [
-                str(records[0].seq.looped().shifted(alignment_shift)),
-                str(records[1].seq.looped().shifted(alignment_shift)),
-            ]
-        else:
-            return [str(records[0].seq), str(records[1].seq)]
+        return [str(records[0].seq), str(records[1].seq)]
