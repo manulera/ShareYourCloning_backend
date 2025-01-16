@@ -6,7 +6,7 @@ from ..dna_functions import (
     format_sequence_genbank,
     read_dsrecord_from_json,
 )
-from ..dna_utils import align_sanger_track
+from ..dna_utils import align_sanger_traces
 from ..pydantic_models import (
     TextFileSequence,
     BaseCloningStrategy,
@@ -58,4 +58,4 @@ async def align_sequences(
     """Align a list of sequences"""
 
     dseqr = read_dsrecord_from_json(sequence)
-    return align_sanger_track(dseqr, trace)
+    return align_sanger_traces(dseqr, trace)

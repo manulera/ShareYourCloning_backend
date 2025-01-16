@@ -65,7 +65,7 @@ def get_alignment_shift(alignment: Dseq, shift: int) -> int:
     return positions_shifted
 
 
-def align_sanger_track(dseqr: Dseqrecord, sanger: str) -> (str, str):
+def align_sanger_traces(dseqr: Dseqrecord, sanger_traces: list[str]) -> list[str]:
     """Align a sanger track to a dseqr sequence"""
     # Check that required executables exist in PATH
     if not shutil.which('mars'):
@@ -74,33 +74,49 @@ def align_sanger_track(dseqr: Dseqrecord, sanger: str) -> (str, str):
         raise RuntimeError("'mafft' executable not found in PATH")
     # Create temporary directory and file
     with tempfile.TemporaryDirectory() as tmpdir:
-        fasta_path = os.path.join(tmpdir, 'sequences.fa')
-        permuted_fasta_path = os.path.join(tmpdir, 'sequences_permuted.fa')
-        aln_path = os.path.join(tmpdir, 'aligned.fa')
 
-        # Write sequences to FASTA file
-        with open(fasta_path, 'w') as f:
-            f.write(f">seq1\n{dseqr.seq}\n")
-            f.write(f">seq2\n{sanger}\n")
+        # Write reference sequence to FASTA file
+        reference_path = os.path.join(tmpdir, 'reference.fa')
+        with open(reference_path, 'w') as f:
+            f.write(f">ref\n{dseqr.seq}\n")
 
-        # If the sequence is circular, use MARS to permutate it
+        # Write traces to FASTA file
+        traces_path = os.path.join(tmpdir, 'traces.fa')
+        with open(traces_path, 'w') as f:
+            for i, sanger_trace in enumerate(sanger_traces):
+                f.write(f">trace-{i+1}\n{sanger_trace}\n")
+
+        # If the sequence is circular, use MARS to permutate the traces
         if dseqr.circular:
-            result = subprocess.run(['mars', '-a', 'DNA', '-m', '0', '-i', fasta_path, '-o', permuted_fasta_path, '-q', '5', '-l', '20', '-P', '1'], capture_output=True, text=True)  # fmt: skip
+            # As an input for MARS, we need the reference + all traces
+            all_path = os.path.join(tmpdir, 'all.fa')
+            with open(all_path, 'w') as f:
+                f.write(f">ref\n{dseqr.seq}\n")
+                for i, sanger_trace in enumerate(sanger_traces):
+                    f.write(f">trace-{i+1}\n{sanger_trace}\n")
+
+            permuted_path = os.path.join(tmpdir, 'sequences_permuted.fa')
+            result = subprocess.run(['mars', '-a', 'DNA', '-m', '0', '-i', all_path, '-o', permuted_path, '-q', '5', '-l', '20', '-P', '1'], capture_output=True, text=True)  # fmt: skip
             if result.returncode != 0:
                 raise RuntimeError(f'MARS failed:\n{result.stderr}')
-            aln_input = permuted_fasta_path
 
-        else:
-            aln_input = fasta_path
+            # Re-write the traces file with the permuted sequences
+            permuted_traces = parse(permuted_path, 'fasta')
+            with open(traces_path, 'w') as f:
+                for record in permuted_traces[1:]:
+                    f.write(f">{record.id}\n{record.seq}\n")
 
         # Run alignment
-        result = subprocess.run(['mafft', '--nuc', '--adjustdirection', aln_input], capture_output=True, text=True)
+        result = subprocess.run(
+            ['mafft', '--nuc', '--adjustdirection', '--6merpair', '--addfragments', traces_path, reference_path],
+            capture_output=True,
+            text=True,
+        )
         if result.returncode != 0:
             raise RuntimeError(f'MAFFT alignment failed:\n{result.stderr}')
-        with open(aln_path, 'w') as f:
+        result_path = os.path.join(tmpdir, 'alignment.fa')
+        with open(result_path, 'w') as f:
             f.write(result.stdout)
 
         # Read the file and return the sequences
-        records = parse(aln_path, 'fasta')
-
-        return [str(records[0].seq), str(records[1].seq)]
+        return [str(record.seq) for record in parse(result_path, 'fasta')]

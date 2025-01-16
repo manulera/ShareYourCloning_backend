@@ -1,6 +1,7 @@
 import os
 import unittest
-from shareyourcloning.dna_utils import sum_is_sticky, get_alignment_shift, align_sanger_track
+import pytest
+from shareyourcloning.dna_utils import sum_is_sticky, get_alignment_shift, align_sanger_traces
 from pydna.dseq import Dseq
 from pydna.parsers import parse
 from Bio.Seq import reverse_complement
@@ -83,25 +84,26 @@ class AlignmentShiftedTest(unittest.TestCase):
 
 
 class AlignSangerTrackTest(unittest.TestCase):
-    def test_align_sanger_track(self):
+
+    def test_align_sanger_traces(self):
         seq = parse(os.path.join(test_files, 'GIN11M86.gb'))[0]
         trace = 'ttgcagcattttgtctttctataaaaatgtgtcgttcctttttttcattttttggcgcgtcgcctcggggtcgtatagaatatg'
-        alignment = align_sanger_track(seq, trace)
+        alignment = align_sanger_traces(seq, [trace])
         self.assertTrue(alignment[1].startswith('-' * 152 + trace))
 
         # Fails with non-nucleotide sequences
         trace_wrong = 'helloworld'
         with self.assertRaises(RuntimeError):
-            align_sanger_track(seq, trace_wrong)
+            align_sanger_traces(seq, [trace_wrong])
 
         # Works with degenerate sequences
         trace_degenerate = trace.replace('g', 'n')
-        alignment_degenerate = align_sanger_track(seq, trace_degenerate)
+        alignment_degenerate = align_sanger_traces(seq, [trace_degenerate])
         self.assertTrue(alignment_degenerate[1].startswith('-' * 152 + trace_degenerate))
 
         # If the trace aligns to the reverse complement, it returns the trace in the opposite orientation
         trace_rc = reverse_complement(trace)
-        alignment_rc = align_sanger_track(seq, trace_rc)
+        alignment_rc = align_sanger_traces(seq, [trace_rc])
         self.assertEqual(alignment_rc[1], alignment[1])
 
         # Works with circular sequences
@@ -109,7 +111,7 @@ class AlignSangerTrackTest(unittest.TestCase):
         end_of_seq = 'ggtggtgggattggtataaagtggtagggtaagtatgtgtgtattatttacgatc'
         start_of_seq = 'gatcaataacagtgtttgtggagca'
         trace_across_origin = end_of_seq + start_of_seq
-        alignment = align_sanger_track(seq, trace_across_origin)
+        alignment = align_sanger_traces(seq, [trace_across_origin])
 
         # The alignment returns the sequence without shifting it
         self.assertEqual(alignment[0].upper(), str(seq.seq))
@@ -120,6 +122,22 @@ class AlignSangerTrackTest(unittest.TestCase):
 
         # Works with circular sequences reversed
         trace_across_origin_rc = reverse_complement(trace_across_origin)
-        alignment_rc = align_sanger_track(seq, trace_across_origin_rc)
+        alignment_rc = align_sanger_traces(seq, [trace_across_origin_rc])
         self.assertEqual(alignment_rc[0].upper(), str(seq.seq))
         self.assertEqual(alignment_rc[1], alignment[1])
+        print(trace)
+        print(trace_rc)
+
+    @pytest.mark.xfail(reason='https://github.com/manulera/ShareYourCloning_frontend/issues/336')
+    def test_align_sanger_traces_multiple(self):
+        seq = parse(os.path.join(test_files, 'GIN11M86.gb'))[0].looped()
+        trace = 'ttgcagcattttgtctttctataaaaatgtgtcgttcctttttttcattttttggcgcgtcgcctcggggtcgtatagaatatg'
+        trace_rc = reverse_complement(trace)
+
+        # Works with multiple traces
+        alignments = align_sanger_traces(seq, [trace, trace, trace_rc])
+        self.assertEqual(alignments[0].upper().replace('-', ''), str(seq.seq))
+        self.assertEqual(len(alignments), 4)
+        self.assertEqual(alignments[1], alignments[2])
+        # TODO: this has to do with https://github.com/manulera/ShareYourCloning_frontend/issues/336
+        self.assertEqual(alignments[1], alignments[3])
