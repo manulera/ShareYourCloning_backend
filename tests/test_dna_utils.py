@@ -112,7 +112,6 @@ class AlignSangerTrackTest(unittest.TestCase):
         start_of_seq = 'gatcaataacagtgtttgtggagca'
         trace_across_origin = end_of_seq + start_of_seq
         alignment = align_sanger_traces(seq, [trace_across_origin])
-
         # The alignment returns the sequence without shifting it
         self.assertEqual(alignment[0].upper(), str(seq.seq))
         self.assertTrue(
@@ -125,8 +124,6 @@ class AlignSangerTrackTest(unittest.TestCase):
         alignment_rc = align_sanger_traces(seq, [trace_across_origin_rc])
         self.assertEqual(alignment_rc[0].upper(), str(seq.seq))
         self.assertEqual(alignment_rc[1], alignment[1])
-        print(trace)
-        print(trace_rc)
 
     @pytest.mark.xfail(reason='https://github.com/manulera/ShareYourCloning_frontend/issues/336')
     def test_align_sanger_traces_multiple(self):
@@ -138,6 +135,7 @@ class AlignSangerTrackTest(unittest.TestCase):
         alignments = align_sanger_traces(seq, [trace, trace, trace_rc])
         self.assertEqual(alignments[0].upper().replace('-', ''), str(seq.seq))
         self.assertEqual(len(alignments), 4)
+        print(*alignments, sep='\n')
         self.assertEqual(alignments[1], alignments[2])
         # TODO: this has to do with https://github.com/manulera/ShareYourCloning_frontend/issues/336
         self.assertEqual(alignments[1], alignments[3])
