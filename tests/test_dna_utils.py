@@ -1,6 +1,5 @@
 import os
 import unittest
-import pytest
 from shareyourcloning.dna_utils import sum_is_sticky, get_alignment_shift, align_sanger_traces
 from pydna.dseq import Dseq
 from pydna.parsers import parse
@@ -125,7 +124,6 @@ class AlignSangerTrackTest(unittest.TestCase):
         self.assertEqual(alignment_rc[0].upper(), str(seq.seq))
         self.assertEqual(alignment_rc[1], alignment[1])
 
-    @pytest.mark.xfail(reason='https://github.com/manulera/ShareYourCloning_frontend/issues/336')
     def test_align_sanger_traces_multiple(self):
         seq = parse(os.path.join(test_files, 'GIN11M86.gb'))[0].looped()
         trace = 'ttgcagcattttgtctttctataaaaatgtgtcgttcctttttttcattttttggcgcgtcgcctcggggtcgtatagaatatg'
