@@ -1,4 +1,4 @@
-from fastapi import Query
+from fastapi import Query, HTTPException
 from Bio.Restriction.Restriction_Dictionary import rest_dict
 
 
@@ -51,11 +51,14 @@ async def rename_sequence(
 
 
 @router.post('/align_sanger', response_model=list[str])
-async def align_sequences(
+async def align_sanger(
     sequence: TextFileSequence,
     traces: list[str],
 ):
-    """Align a list of sequences"""
+    """Align a list of sanger traces to a sequence"""
 
     dseqr = read_dsrecord_from_json(sequence)
-    return align_sanger_traces(dseqr, traces)
+    try:
+        return align_sanger_traces(dseqr, traces)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))

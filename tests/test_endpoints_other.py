@@ -3,7 +3,7 @@ import unittest
 from fastapi.testclient import TestClient
 import json
 from pydna.dseqrecord import Dseqrecord
-
+from pydna.parsers import parse
 import shareyourcloning.main as _main
 from shareyourcloning.dna_functions import format_sequence_genbank, read_dsrecord_from_json
 from shareyourcloning.pydantic_models import TextFileSequence, BaseCloningStrategy
@@ -95,3 +95,22 @@ class RestrictionEnzymeListTest(unittest.TestCase):
         response = client.get('/restriction_enzyme_list')
         assert response.status_code == 200
         assert 'EcoRI' in response.json()['enzyme_names']
+
+
+class AlignSangerTest(unittest.TestCase):
+
+    def test_align_sanger(self):
+        seq = parse(os.path.join(test_files, 'GIN11M86.gb'))[0].looped()
+        json_seq = format_sequence_genbank(seq)
+        json_seq.id = 0
+        trace = 'ttgcagcattttgtctttctataaaaatgtgtcgttcctttttttcattttttggcgcgtcgcctcggggtcgtatagaatatg'
+        response = client.post('/align_sanger', json={'sequence': json_seq.model_dump(), 'traces': [trace]})
+        assert response.status_code == 200
+        assert len(response.json()) == 2
+
+    def test_errors(self):
+        seq = Dseqrecord('ACGT', circular=True)
+        json_seq = format_sequence_genbank(seq)
+        json_seq.id = 0
+        response = client.post('/align_sanger', json={'sequence': json_seq.model_dump(), 'traces': ['ACGT']})
+        assert response.status_code == 400

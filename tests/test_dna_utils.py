@@ -1,8 +1,10 @@
 import os
 import unittest
-from shareyourcloning.dna_utils import sum_is_sticky, get_alignment_shift, align_sanger_traces
+from unittest.mock import patch
+from shareyourcloning.dna_utils import sum_is_sticky, get_alignment_shift, align_sanger_traces, permutate_trace
 from pydna.dseq import Dseq
 from pydna.parsers import parse
+from pydna.dseqrecord import Dseqrecord
 from Bio.Seq import reverse_complement
 
 test_files = os.path.join(os.path.dirname(__file__), 'test_files')
@@ -137,3 +139,22 @@ class AlignSangerTrackTest(unittest.TestCase):
         self.assertEqual(alignments[1], alignments[2])
         # TODO: this has to do with https://github.com/manulera/ShareYourCloning_frontend/issues/336
         self.assertEqual(alignments[1], alignments[3])
+
+    def test_permutate_trace_error(self):
+        with self.assertRaises(RuntimeError):
+            permutate_trace('hello', 'world')
+
+    def test_binaries_missing(self):
+        seq = Dseqrecord('ACGT')
+
+        # Test mars missing
+        with patch('shutil.which', lambda x: None if x == 'mars' else True):
+            with self.assertRaises(RuntimeError) as cm:
+                align_sanger_traces(seq, ['ACGT'])
+            self.assertEqual(str(cm.exception), "'mars' executable not found in PATH")
+
+        # Test mafft missing
+        with patch('shutil.which', lambda x: None if x == 'mafft' else True):
+            with self.assertRaises(RuntimeError) as cm:
+                align_sanger_traces(seq, ['ACGT'])
+            self.assertEqual(str(cm.exception), "'mafft' executable not found in PATH")
