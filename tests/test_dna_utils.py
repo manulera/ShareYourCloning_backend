@@ -144,6 +144,9 @@ class AlignSangerTrackTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             permutate_trace('hello', 'world')
 
+        with self.assertRaises(ValueError):
+            permutate_trace('a', 'aa')
+
     def test_binaries_missing(self):
         seq = Dseqrecord('ACGT')
 
