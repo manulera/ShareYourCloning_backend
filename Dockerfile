@@ -4,7 +4,12 @@
 # BUILDER IMAGE
 FROM python:3.11-slim-bookworm as builder
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y gcc git g++
+RUN apt-get update && apt-get install -y gcc git g++ wget
+
+# Download MARS executable
+RUN wget https://github.com/manulera/MARS/releases/download/v0.2/mars-Debian-Bookworm && \
+    chmod +x mars-Debian-Bookworm && \
+    mv mars-Debian-Bookworm /usr/local/bin/mars
 
 RUN useradd -ms /bin/bash backend
 USER backend
@@ -41,6 +46,8 @@ FROM python:3.11-slim-bookworm
 # directly output things to stdout/stderr, without buffering
 ENV PYTHONUNBUFFERED=1
 
+RUN apt-get update && apt-get install -y mafft libgomp1
+
 # create a user to run the app
 RUN useradd -ms /bin/bash backend
 USER backend
@@ -56,6 +63,8 @@ RUN echo "${VERSION}" > version.txt
 
 ENV VIRTUAL_ENV="/home/backend/venv"
 COPY --from=builder $VIRTUAL_ENV $VIRTUAL_ENV
+COPY --from=builder /usr/local/bin/mars /usr/local/bin/mars
+
 
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # For example, ROOT_PATH="/syc"

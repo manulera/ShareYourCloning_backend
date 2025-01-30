@@ -22,3 +22,5 @@ batch_cloning_output/
 
 # poetry build
 dist/
+
+bin/

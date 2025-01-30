@@ -12,12 +12,20 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: checkout
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+      - name: install mafft
+        run: |
+          sudo apt-get install -y mafft
+      - name: Download MARS executable
+        run: |
+          wget https://github.com/manulera/MARS/releases/download/v0.2/mars-Linux
+          chmod +x mars-Linux
+          sudo mv mars-Linux /usr/local/bin/mars
       - name: Install Python
         uses: actions/setup-python@v1
         with:

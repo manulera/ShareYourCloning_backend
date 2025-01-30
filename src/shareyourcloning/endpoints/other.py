@@ -1,15 +1,16 @@
-from fastapi import Query
+from fastapi import Query, HTTPException
 from Bio.Restriction.Restriction_Dictionary import rest_dict
+
+
 from ..dna_functions import (
     format_sequence_genbank,
     read_dsrecord_from_json,
 )
+from ..dna_utils import align_sanger_traces
 from ..pydantic_models import (
     TextFileSequence,
     BaseCloningStrategy,
 )
-
-
 from ..get_router import get_router
 from ..utils import api_version
 
@@ -47,3 +48,17 @@ async def rename_sequence(
     """Rename a sequence"""
     dseqr = read_dsrecord_from_json(sequence)
     return format_sequence_genbank(dseqr, name)
+
+
+@router.post('/align_sanger', response_model=list[str])
+async def align_sanger(
+    sequence: TextFileSequence,
+    traces: list[str],
+):
+    """Align a list of sanger traces to a sequence"""
+
+    dseqr = read_dsrecord_from_json(sequence)
+    try:
+        return align_sanger_traces(dseqr, traces)
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
