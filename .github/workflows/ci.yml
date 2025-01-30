@@ -23,7 +23,7 @@ jobs:
           sudo apt-get install -y mafft
       - name: Download MARS executable
         run: |
-          wget https://github.com/manulera/MARS/releases/download/v0.1/mars-Linux
+          wget https://github.com/manulera/MARS/releases/download/v0.2/mars-Linux
           chmod +x mars-Linux
           sudo mv mars-Linux /usr/local/bin/mars
       - name: Install Python
