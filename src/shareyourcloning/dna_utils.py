@@ -12,10 +12,7 @@ import shutil
 from pydna.parsers import parse
 from Bio.Align import PairwiseAligner
 
-aligner = PairwiseAligner()
-aligner.open_gap_score = -1.0
-aligner.extend_gap_score = 0.0
-aligner.mode = 'local'
+aligner = PairwiseAligner(scoring='blastn')
 
 
 def sum_is_sticky(three_prime_end: tuple[str, str], five_prime_end: tuple[str, str], partial: bool = False) -> int:
@@ -96,11 +93,15 @@ def permutate_trace(reference: str, sanger_trace: str) -> str:
     # As an input for MARS, we need the reference + all traces
     # We include traces in both directions, since MARS does not handle
     # reverse complements - see https://github.com/lorrainea/MARS/issues/17#issuecomment-2598314356
+    len_diff = len(reference) - len(sanger_trace)
+    if len_diff < 0:
+        raise ValueError('Sanger trace is longer than the reference')
+
     with tempfile.TemporaryDirectory() as tmpdir:
         input_path = os.path.join(tmpdir, 'input.fa')
         with open(input_path, 'w') as f:
             f.write(f">ref\n{reference}\n")
-            f.write(f">trace\n{sanger_trace}\n")
+            f.write(f">trace\n{sanger_trace + len_diff * 'N'}\n")
 
         output_path = os.path.join(tmpdir, 'output.fa')
         result = subprocess.run(['mars', '-a', 'DNA', '-m', '0', '-i', input_path, '-o', output_path, '-q', '5', '-l', '20', '-P', '1'], capture_output=True, text=True)  # fmt: skip
@@ -131,10 +132,13 @@ def align_sanger_traces(dseqr: Dseqrecord, sanger_traces: list[str]) -> list[str
         traces_oriented = []
         # Pairwise-align and keep the best alignment, to decide which orientation to keep
         for fwd, rvs in zip(permutated_traces[::2], permutated_traces[1::2]):
-            fwd_score = aligner.score(*align_with_mafft([query_str, fwd], True))
-            rvs_score = aligner.score(*align_with_mafft([query_str, rvs], True))
+            fwd_alignment = next(aligner.align(query_str, fwd))
+            rvs_alignment = next(aligner.align(query_str, rvs))
 
-            traces_oriented.append(fwd if fwd_score > rvs_score else rvs)
+            if fwd_alignment.score > rvs_alignment.score:
+                traces_oriented.append(fwd.replace('N', ''))
+            else:
+                traces_oriented.append(rvs.replace('N', ''))
         sanger_traces = traces_oriented
 
     return align_with_mafft([query_str, *sanger_traces], True)
