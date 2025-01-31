@@ -232,7 +232,7 @@ class AssemblyFragment(_AssemblyFragment):
 
 
 class AssemblySourceCommonClass(SourceCommonClass):
-    # TODO: This is different in the LinkML model, because there it is required,
+    # TODO: This is different in the LinkML model, because there it is not required,
     # and here we make it default to list.
     assembly: List[AssemblyFragment] = Field(
         default_factory=list, description="""The joins between the fragments in the assembly"""

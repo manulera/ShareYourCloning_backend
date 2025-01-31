@@ -135,7 +135,6 @@ class AlignSangerTrackTest(unittest.TestCase):
         alignments = align_sanger_traces(seq, [trace, trace, trace_rc])
         self.assertEqual(alignments[0].upper().replace('-', ''), str(seq.seq))
         self.assertEqual(len(alignments), 4)
-        print(*alignments, sep='\n')
         self.assertEqual(alignments[1], alignments[2])
         # TODO: this has to do with https://github.com/manulera/ShareYourCloning_frontend/issues/336
         self.assertEqual(alignments[1], alignments[3])

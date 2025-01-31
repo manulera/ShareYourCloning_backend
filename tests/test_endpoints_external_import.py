@@ -696,10 +696,17 @@ class GenomeRegionTest(unittest.TestCase):
         s = correct_source.model_copy()
         s.locus_tag = None
         s.gene_id = None
+        # It used to be the case, but it changed so now we just mock the response
         s.assembly_accession = 'GCF_000146045.1'
-        response = client.post('/genome_coordinates', json=s.model_dump())
-        self.assertStatusCode(response.status_code, 400)
-        self.assertIn('No sequence accessions linked', response.json()['detail'])
+
+        with respx.mock:
+            respx.get(
+                'https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/GCF_000146045.1/sequence_reports'
+            ).mock(return_value=httpx.Response(200, json={'total_count': 0}))
+
+            response = client.post('/genome_coordinates', json=s.model_dump())
+            self.assertStatusCode(response.status_code, 400)
+            self.assertIn('No sequence accessions linked', response.json()['detail'])
 
         # Assembly accession not linked to that sequence accession
         s = correct_source.model_copy()
