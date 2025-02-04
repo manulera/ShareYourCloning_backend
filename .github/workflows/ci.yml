@@ -92,14 +92,14 @@ jobs:
         id: meta
         uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
         with:
-          images: manulera/shareyourcloningbackend
+          images: manulera/opencloningbackend
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: manulera/shareyourcloningbackend:latest
+          tags: manulera/opencloningbackend:latest
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             COMMIT_SHA=${{ github.sha }}

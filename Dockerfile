@@ -1,5 +1,5 @@
-# Backend for ShareYourCloning
-# https://github.com/manulera/ShareYourCloning_backend
+# Backend for OpenCloning
+# https://github.com/manulera/OpenCloning_backend
 
 # BUILDER IMAGE
 FROM python:3.11-slim-bookworm as builder
@@ -38,7 +38,7 @@ COPY ./pyproject.toml .
 COPY ./README.md .
 
 RUN poetry build
-RUN pip install dist/shareyourcloning-*.whl
+RUN pip install dist/opencloning-*.whl
 
 # FINAL IMAGE
 FROM python:3.11-slim-bookworm
@@ -70,4 +70,4 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # For example, ROOT_PATH="/syc"
 ENV ROOT_PATH=""
 # Only add --root-path if ROOT_PATH is not empty, otherwise uvicorn will throw an error
-CMD uvicorn shareyourcloning.main:app --host 0.0.0.0 --port 8000 ${ROOT_PATH:+--root-path ${ROOT_PATH}}
+CMD uvicorn opencloning.main:app --host 0.0.0.0 --port 8000 ${ROOT_PATH:+--root-path ${ROOT_PATH}}

@@ -955,7 +955,7 @@ class Assembly:
             node_paths = [x for x in node_paths if len(x) == len(self.fragments)]
 
         # For each path, we check if there are reverse complement duplicates
-        # See: https://github.com/manulera/ShareYourCloning_backend/issues/160
+        # See: https://github.com/manulera/OpenCloning_backend/issues/160
         unique_node_paths = list()
         for p in node_paths:
             if [-x for x in p[::-1]] not in unique_node_paths:
