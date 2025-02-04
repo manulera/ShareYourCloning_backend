@@ -1,7 +1,7 @@
 import os
 import unittest
 from unittest.mock import patch
-from shareyourcloning.dna_utils import sum_is_sticky, get_alignment_shift, align_sanger_traces, permutate_trace
+from opencloning.dna_utils import sum_is_sticky, get_alignment_shift, align_sanger_traces, permutate_trace
 from pydna.dseq import Dseq
 from pydna.parsers import parse
 from pydna.dseqrecord import Dseqrecord
@@ -136,7 +136,7 @@ class AlignSangerTrackTest(unittest.TestCase):
         self.assertEqual(alignments[0].upper().replace('-', ''), str(seq.seq))
         self.assertEqual(len(alignments), 4)
         self.assertEqual(alignments[1], alignments[2])
-        # TODO: this has to do with https://github.com/manulera/ShareYourCloning_frontend/issues/336
+        # TODO: this has to do with https://github.com/manulera/OpenCloning_frontend/issues/336
         self.assertEqual(alignments[1], alignments[3])
 
     def test_permutate_trace_error(self):

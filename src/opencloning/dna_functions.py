@@ -5,7 +5,7 @@ from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
 from .pydantic_models import TextFileSequence, AddGeneIdSource, SequenceFileFormat
-from shareyourcloning_linkml.datamodel import PlannotateAnnotationReport
+from opencloning_linkml.datamodel import PlannotateAnnotationReport
 from pydna.parsers import parse as pydna_parse
 import requests
 from bs4 import BeautifulSoup
@@ -96,7 +96,7 @@ async def request_from_addgene(source: AddGeneIdSource) -> tuple[Dseqrecord, Add
         raise HTTPError(url, 404, 'wrong addgene id', 'wrong addgene id', None)
     soup = BeautifulSoup(resp.content, 'html.parser')
 
-    # Get a span.material-name from the soup, see https://github.com/manulera/ShareYourCloning_backend/issues/182
+    # Get a span.material-name from the soup, see https://github.com/manulera/OpenCloning_backend/issues/182
     plasmid_name = soup.find('span', class_='material-name').text.replace(' ', '_')
 
     if source.sequence_file_url:

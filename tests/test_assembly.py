@@ -5,7 +5,7 @@ from Bio.Restriction import AatII, AjiI, AgeI, EcoRV, ZraI, SalI, EcoRI, RgaI, B
 from pydna.amplify import pcr
 from pydna.dseq import Dseq
 from pydna.readers import read
-import shareyourcloning.assembly2 as assembly
+import opencloning.assembly2 as assembly
 from Bio.SeqFeature import ExactPosition, FeatureLocation, SeqFeature, SimpleLocation
 from pydna.dseqrecord import Dseqrecord
 from pydna.parsers import parse

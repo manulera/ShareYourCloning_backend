@@ -25,7 +25,7 @@ You can see it in the SnapGene history of `final_plasmid.dna` if you open with s
 
 ![](final_plasmid_history.svg)
 
-The equivalent history is built with ShareYourCloning with the script `build_history.py`, and stored as json in `history.json`. The only difference in this case is that ase1 is loaded directly from GenBank instead of loaded from a file (I actually loaded from GenBank with SnapGene, but it does not register this in the history).
+The equivalent history is built with OpenCloning with the script `build_history.py`, and stored as json in `history.json`. The only difference in this case is that ase1 is loaded directly from GenBank instead of loaded from a file (I actually loaded from GenBank with SnapGene, but it does not register this in the history).
 
 ## Old SnapGene files
 

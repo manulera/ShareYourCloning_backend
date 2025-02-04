@@ -44,10 +44,10 @@ if not settings.SERVE_FRONTEND:
         html_content = """
             <html>
                 <head>
-                    <title>Welcome to ShareYourCloning API</title>
+                    <title>Welcome to OpenCloning API</title>
                 </head>
                 <body>
-                    <h1>Welcome to ShareYourCloning API</h1>
+                    <h1>Welcome to OpenCloning API</h1>
                     <p>You can access the endpoints documentation <a href="./docs">here</a></p>
                 </body>
             </html>

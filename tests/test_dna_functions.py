@@ -4,7 +4,7 @@ import os
 import respx
 import httpx
 
-from shareyourcloning.dna_functions import (
+from opencloning.dna_functions import (
     find_sequence_regex,
     custom_file_parser,
     correct_name,

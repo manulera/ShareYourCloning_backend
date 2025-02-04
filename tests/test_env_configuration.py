@@ -2,13 +2,13 @@ import unittest
 from pytest import MonkeyPatch
 from importlib import reload
 from fastapi.testclient import TestClient
-from shareyourcloning.utils import TemporaryFolderOverride
+from opencloning.utils import TemporaryFolderOverride
 import shutil
 import glob
 import os
 import tempfile
-import shareyourcloning.main as main
-import shareyourcloning.app_settings as app_settings
+import opencloning.main as main
+import opencloning.app_settings as app_settings
 
 
 test_files = os.path.join(os.path.dirname(__file__), 'test_files')

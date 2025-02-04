@@ -2,17 +2,17 @@ from fastapi.testclient import TestClient
 import unittest
 import shutil
 import os
-from shareyourcloning.pydantic_models import ManuallyTypedSource, RestrictionEnzymeDigestionSource
+from opencloning.pydantic_models import ManuallyTypedSource, RestrictionEnzymeDigestionSource
 from pytest import MonkeyPatch
 from importlib import reload
 from pydna.dseqrecord import Dseqrecord
 
-from shareyourcloning.dna_functions import format_sequence_genbank
-import shareyourcloning.get_router as get_router
-import shareyourcloning.endpoints.no_input as no_input_endpoints
-import shareyourcloning.endpoints.no_assembly as no_assembly_endpoints
-import shareyourcloning.main as main
-import shareyourcloning.app_settings as app_settings
+from opencloning.dna_functions import format_sequence_genbank
+import opencloning.get_router as get_router
+import opencloning.endpoints.no_input as no_input_endpoints
+import opencloning.endpoints.no_assembly as no_assembly_endpoints
+import opencloning.main as main
+import opencloning.app_settings as app_settings
 
 
 class StubRouteTest(unittest.TestCase):

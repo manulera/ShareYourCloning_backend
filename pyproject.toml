@@ -1,12 +1,12 @@
 [tool.poetry]
 authors = ["Manuel Lera-Ramirez <manulera14@gmail.com>"]
-description = "Backend of ShareYourCloning, a web application to generate molecular cloning strategies in json format, and share them with others."
+description = "Backend of OpenCloning, a web application to generate molecular cloning strategies in json format, and share them with others."
 license = "MIT"
-name = "shareyourcloning"
+name = "opencloning"
 version = "0.1.0"
 package-mode = true
 readme = "README.md"
-repository = "https://github.com/manulera/shareyourcloning_backend"
+repository = "https://github.com/manulera/OpenCloning_backend"
 
 [tool.poetry.dependencies]
 beautifulsoup4 = "^4.11.1"
@@ -19,10 +19,10 @@ pydna = "^5.3"
 requests = "^2.31.0"
 regex = "^2023.10.3"
 pydantic = "^2.7.1"
-shareyourcloning-linkml = "0.1.12a0"
 pandas = "^2.2.3"
 openpyxl = "^3.1.5"
 pyyaml = "^6.0.2"
+opencloning-linkml = "^0.2a0"
 
 [tool.poetry.group.dev.dependencies]
 autopep8 = "^2.0.4"

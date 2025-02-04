@@ -2,9 +2,9 @@ from fastapi.testclient import TestClient
 import unittest
 import os
 
-from shareyourcloning.dna_functions import read_dsrecord_from_json
-import shareyourcloning.main as _main
-from shareyourcloning.pydantic_models import (
+from opencloning.dna_functions import read_dsrecord_from_json
+import opencloning.main as _main
+from opencloning.pydantic_models import (
     TextFileSequence,
 )
 

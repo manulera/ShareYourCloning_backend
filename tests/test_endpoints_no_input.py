@@ -4,10 +4,10 @@ from pydna.dseq import Dseq
 import copy
 import os
 
-import shareyourcloning.request_examples as request_examples
-from shareyourcloning.dna_functions import read_dsrecord_from_json
-import shareyourcloning.main as _main
-from shareyourcloning.pydantic_models import (
+import opencloning.request_examples as request_examples
+from opencloning.dna_functions import read_dsrecord_from_json
+import opencloning.main as _main
+from opencloning.pydantic_models import (
     TextFileSequence,
     ManuallyTypedSource,
     OligoHybridizationSource,

@@ -1,6 +1,6 @@
 from unittest import TestCase
-from shareyourcloning.pydantic_models import AssemblySource, SimpleSequenceLocation as SimpleSequenceLocationModel
-from shareyourcloning.assembly2 import edge_representation2subfragment_representation
+from opencloning.pydantic_models import AssemblySource, SimpleSequenceLocation as SimpleSequenceLocationModel
+from opencloning.assembly2 import edge_representation2subfragment_representation
 from Bio.SeqFeature import SimpleLocation
 from pydna.utils import shift_location
 
