@@ -10,7 +10,7 @@ from Bio.SeqIO.InsdcIO import _insdc_location_string as format_feature_location
 from Bio.Restriction.Restriction import RestrictionType, RestrictionBatch
 from Bio.SeqRecord import SeqRecord as _SeqRecord
 from pydna.primer import Primer as _PydnaPrimer
-from shareyourcloning_linkml.datamodel import (
+from opencloning_linkml.datamodel import (
     OligoHybridizationSource as _OligoHybridizationSource,
     PolymeraseExtensionSource as _PolymeraseExtensionSource,
     GenomeCoordinatesSource as _GenomeCoordinatesSource,

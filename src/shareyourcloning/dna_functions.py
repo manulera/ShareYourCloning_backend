@@ -5,7 +5,7 @@ from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
 from .pydantic_models import TextFileSequence, AddGeneIdSource, SequenceFileFormat
-from shareyourcloning_linkml.datamodel import PlannotateAnnotationReport
+from opencloning_linkml.datamodel import PlannotateAnnotationReport
 from pydna.parsers import parse as pydna_parse
 import requests
 from bs4 import BeautifulSoup
