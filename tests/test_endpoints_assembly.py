@@ -7,9 +7,9 @@ import unittest
 from pydna.dseq import Dseq
 import os
 
-from shareyourcloning.dna_functions import format_sequence_genbank, read_dsrecord_from_json
-import shareyourcloning.main as _main
-from shareyourcloning.pydantic_models import (
+from opencloning.dna_functions import format_sequence_genbank, read_dsrecord_from_json
+import opencloning.main as _main
+from opencloning.pydantic_models import (
     PCRSource,
     PrimerModel,
     TextFileSequence,

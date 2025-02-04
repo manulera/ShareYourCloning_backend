@@ -3,8 +3,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.testclient import TestClient
 
-import shareyourcloning.main as _main
-from shareyourcloning.api_config_utils import custom_http_exception_handler
+import opencloning.main as _main
+from opencloning.api_config_utils import custom_http_exception_handler
 
 
 client = TestClient(_main.app)

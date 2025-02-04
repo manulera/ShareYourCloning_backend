@@ -1,7 +1,7 @@
-from shareyourcloning.gateway import gateway_overlap, find_gateway_sites
-import shareyourcloning.assembly2 as assembly
+from opencloning.gateway import gateway_overlap, find_gateway_sites
+import opencloning.assembly2 as assembly
 import glob
-from shareyourcloning.dna_functions import custom_file_parser
+from opencloning.dna_functions import custom_file_parser
 from pydna.dseqrecord import Dseqrecord
 from Bio.SeqFeature import SimpleLocation
 import os

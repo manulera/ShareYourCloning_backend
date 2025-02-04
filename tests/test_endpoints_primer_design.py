@@ -5,9 +5,9 @@ import copy
 from Bio.Seq import reverse_complement
 import os
 
-from shareyourcloning.dna_functions import format_sequence_genbank
-import shareyourcloning.main as _main
-from shareyourcloning.pydantic_models import (
+from opencloning.dna_functions import format_sequence_genbank
+import opencloning.main as _main
+from opencloning.pydantic_models import (
     PrimerModel,
     SimpleSequenceLocation as PydanticSimpleLocation,
 )

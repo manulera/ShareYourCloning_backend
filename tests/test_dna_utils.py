@@ -1,7 +1,7 @@
 import os
 import unittest
 from unittest.mock import patch
-from shareyourcloning.dna_utils import sum_is_sticky, get_alignment_shift, align_sanger_traces, permutate_trace
+from opencloning.dna_utils import sum_is_sticky, get_alignment_shift, align_sanger_traces, permutate_trace
 from pydna.dseq import Dseq
 from pydna.parsers import parse
 from pydna.dseqrecord import Dseqrecord

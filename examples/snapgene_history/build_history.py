@@ -1,6 +1,6 @@
 """
 A script to clone a gene into a plasmid. The same operation will be done in Snapgene,
-and we will try to extract the snapgene history to match the documentation by ShareYourCloning.
+and we will try to extract the snapgene history to match the documentation by OpenCloning.
 """
 
 # %%

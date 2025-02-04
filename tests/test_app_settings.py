@@ -3,7 +3,7 @@ import pytest
 from importlib import reload
 import os
 
-from shareyourcloning import app_settings
+from opencloning import app_settings
 
 
 class TestAppSettings(unittest.TestCase):

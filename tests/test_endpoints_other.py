@@ -4,9 +4,9 @@ from fastapi.testclient import TestClient
 import json
 from pydna.dseqrecord import Dseqrecord
 from pydna.parsers import parse
-import shareyourcloning.main as _main
-from shareyourcloning.dna_functions import format_sequence_genbank, read_dsrecord_from_json
-from shareyourcloning.pydantic_models import TextFileSequence, BaseCloningStrategy
+import opencloning.main as _main
+from opencloning.dna_functions import format_sequence_genbank, read_dsrecord_from_json
+from opencloning.pydantic_models import TextFileSequence, BaseCloningStrategy
 
 
 test_files = os.path.join(os.path.dirname(__file__), 'test_files')

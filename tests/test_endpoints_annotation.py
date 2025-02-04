@@ -9,11 +9,11 @@ import httpx
 from urllib.error import HTTPError
 import os
 
-from shareyourcloning.dna_functions import format_sequence_genbank, read_dsrecord_from_json, annotate_with_plannotate
-import shareyourcloning.app_settings as app_settings
-import shareyourcloning.endpoints.annotation as annotation_endpoints
-import shareyourcloning.main as _main
-from shareyourcloning.pydantic_models import (
+from opencloning.dna_functions import format_sequence_genbank, read_dsrecord_from_json, annotate_with_plannotate
+import opencloning.app_settings as app_settings
+import opencloning.endpoints.annotation as annotation_endpoints
+import opencloning.main as _main
+from opencloning.pydantic_models import (
     TextFileSequence,
     AnnotationSource,
 )

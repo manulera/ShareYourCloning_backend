@@ -2,7 +2,7 @@
 Some extra tests that are not covered by the main endpoint tests
 """
 
-import shareyourcloning.ncbi_requests as ncbi_requests
+import opencloning.ncbi_requests as ncbi_requests
 import pytest
 import respx
 from fastapi import HTTPException
