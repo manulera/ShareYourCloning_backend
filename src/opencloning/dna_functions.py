@@ -4,7 +4,7 @@ from Bio.Restriction.Restriction import RestrictionBatch
 from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from .pydantic_models import TextFileSequence, AddGeneIdSource, SequenceFileFormat
+from .pydantic_models import TextFileSequence, AddGeneIdSource, SequenceFileFormat, WekWikGeneIdSource
 from opencloning_linkml.datamodel import PlannotateAnnotationReport
 from pydna.parsers import parse as pydna_parse
 import requests
@@ -67,14 +67,19 @@ def get_invalid_enzyme_names(enzyme_names_list: list[str | None]) -> list[str]:
     return invalid_names
 
 
-async def get_sequences_from_gb_file_url(url: str) -> list[Dseqrecord]:
+async def get_sequences_from_file_url(
+    url: str, format: SequenceFileFormat = SequenceFileFormat('genbank')
+) -> list[Dseqrecord]:
     # TODO once pydna parse is fixed it should handle urls that point to non-gb files
     async with httpx.AsyncClient() as client:
         resp = await client.get(url)
 
     if resp.status_code != 200:
         raise HTTPError(url, 404, 'file requested from url not found', 'file requested from url not found', None)
-    return custom_file_parser(io.StringIO(resp.text), SequenceFileFormat('genbank'))
+    if format == SequenceFileFormat('snapgene'):
+        return custom_file_parser(io.BytesIO(resp.content), format)
+    else:
+        return custom_file_parser(io.StringIO(resp.text), format)
 
 
 def get_sequence_from_snagene_url(url: str) -> Dseqrecord:
@@ -100,7 +105,7 @@ async def request_from_addgene(source: AddGeneIdSource) -> tuple[Dseqrecord, Add
     plasmid_name = soup.find('span', class_='material-name').text.replace(' ', '_')
 
     if source.sequence_file_url:
-        dseqr = (await get_sequences_from_gb_file_url(source.sequence_file_url))[0]
+        dseqr = (await get_sequences_from_file_url(source.sequence_file_url))[0]
         dseqr.name = plasmid_name
         return dseqr, source
 
@@ -124,7 +129,7 @@ async def request_from_addgene(source: AddGeneIdSource) -> tuple[Dseqrecord, Add
                 new_source.addgene_sequence_type = _type
                 sources.append(new_source)
                 # There should be only one sequence
-                products.append((await get_sequences_from_gb_file_url(seq_url))[0])
+                products.append((await get_sequences_from_file_url(seq_url))[0])
 
     if len(products) == 0:
         # They may have only partial sequences
@@ -140,6 +145,22 @@ async def request_from_addgene(source: AddGeneIdSource) -> tuple[Dseqrecord, Add
     for p in products:
         p.name = plasmid_name
     return products[0], sources[0]
+
+
+async def request_from_wekwikgene(source: WekWikGeneIdSource) -> tuple[Dseqrecord, WekWikGeneIdSource]:
+    url = f'https://wekwikgene.wllsb.edu.cn/plasmids/{source.repository_id}'
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(url)
+    if resp.status_code == 404:
+        raise HTTPError(url, 404, 'invalid wekwikgene id', 'invalid wekwikgene id', None)
+    soup = BeautifulSoup(resp.content, 'html.parser')
+    # Get the sequence file URL from the page
+    sequence_file_url = soup.find('a', text=lambda x: x and 'Download Sequence' in x).get('href')
+    sequence_name = soup.find('h1', class_='plasmid__info__name').text.replace(' ', '_')
+    seq = (await get_sequences_from_file_url(sequence_file_url, 'snapgene'))[0]
+    seq.name = sequence_name
+    source.sequence_file_url = sequence_file_url
+    return seq, source
 
 
 def correct_name(dseq: Dseqrecord):
@@ -313,7 +334,7 @@ async def get_sequence_from_euroscarf_url(plasmid_id: str) -> Dseqrecord:
         msg = f'Could not retrieve plasmid details, double-check the euroscarf site: {url}'
         raise HTTPError(url, 503, msg, msg, None)
     genbank_url = f'http://www.euroscarf.de/{subpath.get("href")}'
-    return (await get_sequences_from_gb_file_url(genbank_url))[0]
+    return (await get_sequences_from_file_url(genbank_url))[0]
 
 
 async def annotate_with_plannotate(

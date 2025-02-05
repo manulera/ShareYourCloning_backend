@@ -14,6 +14,7 @@ from ..pydantic_models import (
     UploadedFileSource,
     RepositoryIdSource,
     AddGeneIdSource,
+    WekWikGeneIdSource,
     BenchlingUrlSource,
     SnapGenePlasmidSource,
     EuroscarfSource,
@@ -24,7 +25,8 @@ from ..pydantic_models import (
 from ..dna_functions import (
     format_sequence_genbank,
     request_from_addgene,
-    get_sequences_from_gb_file_url,
+    request_from_wekwikgene,
+    get_sequences_from_file_url,
     get_sequence_from_snagene_url,
     custom_file_parser,
     get_sequence_from_euroscarf_url,
@@ -174,14 +176,25 @@ def repository_id_http_error_handler(exception: HTTPError, source: RepositoryIdS
     response_model=create_model(
         'RepositoryIdResponse',
         sources=(
-            list[RepositoryIdSource] | list[AddGeneIdSource] | list[BenchlingUrlSource] | list[EuroscarfSource],
+            list[RepositoryIdSource]
+            | list[AddGeneIdSource]
+            | list[BenchlingUrlSource]
+            | list[EuroscarfSource]
+            | list[WekWikGeneIdSource],
             ...,
         ),
         sequences=(list[TextFileSequence], ...),
     ),
 )
 async def get_from_repository_id(
-    source: RepositoryIdSource | AddGeneIdSource | BenchlingUrlSource | SnapGenePlasmidSource | EuroscarfSource,
+    source: (
+        RepositoryIdSource
+        | AddGeneIdSource
+        | BenchlingUrlSource
+        | SnapGenePlasmidSource
+        | EuroscarfSource
+        | WekWikGeneIdSource
+    ),
 ):
     return RedirectResponse(f'/repository_id/{source.repository_name}', status_code=307)
 
@@ -216,7 +229,25 @@ async def get_from_repository_id_addgene(source: AddGeneIdSource):
         dseq, out_source = await request_from_addgene(source)
     except HTTPError as exception:
         repository_id_http_error_handler(exception, source)
+    except httpx.ConnectError:
+        raise HTTPException(504, 'unable to connect to AddGene')
 
+    return {'sequences': [format_sequence_genbank(dseq, source.output_name)], 'sources': [out_source]}
+
+
+@router.post(
+    '/repository_id/wekwikgene',
+    response_model=create_model(
+        'WekWikGeneIdResponse', sources=(list[WekWikGeneIdSource], ...), sequences=(list[TextFileSequence], ...)
+    ),
+)
+async def get_from_repository_id_wekwikgene(source: WekWikGeneIdSource):
+    try:
+        dseq, out_source = await request_from_wekwikgene(source)
+    except HTTPError as exception:
+        repository_id_http_error_handler(exception, source)
+    except httpx.ConnectError:
+        raise HTTPException(504, 'unable to connect to WekWikGene')
     return {'sequences': [format_sequence_genbank(dseq, source.output_name)], 'sources': [out_source]}
 
 
@@ -230,7 +261,7 @@ async def get_from_benchling_url(
     source: Annotated[BenchlingUrlSource, Body(openapi_examples=request_examples.benchling_url_examples)]
 ):
     try:
-        dseqs = await get_sequences_from_gb_file_url(source.repository_id)
+        dseqs = await get_sequences_from_file_url(source.repository_id)
         return {
             'sequences': [format_sequence_genbank(s, source.output_name) for s in dseqs],
             'sources': [source for s in dseqs],
@@ -292,7 +323,7 @@ async def get_from_repository_id_euroscarf(source: EuroscarfSource):
 )
 async def get_from_repository_id_igem(source: IGEMSource):
     try:
-        dseq = (await get_sequences_from_gb_file_url(source.sequence_file_url))[0]
+        dseq = (await get_sequences_from_file_url(source.sequence_file_url))[0]
         return {'sequences': [format_sequence_genbank(dseq, source.output_name)], 'sources': [source]}
     except HTTPError as exception:
         repository_id_http_error_handler(exception, source)
