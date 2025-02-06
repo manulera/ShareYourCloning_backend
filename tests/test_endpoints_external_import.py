@@ -20,6 +20,7 @@ from opencloning.pydantic_models import (
     EuroscarfSource,
     SnapGenePlasmidSource,
     IGEMSource,
+    WekWikGeneIdSource,
 )
 
 
@@ -423,6 +424,73 @@ class AddGeneTest(unittest.TestCase):
         payload = response.json()
         sequence: Dseqrecord = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
         self.assertIn('synthetic circular DNA', sequence.description)
+
+    @respx.mock
+    def test_addgene_down(self):
+        respx.get('https://www.addgene.org/39282/sequences/').mock(side_effect=httpx.ConnectError('Connection error'))
+        source = AddGeneIdSource(
+            id=1,
+            repository_name='addgene',
+            repository_id='39282',
+        )
+        response = client.post('/repository_id/addgene', json=source.model_dump())
+        self.assertEqual(response.status_code, 504)
+        self.assertIn('unable to connect to AddGene', response.json()['detail'])
+
+
+class WekWikGeneSourceTest(unittest.TestCase):
+
+    def test_valid_id(self):
+        source = WekWikGeneIdSource(
+            id=1,
+            repository_name='wekwikgene',
+            repository_id='0000304',
+        )
+        response = client.post('/repository_id/wekwikgene', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sequences']), 1)
+        self.assertEqual(len(payload['sources']), 1)
+        sequence: Dseqrecord = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertTrue(sequence.circular)
+        self.assertIn('RPL15', sequence.name)
+
+    def test_invalid_id(self):
+        source = WekWikGeneIdSource(
+            id=1,
+            repository_name='wekwikgene',
+            repository_id='999999999999999999999999999999',  # Non-existent ID
+        )
+        response = client.post('/repository_id/wekwikgene', json=source.model_dump())
+        self.assertEqual(response.status_code, 404)
+        self.assertIn('invalid wekwikgene id', response.json()['detail'])
+
+    @respx.mock
+    def test_wekwikgene_down(self):
+        source = WekWikGeneIdSource(
+            id=1,
+            repository_name='wekwikgene',
+            repository_id='0000304',
+        )
+
+        respx.get('https://wekwikgene.wllsb.edu.cn/plasmids/0000304').mock(
+            side_effect=httpx.ConnectError('Connection error')
+        )
+        response = client.post('/repository_id/wekwikgene', json=source.model_dump())
+        self.assertEqual(response.status_code, 504)
+        self.assertIn('unable to connect to WekWikGene', response.json()['detail'])
+
+    def test_redirect(self):
+        source = WekWikGeneIdSource(
+            id=1,
+            repository_name='wekwikgene',
+            repository_id='0000304',
+        )
+        response = client.post('/repository_id', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        sequence: Dseqrecord = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertIn('RPL15', sequence.name)
 
 
 class BenchlingUrlSourceTest(unittest.TestCase):
