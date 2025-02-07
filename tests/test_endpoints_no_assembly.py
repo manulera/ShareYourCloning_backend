@@ -313,6 +313,17 @@ class RestrictionTest(unittest.TestCase):
             self.assertEqual(len(sources), 1)
             self.assertEqual(resulting_sequences[0].seq.watson, fragment_sequences[i])
 
+    def test_enzymes_overlap(self):
+        dseq = Dseqrecord('AAGGTACCAA', circular=False)
+        json_seq = format_sequence_genbank(dseq)
+        json_seq.id = 1
+
+        source = RestrictionEnzymeDigestionSource(id=0)
+        data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
+        response = client.post('/restriction', json=data, params={'restriction_enzymes': ['Acc65I', 'BanI']})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('overlap', response.json()['detail'])
+
 
 class PolymeraseExtensionTest(unittest.TestCase):
 
