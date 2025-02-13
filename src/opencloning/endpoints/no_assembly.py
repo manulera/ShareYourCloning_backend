@@ -59,21 +59,24 @@ async def restriction(
     if len(enzymes_not_cutting):
         raise HTTPException(400, 'These enzymes do not cut: ' + ', '.join(enzymes_not_cutting))
 
-    # If the output is known
-    if source.left_edge is not None or source.right_edge is not None:
+    try:
+        # If the output is known
+        if source.left_edge is not None or source.right_edge is not None:
 
-        for i, s in enumerate(sources):
-            if s == source:
-                return {
-                    'sequences': [format_sequence_genbank(seqr.apply_cut(*cutsite_pairs[i]), source.output_name)],
-                    'sources': [s],
-                }
+            for i, s in enumerate(sources):
+                if s == source:
+                    return {
+                        'sequences': [format_sequence_genbank(seqr.apply_cut(*cutsite_pairs[i]), source.output_name)],
+                        'sources': [s],
+                    }
 
-        raise HTTPException(400, 'Invalid restriction enzyme pair.')
+            raise HTTPException(400, 'Invalid restriction enzyme pair.')
 
-    products = [format_sequence_genbank(seqr.apply_cut(*p), source.output_name) for p in cutsite_pairs]
+        products = [format_sequence_genbank(seqr.apply_cut(*p), source.output_name) for p in cutsite_pairs]
 
-    return {'sequences': products, 'sources': sources}
+        return {'sequences': products, 'sources': sources}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @router.post(

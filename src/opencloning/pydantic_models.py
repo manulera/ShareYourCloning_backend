@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, model_validator
-from typing import Optional, List
+from typing import Optional, List, Any
+
 from Bio.SeqFeature import (
     SeqFeature,
     Location,
@@ -56,6 +57,8 @@ class TextFileSequence(_TextFileSequence):
 
 class PrimerModel(_Primer):
     """Called PrimerModel not to be confused with the class from pydna."""
+
+    database_id: Optional[Any] = None
 
     def to_pydna_primer(self) -> _PydnaPrimer:
         """

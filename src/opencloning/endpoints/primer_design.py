@@ -153,7 +153,7 @@ async def primer_design_simple_pair(
     be chosen by order of appearance in the dictionary `ambiguous_dna_values` from `Bio.Data.IUPACData`.
     """
 
-    if not re.match(r'^[ACGT]+$', filler_bases.upper()):
+    if not re.match(r'^[ACGT]*$', filler_bases.upper()):
         raise HTTPException(400, 'Filler bases can only contain ACGT bases.')
 
     invalid_enzymes = get_invalid_enzyme_names([left_enzyme, right_enzyme])

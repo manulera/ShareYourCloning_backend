@@ -245,6 +245,18 @@ class RestrictionTest(unittest.TestCase):
             self.assertEqual(len(sources), 1)
             self.assertEqual(resulting_sequences[0].seq.watson, fragment_sequences[i])
 
+    def test_wrong_known_fragment(self):
+        dseq = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', circular=False)
+        json_seq = format_sequence_genbank(dseq)
+        json_seq.id = 1
+        # Submitting a wrong "known" fragment
+        wrong_edges = (None, RestrictionSequenceCut(cut_watson=3, overhang=-4, restriction_enzyme='BamHI'))
+        source = RestrictionEnzymeDigestionSource(id=0, left_edge=wrong_edges[0], right_edge=wrong_edges[1])
+        data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
+        response = client.post('/restriction', json=data)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Invalid restriction enzyme pair', response.json()['detail'])
+
     def test_circular_multiple_restriction(self):
 
         dseq = Dseqrecord('AAAGGATCCAAAAGATATCAAAAA', circular=True)
@@ -312,6 +324,17 @@ class RestrictionTest(unittest.TestCase):
             self.assertEqual(len(resulting_sequences), 1)
             self.assertEqual(len(sources), 1)
             self.assertEqual(resulting_sequences[0].seq.watson, fragment_sequences[i])
+
+    def test_enzymes_overlap(self):
+        dseq = Dseqrecord('AAGGTACCAA', circular=False)
+        json_seq = format_sequence_genbank(dseq)
+        json_seq.id = 1
+
+        source = RestrictionEnzymeDigestionSource(id=0)
+        data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
+        response = client.post('/restriction', json=data, params={'restriction_enzymes': ['Acc65I', 'BanI']})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('overlap', response.json()['detail'])
 
 
 class PolymeraseExtensionTest(unittest.TestCase):
