@@ -13,6 +13,7 @@ from ..pydantic_models import (
     RestrictionEnzymeDigestionSource,
     TextFileSequence,
     PolymeraseExtensionSource,
+    ReverseComplementSource,
 )
 from ..get_router import get_router
 
@@ -104,3 +105,21 @@ async def polymerase_extension(
     out_sequence = Dseqrecord(dseq.seq.fill_in(), features=dseq.features)
 
     return {'sequences': [format_sequence_genbank(out_sequence, source.output_name)], 'sources': [source]}
+
+
+@router.post(
+    '/reverse_complement',
+    response_model=create_model(
+        'ReverseComplementResponse',
+        sources=(list[ReverseComplementSource], ...),
+        sequences=(list[TextFileSequence], ...),
+    ),
+)
+async def reverse_complement(
+    source: ReverseComplementSource,
+    sequences: conlist(TextFileSequence, min_length=1, max_length=1),
+):
+    dseq = read_dsrecord_from_json(sequences[0])
+    out_sequence = dseq.reverse_complement()
+    seq_name = source.output_name if source.output_name is not None else dseq.name + '_rc'
+    return {'sequences': [format_sequence_genbank(out_sequence, seq_name)], 'sources': [source]}

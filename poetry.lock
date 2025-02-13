@@ -1148,15 +1148,15 @@ files = [
 
 [[package]]
 name = "opencloning-linkml"
-version = "0.2.1a0"
+version = "0.2.2a0"
 description = "A LinkML data model for OpenCloning"
 optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
 markers = "python_version == \"3.11\" or python_version >= \"3.12\""
 files = [
-    {file = "opencloning_linkml-0.2.1a0-py3-none-any.whl", hash = "sha256:e7dc340974870d7f8b171843a7b4e1b556f4ea863b45296bed75a9e59d7d5a2d"},
-    {file = "opencloning_linkml-0.2.1a0.tar.gz", hash = "sha256:f25e22f9b3da49b7782c138462510aabbaa7e0416232e06b00f588b14cdda352"},
+    {file = "opencloning_linkml-0.2.2a0-py3-none-any.whl", hash = "sha256:15228c5663193f089d5eb26b00e9d0b5df27e308bf95f9ef85c2b172c33764ae"},
+    {file = "opencloning_linkml-0.2.2a0.tar.gz", hash = "sha256:dd76a31d2f894e1d166ae7ca313aa2a9c3549f6d6e53dd6d048d7320c0682f26"},
 ]
 
 [package.dependencies]
@@ -2556,4 +2556,4 @@ test = ["pytest (>=6.0.0)", "setuptools (>=65)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "a37c2c219a456e6f69604df41e7ce536435f9ca5fd3a83fdb4a50c9a22b694cf"
+content-hash = "2125322eb35acce00c5d08804f3b100e1febc222f2d48e242524fe3fb2ce628a"

@@ -11,6 +11,7 @@ from opencloning.pydantic_models import (
     TextFileSequence,
     RestrictionSequenceCut,
     PolymeraseExtensionSource,
+    ReverseComplementSource,
 )
 
 
@@ -379,3 +380,30 @@ class PolymeraseExtensionTest(unittest.TestCase):
             data = {'source': source.model_dump(), 'sequences': [json_template.model_dump()]}
             response = client.post('/polymerase_extension', json=data)
             self.assertEqual(response.status_code, status_code)
+
+
+class ReverseComplementTest(unittest.TestCase):
+
+    def test_reverse_complement(self):
+        dseq = Dseqrecord('ACGTT', circular=False)
+        json_seq = format_sequence_genbank(dseq)
+        json_seq.id = 1
+
+        source = ReverseComplementSource(id=0)
+        data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
+        response = client.post('/reverse_complement', json=data)
+        payload = response.json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload['sequences'][0]['id'], 0)
+        self.assertEqual(payload['sources'][0], source.model_dump())
+        dseq_rc = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertEqual(dseq_rc.name, dseq.name + '_rc')
+        self.assertEqual(dseq_rc.reverse_complement().seq, dseq.seq)
+
+        # Also works renaming
+        source = ReverseComplementSource(id=0, output_name='test')
+        data = {'source': source.model_dump(), 'sequences': [json_seq.model_dump()]}
+        response = client.post('/reverse_complement', json=data)
+        payload = response.json()
+        dseq_rc = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertEqual(dseq_rc.name, 'test')

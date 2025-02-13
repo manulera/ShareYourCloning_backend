@@ -43,6 +43,7 @@ from opencloning_linkml.datamodel import (
     InFusionSource as _InFusionSource,
     AnnotationSource as _AnnotationSource,
     IGEMSource as _IGEMSource,
+    ReverseComplementSource as _ReverseComplementSource,
 )
 from pydna.utils import shift_location as _shift_location
 from .assembly2 import edge_representation2subfragment_representation, subfragment_representation2edge_representation
@@ -151,6 +152,10 @@ class GenomeCoordinatesSource(SourceCommonClass, _GenomeCoordinatesSource):
 
 
 class AnnotationSource(SourceCommonClass, _AnnotationSource):
+    pass
+
+
+class ReverseComplementSource(SourceCommonClass, _ReverseComplementSource):
     pass
 
 
