@@ -173,6 +173,8 @@ async def get_seva_plasmid(source: SEVASource) -> tuple[Dseqrecord, SEVASource]:
         seq = (await get_sequences_from_file_url(source.sequence_file_url))[0]
     else:
         raise HTTPError(source.sequence_file_url, 404, 'invalid SEVA url', 'invalid SEVA url', None)
+    if not seq.circular:
+        seq = seq.looped()
     return seq, source
 
 
@@ -252,7 +254,7 @@ class MyGenBankScanner(GenBankScanner):
     def _feed_first_line(self, consumer, line):
         # A regex for LOCUS       pKM265       4536 bp    DNA   circular  SYN        21-JUN-2013
         m = re.match(
-            r'(?i)LOCUS\s+(?P<name>\S+)\s+(?P<size>\d+ bp)\s+(?P<molecule_type>\S+)\s+(?P<topology>(?:circular|linear))?\s+.+(?P<date>\d+-\w+-\d+)',
+            r'(?i)LOCUS\s+(?P<name>\S+)\s+(?P<size>\d+ bp)\s+(?P<molecule_type>\S+)(?:\s+(?P<topology>circular|linear))?(?:\s+.+\s+)?(?P<date>\d+-\w+-\d+)?',
             line,
         )
         if m is None:
