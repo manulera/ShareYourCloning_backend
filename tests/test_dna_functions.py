@@ -119,6 +119,13 @@ class PermisiveParserWithApeTest(unittest.TestCase):
                 custom_file_parser(f, 'genbank')
 
 
+class PermissiveParserOtherTest(unittest.TestCase):
+    def test_permissive_parser_other(self):
+        with open(f'{test_files}/pSEVA427.gbk', 'r') as f:
+            plasmid = custom_file_parser(f, 'genbank')[0]
+            self.assertEqual(plasmid.circular, True)
+
+
 class MinorFunctionsTest(unittest.TestCase):
     def test_correct_name(self):
         file = f'{test_files}/addgene-plasmid-39296-sequence-49545.gbk'

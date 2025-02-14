@@ -4,7 +4,7 @@ from Bio.Restriction.Restriction import RestrictionBatch
 from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from .pydantic_models import TextFileSequence, AddGeneIdSource, SequenceFileFormat, WekWikGeneIdSource
+from .pydantic_models import TextFileSequence, AddGeneIdSource, SequenceFileFormat, WekWikGeneIdSource, SEVASource
 from opencloning_linkml.datamodel import PlannotateAnnotationReport
 from pydna.parsers import parse as pydna_parse
 import requests
@@ -19,6 +19,7 @@ import warnings
 from Bio.SeqIO.InsdcIO import GenBankIterator, GenBankScanner
 import re
 import httpx
+from .ncbi_requests import get_genbank_sequence
 
 
 def format_sequence_genbank(seq: Dseqrecord, seq_name: str = None) -> TextFileSequence:
@@ -163,6 +164,23 @@ async def request_from_wekwikgene(source: WekWikGeneIdSource) -> tuple[Dseqrecor
     return seq, source
 
 
+async def get_seva_plasmid(source: SEVASource) -> tuple[Dseqrecord, SEVASource]:
+    if 'ncbi.nlm.nih.gov/nuccore' in source.sequence_file_url:
+        genbank_id = source.sequence_file_url.split('/')[-1]
+        seq = await get_genbank_sequence(genbank_id)
+        seq.name = source.repository_id
+    elif source.sequence_file_url.startswith('https://seva-plasmids.com'):
+        seq_list = await get_sequences_from_file_url(source.sequence_file_url)
+        if len(seq_list) == 0:
+            raise ValueError('No sequences found in SEVA file')
+        seq = seq_list[0]
+    else:
+        raise HTTPError(source.sequence_file_url, 404, 'invalid SEVA url', 'invalid SEVA url', None)
+    if not seq.circular:
+        seq = seq.looped()
+    return seq, source
+
+
 def correct_name(dseq: Dseqrecord):
     # Can set the name from keyword if locus is set to Exported
     if dseq.name.lower() == 'exported' and dseq.locus.lower() == 'exported' and 'keywords' in dseq.annotations:
@@ -239,7 +257,7 @@ class MyGenBankScanner(GenBankScanner):
     def _feed_first_line(self, consumer, line):
         # A regex for LOCUS       pKM265       4536 bp    DNA   circular  SYN        21-JUN-2013
         m = re.match(
-            r'(?i)LOCUS\s+(?P<name>\S+)\s+(?P<size>\d+ bp)\s+(?P<molecule_type>\S+)\s+(?P<topology>(?:circular|linear))?\s+.+(?P<date>\d+-\w+-\d+)',
+            r'(?i)LOCUS\s+(?P<name>\S+)\s+(?P<size>\d+ bp)\s+(?P<molecule_type>\S+)(?:\s+(?P<topology>circular|linear))?(?:\s+.+\s+)?(?P<date>\d+-\w+-\d+)?',
             line,
         )
         if m is None:

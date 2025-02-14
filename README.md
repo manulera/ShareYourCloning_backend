@@ -126,6 +126,13 @@ pytest -v -ks
 poetry add git+https://github.com/BjornFJohansson/pydna#4fd760d075f77cceeb27969e017e04b42f6d0aa3
 ```
 
+When installing the last version, sometimes poetry may not be able to access the latest version
+and complain with `Could not find a matching version`, in that case you can do:
+
+```
+poetry cache clear pypi --all
+```
+
 ### Generating API stubs
 
 For the frontend, it may be useful to produce stubs (I use them for writing the tests). See how this is implemented

@@ -21,6 +21,7 @@ from ..pydantic_models import (
     IGEMSource,
     GenomeCoordinatesSource,
     SequenceFileFormat,
+    SEVASource,
 )
 from ..dna_functions import (
     format_sequence_genbank,
@@ -30,6 +31,7 @@ from ..dna_functions import (
     get_sequence_from_snagene_url,
     custom_file_parser,
     get_sequence_from_euroscarf_url,
+    get_seva_plasmid,
 )
 from .. import request_examples
 from .. import ncbi_requests
@@ -180,7 +182,8 @@ def repository_id_http_error_handler(exception: HTTPError, source: RepositoryIdS
             | list[AddGeneIdSource]
             | list[BenchlingUrlSource]
             | list[EuroscarfSource]
-            | list[WekWikGeneIdSource],
+            | list[WekWikGeneIdSource]
+            | list[SEVASource],
             ...,
         ),
         sequences=(list[TextFileSequence], ...),
@@ -194,6 +197,7 @@ async def get_from_repository_id(
         | SnapGenePlasmidSource
         | EuroscarfSource
         | WekWikGeneIdSource
+        | SEVASource
     ),
 ):
     return RedirectResponse(f'/repository_id/{source.repository_name}', status_code=307)
@@ -400,3 +404,24 @@ async def genome_coordinates(
         raise HTTPException(400, 'coordinates fall outside the sequence')
 
     return {'sequences': [format_sequence_genbank(seq, source.output_name)], 'sources': [source.model_copy()]}
+
+
+@router.post(
+    '/repository_id/seva',
+    response_model=create_model(
+        'SEVASource', sources=(list[SEVASource], ...), sequences=(list[TextFileSequence], ...)
+    ),
+)
+async def get_from_repository_id_seva(source: SEVASource):
+    """
+    Return the sequence from a plasmid in SEVA.
+    """
+    try:
+        dseq, source = await get_seva_plasmid(source)
+        return {'sequences': [format_sequence_genbank(dseq, source.output_name)], 'sources': [source]}
+    except HTTPError as exception:
+        repository_id_http_error_handler(exception, source)
+    except httpx.ConnectError:
+        raise HTTPException(504, 'unable to connect to SEVA')
+    except Exception as exception:
+        raise HTTPException(400, f'Error parsing file: {exception}')
