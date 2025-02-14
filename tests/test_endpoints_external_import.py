@@ -900,3 +900,18 @@ class SEVASourceTest(unittest.TestCase):
             self.assertEqual(response.status_code, 504)
             payload = response.json()
             self.assertEqual(payload['detail'], 'unable to connect to SEVA')
+
+    def test_redirect(self):
+        source = SEVASource(
+            id=0,
+            repository_id='pSEVA261',
+            repository_name='seva',
+            sequence_file_url='https://seva-plasmids.com/maps-canonical/maps-plasmids-SEVAs-canonical-versions-web-1-3-gbk/pSEVA261.gbk',
+        )
+        with open(f'{test_files}/ase1.gb', 'r') as f:
+            mock_seq = f.read()
+        # We mock to avoid extra requests
+        with respx.mock:
+            respx.get(source.sequence_file_url).mock(return_value=httpx.Response(200, text=mock_seq))
+            response = client.post('/repository_id', json=source.model_dump())
+            self.assertEqual(response.status_code, 200)

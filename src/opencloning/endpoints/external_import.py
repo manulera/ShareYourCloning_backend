@@ -182,7 +182,8 @@ def repository_id_http_error_handler(exception: HTTPError, source: RepositoryIdS
             | list[AddGeneIdSource]
             | list[BenchlingUrlSource]
             | list[EuroscarfSource]
-            | list[WekWikGeneIdSource],
+            | list[WekWikGeneIdSource]
+            | list[SEVASource],
             ...,
         ),
         sequences=(list[TextFileSequence], ...),
@@ -196,6 +197,7 @@ async def get_from_repository_id(
         | SnapGenePlasmidSource
         | EuroscarfSource
         | WekWikGeneIdSource
+        | SEVASource
     ),
 ):
     return RedirectResponse(f'/repository_id/{source.repository_name}', status_code=307)

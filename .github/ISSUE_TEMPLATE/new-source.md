@@ -21,6 +21,7 @@ You can do some of these tasks in parallel, specially if you need to wait for ap
     poetry add git+https://github.com/genestorian/OpenCloning_LinkML#<commit-id>
     ```
 * [ ] Implement the new source in a branch in this repository. You will need to add a new endpoint in `main.py` and a new class in `pydantic_models.py` that will handle the new source. You can use the existing sources as a template. Note that you can add extra validation or methods (see examples as well).
+* [ ] If the source is a repository_id, make sure to add the appropriate redirect in `endpoints/external_import.py`, endpoint `/repository_id`.
 * [ ] Write tests for the new source in `tests/test_endpoints.py`. You can use the existing tests as a template.
 * [ ] Once the tests pass, merge the PR of the new source in [OpenCloning_LinkML] and make a release of the `opencloning-linkml` package.
 * [ ] Update the dependency in the branch of this repository repository to the new version.
