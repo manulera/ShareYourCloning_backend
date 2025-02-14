@@ -170,7 +170,10 @@ async def get_seva_plasmid(source: SEVASource) -> tuple[Dseqrecord, SEVASource]:
         seq = await get_genbank_sequence(genbank_id)
         seq.name = source.repository_id
     elif source.sequence_file_url.startswith('https://seva-plasmids.com'):
-        seq = (await get_sequences_from_file_url(source.sequence_file_url))[0]
+        seq_list = await get_sequences_from_file_url(source.sequence_file_url)
+        if len(seq_list) == 0:
+            raise ValueError('No sequences found in SEVA file')
+        seq = seq_list[0]
     else:
         raise HTTPError(source.sequence_file_url, 404, 'invalid SEVA url', 'invalid SEVA url', None)
     if not seq.circular:

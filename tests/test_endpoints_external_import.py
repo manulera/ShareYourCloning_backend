@@ -901,6 +901,25 @@ class SEVASourceTest(unittest.TestCase):
             payload = response.json()
             self.assertEqual(payload['detail'], 'unable to connect to SEVA')
 
+        # Mock incorrect file
+        with respx.mock:
+            respx.get('https://seva-plasmids.com/dummy.gbk').mock(return_value=httpx.Response(200, text='dummy test'))
+            response = client.post('/repository_id/seva', json=source.model_dump())
+            self.assertEqual(response.status_code, 400)
+            payload = response.json()
+            self.assertIn('Error parsing file', payload['detail'])
+            self.assertIn('No sequences found in SEVA file', payload['detail'])
+
+        with respx.mock:
+            with open(f'{test_files}/ase1_body_error.gb', 'r') as f:
+                mock_seq = f.read()
+            respx.get('https://seva-plasmids.com/dummy.gbk').mock(return_value=httpx.Response(200, text=mock_seq))
+            response = client.post('/repository_id/seva', json=source.model_dump())
+            self.assertEqual(response.status_code, 400)
+            payload = response.json()
+            self.assertIn('Error parsing file', payload['detail'])
+            self.assertIn('Premature end of line', payload['detail'])
+
     def test_redirect(self):
         source = SEVASource(
             id=0,

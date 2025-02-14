@@ -424,4 +424,4 @@ async def get_from_repository_id_seva(source: SEVASource):
     except httpx.ConnectError:
         raise HTTPException(504, 'unable to connect to SEVA')
     except Exception as exception:
-        raise HTTPException(400, f'{exception}')
+        raise HTTPException(400, f'Error parsing file: {exception}')
