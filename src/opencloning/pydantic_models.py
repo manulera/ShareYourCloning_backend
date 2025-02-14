@@ -44,6 +44,7 @@ from opencloning_linkml.datamodel import (
     AnnotationSource as _AnnotationSource,
     IGEMSource as _IGEMSource,
     ReverseComplementSource as _ReverseComplementSource,
+    SEVASource as _SEVASource,
 )
 from pydna.utils import shift_location as _shift_location
 from .assembly2 import edge_representation2subfragment_representation, subfragment_representation2edge_representation
@@ -145,6 +146,10 @@ class IGEMSource(SourceCommonClass, _IGEMSource):
         file_name = self.sequence_file_url.split('/')[-1]
         assert file_name.endswith('.gb'), 'The sequence file must be a GenBank file'
         return self
+
+
+class SEVASource(SourceCommonClass, _SEVASource):
+    pass
 
 
 class GenomeCoordinatesSource(SourceCommonClass, _GenomeCoordinatesSource):

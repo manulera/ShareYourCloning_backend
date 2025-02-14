@@ -2,7 +2,7 @@ import requests
 from fastapi import HTTPException
 from pydna.parsers import parse as pydna_parse
 from httpx import AsyncClient, Response
-
+from pydna.dseqrecord import Dseqrecord
 from .app_settings import settings
 
 headers = None if settings.NCBI_API_KEY is None else {'api_key': settings.NCBI_API_KEY}
@@ -92,7 +92,7 @@ async def get_sequence_length_from_sequence_accession(sequence_accession: str) -
     return data['result'][sequence_id]['slen']
 
 
-async def get_genbank_sequence(sequence_accession, start=None, end=None, strand=None):
+async def get_genbank_sequence(sequence_accession, start=None, end=None, strand=None) -> Dseqrecord:
     gb_strand = 1 if strand == 1 or strand is None else 2
     url = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi'
     params = {

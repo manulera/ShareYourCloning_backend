@@ -21,6 +21,7 @@ from opencloning.pydantic_models import (
     SnapGenePlasmidSource,
     IGEMSource,
     WekWikGeneIdSource,
+    SEVASource,
 )
 
 
@@ -827,3 +828,75 @@ class GenomeRegionTest(unittest.TestCase):
         viral_source.end = 100004
         response = client.post('/genome_coordinates', json=viral_source.model_dump())
         self.assertStatusCode(response.status_code, 400)
+
+
+class SEVASourceTest(unittest.TestCase):
+    def test_seva_url(self):
+        source = SEVASource(
+            id=0,
+            repository_id='pSEVA261',
+            repository_name='seva',
+            sequence_file_url='https://seva-plasmids.com/maps-canonical/maps-plasmids-SEVAs-canonical-versions-web-1-3-gbk/pSEVA261.gbk',
+        )
+        response = client.post('/repository_id/seva', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sequences']), 1)
+        self.assertEqual(len(payload['sources']), 1)
+        out_source = payload['sources'][0]
+        self.assertEqual(out_source, source.model_dump())
+        seq = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertEqual(seq.name, 'pSEVA261')
+
+    def test_ncbi_url(self):
+        source = SEVASource(
+            id=0,
+            repository_id='pSEVA2214',
+            repository_name='seva',
+            sequence_file_url='https://www.ncbi.nlm.nih.gov/nuccore/MH650998',
+        )
+        response = client.post('/repository_id/seva', json=source.model_dump())
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['sequences']), 1)
+        self.assertEqual(len(payload['sources']), 1)
+        out_source = payload['sources'][0]
+        self.assertEqual(out_source, source.model_dump())
+        seq = read_dsrecord_from_json(TextFileSequence.model_validate(payload['sequences'][0]))
+        self.assertEqual(seq.name, 'pSEVA2214')
+
+    def test_errors(self):
+        source = SEVASource(
+            id=0,
+            repository_id='pSEVA261',
+            repository_name='seva',
+            sequence_file_url='https://seva-plasmids.com/dummy.gbk',
+        )
+
+        response = client.post('/repository_id/seva', json=source.model_dump())
+        self.assertEqual(response.status_code, 404)
+
+        source_dict = source.model_dump()
+        source_dict['repository_id'] = 'hello'
+        response = client.post('/repository_id/seva', json=source_dict)
+        self.assertEqual(response.status_code, 422)
+
+        source_dict = source.model_dump()
+        source_dict['sequence_file_url'] = 'hello'
+        response = client.post('/repository_id/seva', json=source_dict)
+        self.assertEqual(response.status_code, 422)
+
+        source_dict = source.model_dump()
+        source_dict['sequence_file_url'] = 'https://hello.com'
+        response = client.post('/repository_id/seva', json=source_dict)
+        self.assertEqual(response.status_code, 404)
+        payload = response.json()
+        self.assertIn('invalid SEVA url', payload['detail'])
+
+        # Mock connection error
+        with respx.mock:
+            respx.get('https://seva-plasmids.com/dummy.gbk').mock(side_effect=httpx.ConnectError)
+            response = client.post('/repository_id/seva', json=source.model_dump())
+            self.assertEqual(response.status_code, 504)
+            payload = response.json()
+            self.assertEqual(payload['detail'], 'unable to connect to SEVA')

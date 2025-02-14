@@ -4,7 +4,7 @@ from Bio.Restriction.Restriction import RestrictionBatch
 from Bio.Seq import reverse_complement
 from pydna.dseqrecord import Dseqrecord
 from pydna.dseq import Dseq
-from .pydantic_models import TextFileSequence, AddGeneIdSource, SequenceFileFormat, WekWikGeneIdSource
+from .pydantic_models import TextFileSequence, AddGeneIdSource, SequenceFileFormat, WekWikGeneIdSource, SEVASource
 from opencloning_linkml.datamodel import PlannotateAnnotationReport
 from pydna.parsers import parse as pydna_parse
 import requests
@@ -19,6 +19,7 @@ import warnings
 from Bio.SeqIO.InsdcIO import GenBankIterator, GenBankScanner
 import re
 import httpx
+from .ncbi_requests import get_genbank_sequence
 
 
 def format_sequence_genbank(seq: Dseqrecord, seq_name: str = None) -> TextFileSequence:
@@ -160,6 +161,18 @@ async def request_from_wekwikgene(source: WekWikGeneIdSource) -> tuple[Dseqrecor
     seq = (await get_sequences_from_file_url(sequence_file_url, 'snapgene'))[0]
     seq.name = sequence_name
     source.sequence_file_url = sequence_file_url
+    return seq, source
+
+
+async def get_seva_plasmid(source: SEVASource) -> tuple[Dseqrecord, SEVASource]:
+    if 'ncbi.nlm.nih.gov/nuccore' in source.sequence_file_url:
+        genbank_id = source.sequence_file_url.split('/')[-1]
+        seq = await get_genbank_sequence(genbank_id)
+        seq.name = source.repository_id
+    elif source.sequence_file_url.startswith('https://seva-plasmids.com'):
+        seq = (await get_sequences_from_file_url(source.sequence_file_url))[0]
+    else:
+        raise HTTPError(source.sequence_file_url, 404, 'invalid SEVA url', 'invalid SEVA url', None)
     return seq, source
 
 
