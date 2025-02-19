@@ -94,14 +94,16 @@ def permutate_trace(reference: str, sanger_trace: str) -> str:
     # We include traces in both directions, since MARS does not handle
     # reverse complements - see https://github.com/lorrainea/MARS/issues/17#issuecomment-2598314356
     len_diff = len(reference) - len(sanger_trace)
-    if len_diff < 0:
-        raise ValueError('Sanger trace is longer than the reference')
+    padded_trace = sanger_trace
+    # TODO: Better way of discriminating between Sanger / full sequence sequencing
+    if len_diff > 0 and (len(sanger_trace) / len(reference) < 0.8):
+        padded_trace = sanger_trace + len_diff * 'N'
 
     with tempfile.TemporaryDirectory() as tmpdir:
         input_path = os.path.join(tmpdir, 'input.fa')
         with open(input_path, 'w') as f:
             f.write(f">ref\n{reference}\n")
-            f.write(f">trace\n{sanger_trace + len_diff * 'N'}\n")
+            f.write(f">trace\n{padded_trace}\n")
 
         output_path = os.path.join(tmpdir, 'output.fa')
         result = subprocess.run(['mars', '-a', 'DNA', '-m', '0', '-i', input_path, '-o', output_path, '-q', '5', '-l', '20', '-P', '1'], capture_output=True, text=True)  # fmt: skip
